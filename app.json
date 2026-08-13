@@ -1,0 +1,71 @@
+{
+  "expo": {
+    "name": "유통기한 지킴이",
+    "slug": "expiry-keeper",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "expirykeeper",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "icon": "./assets/expo.icon",
+      "supportsTablet": false,
+      "bundleIdentifier": "com.expirykeeper.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "바코드 스캔과 상품 사진 촬영을 위해 카메라를 사용합니다."
+      }
+    },
+    "android": {
+      "package": "com.shlab.expirykeeper",
+      "adaptiveIcon": {
+        "backgroundColor": "#FFF7EB",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": ["android.permission.CAMERA"]
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#FFFFFF",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 76
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "바코드 스캔을 위해 카메라 접근 권한이 필요합니다.",
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "상품 사진 촬영을 위해 카메라 접근 권한이 필요합니다.",
+          "photosPermission": "상품 사진 선택을 위해 앨범 접근 권한이 필요합니다."
+        }
+      ],
+      "expo-notifications"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "b559d7fd-54eb-482b-947c-de0e717338fc"
+      }
+    },
+    "owner": "ef0070"
+  }
+}
