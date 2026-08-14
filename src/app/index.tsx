@@ -32,7 +32,7 @@ export default function Dashboard() {
   const mode = useAppMode();
   const [products, setProducts] = useState<Product[]>([]);
   const [query, setQuery] = useState('');
-  const [category, setCategory] = useState<string | null>(null);
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
@@ -58,7 +58,8 @@ export default function Dashboard() {
   const sections = useMemo(() => {
     const q = query.trim().toLowerCase();
     const filtered = products.filter((p) => {
-      if (category && p.category !== category) return false;
+      if (selectedCategories.size > 0 && (!p.category || !selectedCategories.has(p.category)))
+        return false;
       if (!q) return true;
       return (
         p.name.toLowerCase().includes(q) ||
@@ -78,7 +79,16 @@ export default function Dashboard() {
       title: SECTION_TITLES[k],
       data: grouped.get(k)!.sort((a, b) => a.expiryDate.localeCompare(b.expiryDate)),
     }));
-  }, [products, query, category]);
+  }, [products, query, selectedCategories]);
+
+  const toggleCategory = (c: string) => {
+    setSelectedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(c)) next.delete(c);
+      else next.add(c);
+      return next;
+    });
+  };
 
   const confirmDelete = (p: Product) => {
     Alert.alert('상품 삭제', `'${p.name}' 을(를) 삭제할까요?\n(통계에도 남지 않습니다)`, [
@@ -168,9 +178,18 @@ export default function Dashboard() {
           className="mt-2.5 max-h-10"
           contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
         >
-          <Chip label="전체" active={category === null} onPress={() => setCategory(null)} />
+          <Chip
+            label="전체"
+            active={selectedCategories.size === 0}
+            onPress={() => setSelectedCategories(new Set())}
+          />
           {categories.map((c) => (
-            <Chip key={c} label={c} active={category === c} onPress={() => setCategory(c)} />
+            <Chip
+              key={c}
+              label={c}
+              active={selectedCategories.has(c)}
+              onPress={() => toggleCategory(c)}
+            />
           ))}
         </ScrollView>
       ) : null}
