@@ -5,6 +5,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { LogBox } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useAppMode } from '@/lib/settings';
 import { isCloudMode, supabase } from '@/lib/supabase';
 
@@ -31,7 +32,7 @@ export default function RootLayout() {
   const authed = !isCloudMode || !!session;
 
   return (
-    <>
+    <SafeAreaProvider>
       <StatusBar style="dark" />
       <Stack
         screenOptions={{
@@ -59,6 +60,6 @@ export default function RootLayout() {
           <Stack.Screen name="login" options={{ headerShown: false }} />
         </Stack.Protected>
       </Stack>
-    </>
+    </SafeAreaProvider>
   );
 }

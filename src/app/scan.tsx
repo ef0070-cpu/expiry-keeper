@@ -124,7 +124,10 @@ export default function Scan() {
       </View>
 
       {/* 직접 입력 */}
-      <View className="absolute w-full items-center" style={{ bottom: insets.bottom + 40 }}>
+      <View
+        className="absolute w-full items-center"
+        style={{ bottom: Math.max(insets.bottom, 48) + 24 }}
+      >
         <Pressable
           onPress={() => router.replace('/product-form')}
           className="rounded-full border border-paper/60 bg-ink/50 px-6 py-3 active:opacity-70"

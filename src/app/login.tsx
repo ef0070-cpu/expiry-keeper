@@ -71,9 +71,18 @@ export default function Login() {
         await completeLogin(result.url, PROVIDER_LABEL[provider]);
         return;
       }
-      // dismiss/cancel이어도 딥링크로 세션만 끊긴 경우일 수 있다.
-      // 이때는 위 useEffect가 딥링크를 받아 이어서 처리하므로 오류로 취급하지 않는다.
-      setBusy(null);
+      // dismiss/cancel이어도 딥링크로 세션만 끊겨 뒤늦게 도착하는 경우가 있어
+      // 잠시 기다렸다가, 그래도 세션이 안 생기면 조용히 버튼만 풀지 않고 알려준다.
+      setTimeout(async () => {
+        const { data: sessionData } = await supabase.auth.getSession();
+        setBusy(null);
+        if (!sessionData.session) {
+          Alert.alert(
+            `${PROVIDER_LABEL[provider]} 로그인 실패`,
+            '로그인 창이 완료되지 않고 닫혔습니다. 기본 브라우저가 Chrome인지 확인한 뒤 다시 시도해주세요.',
+          );
+        }
+      }, 1500);
     } catch (e) {
       Alert.alert(
         `${PROVIDER_LABEL[provider]} 로그인 오류`,
