@@ -89,8 +89,13 @@ Deno.serve(async (req) => {
       lookupOpenFoodFacts(barcode),
     ]);
 
-    const name = kr.name ?? naver.name ?? off.name;
-    let imageUrl = naver.imageUrl ?? off.imageUrl;
+    // name과 imageUrl은 항상 같은 소스에서 나온 한 쌍으로만 채택한다 — 소스를 섞으면
+    // (예: 식품안전나라 이름 + 네이버 검색 이미지) 서로 다른 상품이 매칭될 수 있다.
+    // 식품안전나라는 바코드로 직접 조회해 이름 정확도가 가장 높지만 이미지가 없으므로,
+    // 이름이 확정된 뒤 그 이름으로 별도 이미지 검색을 한다.
+    const best = kr.name ? kr : naver.name ? naver : off;
+    const name = best.name;
+    let imageUrl = best.imageUrl;
     if (name && !imageUrl) {
       imageUrl = await searchProductImage(name);
     }
