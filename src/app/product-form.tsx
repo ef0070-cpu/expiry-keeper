@@ -36,7 +36,7 @@ export default function ProductForm() {
   // 새 상품이면 현재 연도를 미리 채워 월·일만 입력하면 되게 한다
   const [expiryDate, setExpiryDate] = useState(params.id ? '' : String(new Date().getFullYear()));
   const [quantity, setQuantity] = useState(1);
-  const [category, setCategory] = useState<string | null>(null);
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
   const [memo, setMemo] = useState('');
   const [createdAt, setCreatedAt] = useState<string | null>(null);
   // 수정 시 기존 소진/폐기 상태를 잃지 않도록 함께 보관
@@ -47,14 +47,14 @@ export default function ProductForm() {
   const [busy, setBusy] = useState(false);
   const [searching, setSearching] = useState(false);
 
-  const barcode = params.barcode ?? null;
+  const [barcode, setBarcode] = useState<string | null>(params.barcode ?? null);
 
   useEffect(() => {
     // 기존 카테고리 목록 수집
     listProducts()
       .then((items) => {
         const set = new Set<string>();
-        items.forEach((p) => p.category && set.add(p.category));
+        items.forEach((p) => p.categories.forEach((c) => set.add(c)));
         setExistingCategories([...set].sort());
       })
       .catch(() => {});
@@ -65,9 +65,10 @@ export default function ProductForm() {
         if (!p) return;
         setName(p.name);
         setImageUri(p.imageUri);
+        setBarcode(p.barcode);
         setExpiryDate(p.expiryDate);
         setQuantity(p.quantity);
-        setCategory(p.category);
+        setSelectedCategories(new Set(p.categories));
         setMemo(p.memo ?? '');
         setCreatedAt(p.createdAt);
         setStatus(p.status);
@@ -78,9 +79,18 @@ export default function ProductForm() {
 
   const categories = useMemo(() => {
     const set = new Set(existingCategories);
-    if (category) set.add(category);
+    selectedCategories.forEach((c) => set.add(c));
     return [...set].sort();
-  }, [existingCategories, category]);
+  }, [existingCategories, selectedCategories]);
+
+  const toggleCategory = (c: string) => {
+    setSelectedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(c)) next.delete(c);
+      else next.add(c);
+      return next;
+    });
+  };
 
   const pickImage = () => {
     Alert.alert('상품 사진', '사진을 어떻게 추가할까요?', [
@@ -147,7 +157,7 @@ export default function ProductForm() {
         name: name.trim(),
         imageUri,
         expiryDate,
-        category,
+        categories: [...selectedCategories],
         memo: memo.trim() || null,
         quantity,
         status,
@@ -283,13 +293,15 @@ export default function ProductForm() {
               {categories.map((c) => (
                 <Pressable
                   key={c}
-                  onPress={() => setCategory(category === c ? null : c)}
+                  onPress={() => toggleCategory(c)}
                   className={`rounded-full border px-3.5 py-1.5 ${
-                    category === c ? 'border-primary bg-primary' : 'border-line bg-paper'
+                    selectedCategories.has(c) ? 'border-primary bg-primary' : 'border-line bg-paper'
                   }`}
                 >
                   <Text
-                    className={`text-sm ${category === c ? 'text-paper font-bold' : 'text-muted'}`}
+                    className={`text-sm ${
+                      selectedCategories.has(c) ? 'text-paper font-bold' : 'text-muted'
+                    }`}
                   >
                     {c}
                   </Text>
@@ -301,7 +313,7 @@ export default function ProductForm() {
             <TextInput
               className="text-ink flex-1 rounded-xl border border-line bg-paper px-3 py-2 text-sm"
               placeholder={
-                mode === 'home' ? '새 카테고리 입력 (예: 냉장실)' : '새 카테고리 입력 (예: 00동 1호점)'
+                mode === 'home' ? '새 카테고리 입력 (예: 냉장실)' : '새 카테고리 입력 (예: 1호매장, 2호매장)'
               }
               placeholderTextColor="#BBBBBB"
               value={newCategory}
@@ -311,7 +323,7 @@ export default function ProductForm() {
               onPress={() => {
                 const v = newCategory.trim();
                 if (!v) return;
-                setCategory(v);
+                setSelectedCategories((prev) => new Set(prev).add(v));
                 setExistingCategories((prev) => (prev.includes(v) ? prev : [...prev, v]));
                 setNewCategory('');
               }}

@@ -42,7 +42,7 @@ create table public.products (
   name text not null,
   image_uri text,
   expiry_date date not null,
-  category text,
+  categories text[] not null default '{}',
   memo text,
   quantity integer not null default 1,
   status text not null default 'active' check (status in ('active', 'consumed', 'discarded')),

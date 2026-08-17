@@ -51,14 +51,14 @@ export default function Dashboard() {
 
   const categories = useMemo(() => {
     const set = new Set<string>();
-    products.forEach((p) => p.category && set.add(p.category));
+    products.forEach((p) => p.categories.forEach((c) => set.add(c)));
     return [...set].sort();
   }, [products]);
 
   const sections = useMemo(() => {
     const q = query.trim().toLowerCase();
     const filtered = products.filter((p) => {
-      if (selectedCategories.size > 0 && (!p.category || !selectedCategories.has(p.category)))
+      if (selectedCategories.size > 0 && !p.categories.some((c) => selectedCategories.has(c)))
         return false;
       if (!q) return true;
       return (

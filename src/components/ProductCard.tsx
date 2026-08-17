@@ -37,12 +37,12 @@ export default function ProductCard({ product, onPress, onLongPress }: Props) {
           {product.name}
         </Text>
         <Text className="text-muted mt-0.5 text-sm">{product.expiryDate}</Text>
-        <View className="mt-1 flex-row items-center">
-          {product.category ? (
-            <View className="rounded border border-line bg-bg px-1.5 py-0.5">
-              <Text className="text-muted text-xs">{product.category}</Text>
+        <View className="mt-1 flex-row flex-wrap items-center" style={{ gap: 4 }}>
+          {product.categories.map((c) => (
+            <View key={c} className="rounded border border-line bg-bg px-1.5 py-0.5">
+              <Text className="text-muted text-xs">{c}</Text>
             </View>
-          ) : null}
+          ))}
           {product.quantity > 1 ? (
             <Text className="text-muted ml-2 text-xs">{product.quantity}개</Text>
           ) : null}

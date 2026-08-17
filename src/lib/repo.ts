@@ -12,12 +12,15 @@ export function newId(): string {
 
 async function localList(): Promise<Product[]> {
   const raw = await AsyncStorage.getItem(LOCAL_KEY);
-  const items = raw ? (JSON.parse(raw) as Product[]) : [];
-  // 상태 필드 추가 전에 저장된 상품은 '보관 중'으로 취급
+  type LegacyProduct = Product & { category?: string | null; categories?: string[] };
+  const items = raw ? (JSON.parse(raw) as LegacyProduct[]) : [];
+  // 상태 필드 추가 전 상품은 '보관 중'으로, 카테고리가 단일값(category)이던 상품은
+  // 배열(categories)로 변환해 취급한다.
   return items.map((p) => ({
     ...p,
     status: p.status ?? ('active' as ProductStatus),
     resolvedAt: p.resolvedAt ?? null,
+    categories: p.categories ?? (p.category ? [p.category] : []),
   }));
 }
 
@@ -33,7 +36,7 @@ interface ProductRow {
   name: string;
   image_uri: string | null;
   expiry_date: string;
-  category: string | null;
+  categories: string[] | null;
   memo: string | null;
   quantity: number;
   status: ProductStatus;
@@ -48,7 +51,7 @@ function fromRow(r: ProductRow): Product {
     name: r.name,
     imageUri: r.image_uri,
     expiryDate: r.expiry_date,
-    category: r.category,
+    categories: r.categories ?? [],
     memo: r.memo,
     quantity: r.quantity,
     status: r.status ?? 'active',
@@ -64,7 +67,7 @@ function toRow(p: Product): ProductRow {
     name: p.name,
     image_uri: p.imageUri,
     expiry_date: p.expiryDate,
-    category: p.category,
+    categories: p.categories,
     memo: p.memo,
     quantity: p.quantity,
     status: p.status,

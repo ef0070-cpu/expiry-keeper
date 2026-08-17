@@ -12,7 +12,7 @@ export interface Product {
   name: string;
   imageUri: string | null;
   expiryDate: string; // YYYY-MM-DD
-  category: string | null;
+  categories: string[];
   memo: string | null;
   quantity: number;
   status: ProductStatus;
