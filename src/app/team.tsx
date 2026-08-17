@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -24,6 +24,8 @@ import {
 import { Team, TeamMember } from '@/lib/types';
 
 export default function TeamScreen() {
+  const router = useRouter();
+  const { code: inviteCode } = useLocalSearchParams<{ code?: string }>();
   const [loading, setLoading] = useState(true);
   const [team, setTeam] = useState<Team | null>(null);
   const [members, setMembers] = useState<TeamMember[]>([]);
@@ -31,6 +33,11 @@ export default function TeamScreen() {
   const [teamName, setTeamName] = useState('');
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
+
+  // 초대 링크(expirykeeper://team?code=XXXXXX)로 열린 경우 코드를 자동으로 채워준다
+  useEffect(() => {
+    if (inviteCode) setCode(inviteCode.toUpperCase());
+  }, [inviteCode]);
 
   const load = useCallback(async () => {
     if (!isCloudMode) {
@@ -176,6 +183,14 @@ export default function TeamScreen() {
             {team.inviteCode}
           </Text>
         </View>
+
+        <Pressable
+          onPress={() => router.push('/team-invite')}
+          className="mt-3 flex-row items-center justify-center rounded-xl bg-primary py-3.5 active:opacity-80"
+        >
+          <MaterialCommunityIcons name="account-plus-outline" size={18} color="#FFFFFF" />
+          <Text className="text-paper ml-2 text-sm font-bold">멤버 초대하기</Text>
+        </Pressable>
 
         <Text className="text-ink mb-2 mt-6 text-sm font-bold">멤버 {members.length}명</Text>
         <View className="rounded-xl border border-line bg-paper">

@@ -54,7 +54,13 @@
           "photosPermission": "상품 사진 선택을 위해 앨범 접근 권한이 필요합니다."
         }
       ],
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "연락처 친구를 초대하기 위해 연락처 접근 권한이 필요합니다."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
