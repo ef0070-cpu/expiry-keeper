@@ -4,6 +4,7 @@ import {
   Alert,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -13,6 +14,7 @@ import {
 } from 'react-native';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
+import { WebView } from 'react-native-webview';
 import { supabase } from '@/lib/supabase';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -39,6 +41,7 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
   const [emailBusy, setEmailBusy] = useState(false);
+  const [webViewSession, setWebViewSession] = useState<{ url: string; redirectTo: string } | null>(null);
   const incomingUrl = Linking.useURL();
   const handledUrls = useRef(new Set<string>());
 
@@ -89,6 +92,17 @@ export default function Login() {
       });
       if (error) throw error;
       console.log('[login] auth url:', data.url);
+
+      // 카카오는 카카오톡이 설치된 기기에서 외부 브라우저(Custom Tabs)로 열면
+      // 안드로이드가 카카오 로그인 주소를 App Link로 가로채 카카오톡 앱으로 전환시키고,
+      // 그 순간 원래 열려있던 인증 세션이 끊겨 dismiss로 닫혀버린다.
+      // WebView는 App Link 가로채기 대상이 아니라 이 문제를 피할 수 있다.
+      // 구글은 반대로 WebView를 통한 로그인을 정책상 차단하므로 외부 브라우저를 그대로 쓴다.
+      if (provider === 'kakao') {
+        setWebViewSession({ url: data.url, redirectTo });
+        return;
+      }
+
       const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
       console.log('[login] browser result:', JSON.stringify(result));
       if (result.type === 'success') {
@@ -146,8 +160,25 @@ export default function Login() {
     }
   };
 
+  const handleWebViewNavigation = (url: string) => {
+    console.log('[login] webview nav:', url);
+    if (webViewSession && url.startsWith(webViewSession.redirectTo)) {
+      setWebViewSession(null);
+      completeLogin(url, 'kakao');
+      return false;
+    }
+    // 카카오 페이지 안의 "카카오톡으로 로그인" 등 커스텀 스킴 링크를 눌러도
+    // 앱 전환이 일어나지 않도록 http(s)가 아닌 이동은 모두 막는다.
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      console.log('[login] webview blocked non-http scheme:', url);
+      return false;
+    }
+    return true;
+  };
+
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
+    <>
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1">
       <ScrollView
         contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}
         keyboardShouldPersistTaps="handled"
@@ -241,5 +272,35 @@ export default function Login() {
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
+
+    <Modal visible={webViewSession !== null} animationType="slide" onRequestClose={() => { setWebViewSession(null); setBusy(null); }}>
+      <View className="flex-1 bg-paper">
+        <View className="flex-row items-center justify-between border-b border-line px-4 py-3 pt-14">
+          <Text className="text-ink text-base font-bold">카카오 로그인</Text>
+          <Pressable onPress={() => { setWebViewSession(null); setBusy(null); }} className="px-2 py-1">
+            <Text className="text-muted text-sm">닫기</Text>
+          </Pressable>
+        </View>
+        {webViewSession && (
+          <WebView
+            key={webViewSession.url}
+            incognito
+            source={{ uri: webViewSession.url }}
+            onShouldStartLoadWithRequest={(request) => handleWebViewNavigation(request.url)}
+            onNavigationStateChange={(navState) => handleWebViewNavigation(navState.url)}
+            onLoadStart={(e) => console.log('[login] webview onLoadStart:', e.nativeEvent.url)}
+            onError={(e) => console.log('[login] webview onError:', JSON.stringify(e.nativeEvent))}
+            onHttpError={(e) => console.log('[login] webview onHttpError:', JSON.stringify(e.nativeEvent))}
+            startInLoadingState
+            renderLoading={() => (
+              <View className="absolute inset-0 items-center justify-center">
+                <ActivityIndicator color="#191919" />
+              </View>
+            )}
+          />
+        )}
+      </View>
+    </Modal>
+    </>
   );
 }
