@@ -50,6 +50,7 @@ export default function RootLayout() {
           <Stack.Screen name="team-invite" options={{ title: '멤버 초대' }} />
           <Stack.Screen name="scan" options={{ title: '바코드 스캔' }} />
           <Stack.Screen name="product-form" options={{ title: '상품 등록' }} />
+          <Stack.Screen name="product-duplicates" options={{ title: '이미 등록된 상품' }} />
           <Stack.Screen name="stats" options={{ title: '소진·폐기 통계' }} />
           <Stack.Screen name="recipes" options={{ title: '레시피 추천' }} />
           <Stack.Screen name="settings" options={{ title: '설정' }} />
