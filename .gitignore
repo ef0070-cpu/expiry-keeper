@@ -49,3 +49,6 @@ example
 # generated native folders
 /ios
 /android
+
+# superpowers subagent-driven-development scratch workspace
+.superpowers/
