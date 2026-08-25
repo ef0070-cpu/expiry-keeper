@@ -1,7 +1,8 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Stack, router, useFocusEffect } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Pressable,
   RefreshControl,
@@ -14,11 +15,12 @@ import {
 import Fab from '@/components/Fab';
 import ProductCard from '@/components/ProductCard';
 import SummaryHeader from '@/components/SummaryHeader';
+import { lookupBarcode } from '@/lib/barcode-lookup';
 import { SECTION_ORDER, SECTION_TITLES, SectionKey, daysUntil, sectionOf } from '@/lib/dates';
 import { cancelExpiryAlerts } from '@/lib/notifications';
 import { deleteProduct, listProducts, resolveProduct } from '@/lib/repo';
 import { useAppMode } from '@/lib/settings';
-import { Product } from '@/lib/types';
+import { BarcodeInfo, Product } from '@/lib/types';
 
 const SECTION_DOT: Record<SectionKey, string> = {
   expired: 'bg-ink',
@@ -34,6 +36,10 @@ export default function Dashboard() {
   const [query, setQuery] = useState('');
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
   const [refreshing, setRefreshing] = useState(false);
+  const scanParams = useLocalSearchParams<{ scannedBarcode?: string }>();
+  const [scannedBarcode, setScannedBarcode] = useState<string | null>(null);
+  const [lookupResult, setLookupResult] = useState<BarcodeInfo | null>(null);
+  const [lookingUp, setLookingUp] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -48,6 +54,14 @@ export default function Dashboard() {
       load();
     }, [load]),
   );
+
+  useEffect(() => {
+    if (scanParams.scannedBarcode) {
+      setQuery(scanParams.scannedBarcode);
+      setScannedBarcode(scanParams.scannedBarcode);
+      setLookupResult(null);
+    }
+  }, [scanParams.scannedBarcode]);
 
   const categories = useMemo(() => {
     const set = new Set<string>();
@@ -80,6 +94,35 @@ export default function Dashboard() {
       data: grouped.get(k)!.sort((a, b) => a.expiryDate.localeCompare(b.expiryDate)),
     }));
   }, [products, query, selectedCategories]);
+
+  const totalFilteredCount = useMemo(
+    () => sections.reduce((sum, s) => sum + s.data.length, 0),
+    [sections],
+  );
+
+  useEffect(() => {
+    if (!scannedBarcode) return;
+    if (query !== scannedBarcode) {
+      // 사용자가 검색어를 직접 수정함 — 스캔 배너를 더 이상 보여주지 않는다
+      setScannedBarcode(null);
+      setLookupResult(null);
+      return;
+    }
+    if (totalFilteredCount > 0) return; // 로컬에 이미 있으면 외부 조회 불필요
+
+    let cancelled = false;
+    setLookingUp(true);
+    lookupBarcode(scannedBarcode)
+      .then((result) => {
+        if (!cancelled) setLookupResult(result);
+      })
+      .finally(() => {
+        if (!cancelled) setLookingUp(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [scannedBarcode, query, totalFilteredCount]);
 
   const toggleCategory = (c: string) => {
     setSelectedCategories((prev) => {
@@ -168,6 +211,13 @@ export default function Dashboard() {
             <MaterialCommunityIcons name="close-circle" size={18} color="#BBBBBB" />
           </Pressable>
         ) : null}
+        <Pressable
+          onPress={() => router.push('/scan?mode=search')}
+          hitSlop={8}
+          className="ml-2"
+        >
+          <MaterialCommunityIcons name="barcode-scan" size={20} color="#888888" />
+        </Pressable>
       </View>
 
       {/* 카테고리 필터 */}
@@ -192,6 +242,40 @@ export default function Dashboard() {
             />
           ))}
         </ScrollView>
+      ) : null}
+
+      {/* 바코드 조회 배너 (로컬 미등록 + 스캔으로 들어온 바코드) */}
+      {lookingUp || lookupResult?.name ? (
+        <Pressable
+          disabled={lookingUp}
+          onPress={() => {
+            if (!lookupResult?.name || !scannedBarcode) return;
+            router.push({
+              pathname: '/product-form',
+              params: {
+                barcode: scannedBarcode,
+                prefillName: lookupResult.name,
+                prefillImage: lookupResult.imageUrl ?? '',
+              },
+            });
+          }}
+          className="mx-4 mt-3 flex-row items-center rounded-xl border border-line bg-paper px-3 py-2.5 active:opacity-70"
+        >
+          {lookingUp ? (
+            <>
+              <ActivityIndicator size="small" color="#CC2222" />
+              <Text className="text-muted ml-2 text-sm">바코드 조회 중...</Text>
+            </>
+          ) : (
+            <>
+              <MaterialCommunityIcons name="barcode-scan" size={18} color="#CC2222" />
+              <Text className="text-ink ml-2 flex-1 text-sm" numberOfLines={1}>
+                바코드 조회: {lookupResult!.name}
+              </Text>
+              <Text className="text-primary text-sm font-bold">등록하기</Text>
+            </>
+          )}
+        </Pressable>
       ) : null}
 
       <SectionList
