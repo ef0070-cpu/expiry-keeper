@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { BarcodeScanningResult, CameraView, useCameraPermissions } from 'expo-camera';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useRef, useState } from 'react';
 import { ActivityIndicator, LayoutChangeEvent, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,6 +20,7 @@ const VALID_LENGTHS: Record<string, number[]> = {
 };
 
 export default function Scan() {
+  const params = useLocalSearchParams<{ mode?: string }>();
   const [permission, requestPermission] = useCameraPermissions();
   const [looking, setLooking] = useState(false);
   const scannedRef = useRef(false);
@@ -61,8 +62,14 @@ export default function Scan() {
     if (!isValidBarcode(type, data)) return;
     if (!isInsideGuide(bounds)) return;
     scannedRef.current = true;
-    setLooking(true);
 
+    if (params.mode === 'search') {
+      // 검색 모드: 외부 조회 없이 스캔한 바코드만 들고 홈 화면으로 돌아간다
+      router.replace({ pathname: '/', params: { scannedBarcode: data } });
+      return;
+    }
+
+    setLooking(true);
     // 바코드로 상품 정보 자동 조회 후 등록 화면으로 이동
     const info = await lookupBarcode(data);
     router.replace({
@@ -123,18 +130,20 @@ export default function Scan() {
         ) : null}
       </View>
 
-      {/* 직접 입력 */}
-      <View
-        className="absolute w-full items-center"
-        style={{ bottom: Math.max(insets.bottom, 48) + 24 }}
-      >
-        <Pressable
-          onPress={() => router.replace('/product-form')}
-          className="rounded-full border border-paper/60 bg-ink/50 px-6 py-3 active:opacity-70"
+      {/* 직접 입력 (검색 모드에서는 의미가 없으므로 숨김) */}
+      {params.mode !== 'search' ? (
+        <View
+          className="absolute w-full items-center"
+          style={{ bottom: Math.max(insets.bottom, 48) + 24 }}
         >
-          <Text className="text-paper text-base font-medium">바코드 없이 직접 입력</Text>
-        </Pressable>
-      </View>
+          <Pressable
+            onPress={() => router.replace('/product-form')}
+            className="rounded-full border border-paper/60 bg-ink/50 px-6 py-3 active:opacity-70"
+          >
+            <Text className="text-paper text-base font-medium">바코드 없이 직접 입력</Text>
+          </Pressable>
+        </View>
+      ) : null}
     </View>
   );
 }
