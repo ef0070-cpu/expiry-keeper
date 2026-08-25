@@ -64,8 +64,13 @@ export default function Scan() {
     scannedRef.current = true;
 
     if (params.mode === 'search') {
-      // 검색 모드: 외부 조회 없이 스캔한 바코드만 들고 홈 화면으로 돌아간다
-      router.replace({ pathname: '/', params: { scannedBarcode: data } });
+      // 검색 모드: 외부 조회 없이 스캔한 바코드만 들고 홈 화면으로 돌아간다.
+      // replace 대신 dismissTo를 써서 스택에 이미 있는 홈 화면으로 되돌아가며
+      // params만 갱신한다(리마운트 없음 — replace는 홈 화면을 스택에 중복시킴).
+      router.dismissTo({
+        pathname: '/',
+        params: { scannedBarcode: data, nonce: String(Date.now()) },
+      });
       return;
     }
 

@@ -36,7 +36,7 @@ export default function Dashboard() {
   const [query, setQuery] = useState('');
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
   const [refreshing, setRefreshing] = useState(false);
-  const scanParams = useLocalSearchParams<{ scannedBarcode?: string }>();
+  const scanParams = useLocalSearchParams<{ scannedBarcode?: string; nonce?: string }>();
   const [scannedBarcode, setScannedBarcode] = useState<string | null>(null);
   const [lookupResult, setLookupResult] = useState<BarcodeInfo | null>(null);
   const [lookingUp, setLookingUp] = useState(false);
@@ -61,7 +61,7 @@ export default function Dashboard() {
       setScannedBarcode(scanParams.scannedBarcode);
       setLookupResult(null);
     }
-  }, [scanParams.scannedBarcode]);
+  }, [scanParams.scannedBarcode, scanParams.nonce]);
 
   const categories = useMemo(() => {
     const set = new Set<string>();
@@ -95,11 +95,6 @@ export default function Dashboard() {
     }));
   }, [products, query, selectedCategories]);
 
-  const totalFilteredCount = useMemo(
-    () => sections.reduce((sum, s) => sum + s.data.length, 0),
-    [sections],
-  );
-
   useEffect(() => {
     if (!scannedBarcode) return;
     if (query !== scannedBarcode) {
@@ -109,10 +104,11 @@ export default function Dashboard() {
       setLookingUp(false);
       return;
     }
-    if (totalFilteredCount > 0) {
+    const registeredLocally = products.some((p) => p.barcode === scannedBarcode);
+    if (registeredLocally) {
       setLookingUp(false);
       return;
-    } // 로컬에 이미 있으면 외부 조회 불필요
+    }
 
     let cancelled = false;
     setLookingUp(true);
@@ -120,13 +116,14 @@ export default function Dashboard() {
       .then((result) => {
         if (!cancelled) setLookupResult(result);
       })
+      .catch(() => {})
       .finally(() => {
         if (!cancelled) setLookingUp(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [scannedBarcode, query, totalFilteredCount]);
+  }, [scannedBarcode, query, products]);
 
   const toggleCategory = (c: string) => {
     setSelectedCategories((prev) => {
@@ -219,6 +216,8 @@ export default function Dashboard() {
           onPress={() => router.push('/scan?mode=search')}
           hitSlop={8}
           className="ml-2"
+          accessibilityRole="button"
+          accessibilityLabel="바코드로 검색"
         >
           <MaterialCommunityIcons name="barcode-scan" size={20} color="#888888" />
         </Pressable>
