@@ -106,9 +106,13 @@ export default function Dashboard() {
       // 사용자가 검색어를 직접 수정함 — 스캔 배너를 더 이상 보여주지 않는다
       setScannedBarcode(null);
       setLookupResult(null);
+      setLookingUp(false);
       return;
     }
-    if (totalFilteredCount > 0) return; // 로컬에 이미 있으면 외부 조회 불필요
+    if (totalFilteredCount > 0) {
+      setLookingUp(false);
+      return;
+    } // 로컬에 이미 있으면 외부 조회 불필요
 
     let cancelled = false;
     setLookingUp(true);
