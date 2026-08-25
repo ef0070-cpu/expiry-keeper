@@ -5,6 +5,7 @@ import { useRef, useState } from 'react';
 import { ActivityIndicator, LayoutChangeEvent, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { lookupBarcode } from '@/lib/barcode-lookup';
+import { listProductsByBarcode } from '@/lib/repo';
 
 // 가이드 사각형 크기 (아래 오버레이의 h-40 w-72 와 동일한 값, px 단위)
 const GUIDE_W = 288;
@@ -75,8 +76,24 @@ export default function Scan() {
     }
 
     setLooking(true);
-    // 바코드로 상품 정보 자동 조회 후 등록 화면으로 이동
-    const info = await lookupBarcode(data);
+    // 상품 정보 조회와 동시에 같은 바코드로 이미 등록된(보관중) 상품이 있는지 확인한다
+    const [info, duplicates] = await Promise.all([
+      lookupBarcode(data),
+      listProductsByBarcode(data),
+    ]);
+
+    if (duplicates.length > 0) {
+      router.replace({
+        pathname: '/product-duplicates',
+        params: {
+          barcode: data,
+          prefillName: info.name ?? '',
+          prefillImage: info.imageUrl ?? '',
+        },
+      });
+      return;
+    }
+
     router.replace({
       pathname: '/product-form',
       params: {
