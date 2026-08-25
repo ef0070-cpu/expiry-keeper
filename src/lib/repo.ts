@@ -198,3 +198,25 @@ export async function deleteProduct(id: string): Promise<void> {
   const items = await localList();
   await localWrite(items.filter((p) => p.id !== id));
 }
+
+/** 같은 바코드로 이미 등록된(보관중) 상품 목록을 조회한다. 실패 시 조용히 빈 배열을 반환한다. */
+export async function listProductsByBarcode(barcode: string): Promise<Product[]> {
+  try {
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('barcode', barcode)
+        .eq('status', 'active')
+        .order('expiry_date', { ascending: true });
+      if (error) return [];
+      return (data as ProductRow[]).map(fromRow);
+    }
+    const items = await localList();
+    return items
+      .filter((p) => p.barcode === barcode && p.status === 'active')
+      .sort((a, b) => a.expiryDate.localeCompare(b.expiryDate));
+  } catch {
+    return [];
+  }
+}
