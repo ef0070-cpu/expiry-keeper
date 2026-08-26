@@ -31,6 +31,7 @@ export interface OrderProduct {
   price: number;
   category: string; // 제품유형: 바/콘/튜브/샌드기타/홈컵 등, 사용자가 추가·수정·삭제 가능
   barcode: string | null;
+  imageUri: string | null;
 }
 
 export type OrderCart = Record<string /* OrderProduct id */, number /* 수량 */>;
@@ -83,7 +84,7 @@ export async function upsertBarcodeCatalog(
   - 카테고리 삭제 시 해당 카테고리를 쓰던 상품은 삭제되지 않고 그대로 남는다(다만 그 상품의 `category` 값은 이제 카테고리 목록에 없는 문자열이 되어, 칩 필터로는 더 이상 걸러낼 수 없다 — 프로토타입과 동일한 동작). 선택 중이던 카테고리가 삭제되면 '전체'로 복귀.
   - 카테고리 수정(rename) 시 해당 카테고리를 쓰는 모든 `OrderProduct.category`도 함께 갱신.
 - 헤더 우측: 바코드 스캔 아이콘(`router.push('/scan?mode=order')`), 상품 추가 아이콘(`router.push('/order-product-form')`)
-- 카탈로그 목록: 각 행에 이름/브랜드/가격, 수량 스테퍼(`-` / 개수 / `+`), 길게 누르면 "수정 / 삭제" 액션시트(→ 수정은 `order-product-form`으로 이동, 삭제는 확인 후 카탈로그에서 제거 — 장바구니에도 있었다면 함께 제거)
+- 카탈로그 목록: 각 행에 사진 썸네일(있으면)/이름/브랜드/가격, 수량 스테퍼(`-` / 개수 / `+`), 길게 누르면 "수정 / 삭제" 액션시트(→ 수정은 `order-product-form`으로 이동, 삭제는 확인 후 카탈로그에서 제거 — 장바구니에도 있었다면 함께 제거)
 - 담은 수량 합계 > 0이면 하단 플로팅 버튼("발주 내역 확인 · N박스") → `/order-cart` 모달 오픈
 
 ### `src/app/order-cart.tsx` (모달)
