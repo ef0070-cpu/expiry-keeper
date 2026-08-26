@@ -243,13 +243,14 @@ create table public.barcode_catalog (
   barcode text primary key,
   name text not null,
   image_uri text,
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  updated_by uuid references auth.users (id) on delete set null
 );
 
 alter table public.barcode_catalog enable row level security;
 
 -- ponytail: 등록자 구분 없이 로그인 사용자 누구나 덮어쓸 수 있는 단순 공용 캐시.
--- 악의적 오염 방지가 필요해지면 등록자 신고/롤백 기능으로 확장할 것.
+-- updated_by로 마지막 수정자만 추적함 (악의적 오염 방지용 신고/롤백 기능은 아직 없음 — 필요해지면 확장할 것).
 create policy "barcode_catalog select" on public.barcode_catalog
   for select to authenticated using (true);
 
@@ -258,3 +259,19 @@ create policy "barcode_catalog insert" on public.barcode_catalog
 
 create policy "barcode_catalog update" on public.barcode_catalog
   for update to authenticated using (true) with check (true);
+
+-- 매번 삽입/수정 시 마지막 수정자를 자동 기록한다 (앱 코드는 신경 쓸 필요 없음)
+create or replace function public.set_barcode_catalog_updater()
+returns trigger
+language plpgsql security definer
+set search_path = public
+as $$
+begin
+  new.updated_by := auth.uid();
+  return new;
+end;
+$$;
+
+create trigger barcode_catalog_set_updater
+  before insert or update on public.barcode_catalog
+  for each row execute function public.set_barcode_catalog_updater();
