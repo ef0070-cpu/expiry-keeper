@@ -192,7 +192,7 @@ export default function ProductForm() {
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       className="flex-1"
     >
       <Stack.Screen options={{ title: isEdit ? '상품 수정' : '상품 등록' }} />
