@@ -1,11 +1,15 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { Alert, FlatList, Text, View } from 'react-native';
+import { Alert, FlatList, Pressable, Text, View } from 'react-native';
 import { daysUntil, ddayLabel } from '@/lib/dates';
 import { RecipeMatch, matchRecipes, urgentProducts } from '@/lib/recipes';
 import { listProducts } from '@/lib/repo';
 import { Product } from '@/lib/types';
+
+function openVideoSearch(query: string) {
+  router.push({ pathname: '/recipe-video', params: { query } });
+}
 
 export default function Recipes() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -26,6 +30,10 @@ export default function Recipes() {
 
   const urgent = useMemo(() => urgentProducts(products), [products]);
   const matches = useMemo(() => matchRecipes(urgent), [urgent]);
+  const unmatched = useMemo(() => {
+    const matchedIds = new Set(matches.flatMap((m) => m.matchedProducts.map((p) => p.id)));
+    return urgent.filter((p) => !matchedIds.has(p.id));
+  }, [urgent, matches]);
 
   return (
     <FlatList
@@ -33,6 +41,28 @@ export default function Recipes() {
       contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
       data={matches}
       keyExtractor={(m) => m.recipe.name}
+      ListFooterComponent={
+        unmatched.length > 0 ? (
+          <View className="mt-1">
+            <Text className="text-muted mb-2 text-xs">
+              고정 레시피는 없지만, 영상으로 바로 찾아볼 수 있어요
+            </Text>
+            {unmatched.map((p) => (
+              <Pressable
+                key={p.id}
+                onPress={() => openVideoSearch(`${p.name} 레시피`)}
+                className="mb-2 flex-row items-center justify-between rounded-xl border border-line bg-paper p-4 active:opacity-70"
+              >
+                <Text className="text-ink text-sm font-bold">{p.name}</Text>
+                <View className="flex-row items-center">
+                  <MaterialCommunityIcons name="youtube" size={16} color="#CC2222" />
+                  <Text className="text-primary ml-1 text-xs font-medium">영상으로 레시피 찾기</Text>
+                </View>
+              </Pressable>
+            ))}
+          </View>
+        ) : null
+      }
       ListHeaderComponent={
         urgent.length > 0 ? (
           <View className="mb-4 rounded-xl border border-line bg-paper p-4">
@@ -67,12 +97,7 @@ export default function Recipes() {
               </Text>
             </>
           ) : (
-            <>
-              <Text className="text-muted mt-4 text-base">추천할 레시피를 찾지 못했어요</Text>
-              <Text className="text-muted mt-1 px-8 text-center text-sm">
-                상품명에 재료 이름(예: 우유, 계란, 두부)이 들어 있으면 더 잘 찾을 수 있어요
-              </Text>
-            </>
+            <Text className="text-muted mt-4 text-base">고정 레시피는 없지만, 아래에서 영상으로 찾아보세요</Text>
           )}
         </View>
       }
@@ -100,6 +125,14 @@ function RecipeCard({ match }: { match: RecipeMatch }) {
       </Text>
       <Text className="text-muted mt-1 text-xs">재료: {recipe.ingredients}</Text>
       <Text className="text-ink mt-2 text-sm leading-5">{recipe.tip}</Text>
+
+      <Pressable
+        onPress={() => openVideoSearch(`${recipe.name} 레시피`)}
+        className="mt-3 flex-row items-center self-start active:opacity-70"
+      >
+        <MaterialCommunityIcons name="youtube" size={16} color="#CC2222" />
+        <Text className="text-primary ml-1 text-xs font-medium">영상으로 레시피 보기</Text>
+      </Pressable>
     </View>
   );
 }

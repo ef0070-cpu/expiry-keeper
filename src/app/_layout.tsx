@@ -53,6 +53,7 @@ export default function RootLayout() {
           <Stack.Screen name="product-duplicates" options={{ title: '이미 등록된 상품' }} />
           <Stack.Screen name="stats" options={{ title: '소진·폐기 통계' }} />
           <Stack.Screen name="recipes" options={{ title: '레시피 추천' }} />
+          <Stack.Screen name="recipe-video" options={{ title: '레시피 영상' }} />
           <Stack.Screen name="settings" options={{ title: '설정' }} />
         </Stack.Protected>
         <Stack.Protected guard={authed && mode === null}>
