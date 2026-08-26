@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getCachedAppMode } from './settings';
 import { supabase } from './supabase';
 import { Product, ProductStatus } from './types';
 
@@ -21,6 +22,7 @@ async function localList(): Promise<Product[]> {
     status: p.status ?? ('active' as ProductStatus),
     resolvedAt: p.resolvedAt ?? null,
     categories: p.categories ?? (p.category ? [p.category] : []),
+    mode: p.mode ?? 'retail',
   }));
 }
 
@@ -42,6 +44,7 @@ interface ProductRow {
   status: ProductStatus;
   resolved_at: string | null;
   created_at: string;
+  mode: 'home' | 'retail';
 }
 
 function fromRow(r: ProductRow): Product {
@@ -57,6 +60,7 @@ function fromRow(r: ProductRow): Product {
     status: r.status ?? 'active',
     resolvedAt: r.resolved_at ?? null,
     createdAt: r.created_at,
+    mode: r.mode ?? 'retail',
   };
 }
 
@@ -73,6 +77,7 @@ function toRow(p: Product): ProductRow {
     status: p.status,
     resolved_at: p.resolvedAt,
     created_at: p.createdAt,
+    mode: p.mode,
   };
 }
 
@@ -110,8 +115,13 @@ async function upsertBarcodeCatalog(p: Product): Promise<void> {
 export type ListFilter = 'active' | 'resolved' | 'all';
 
 export async function listProducts(filter: ListFilter = 'active'): Promise<Product[]> {
+  const mode = getCachedAppMode() ?? 'retail';
   if (supabase) {
-    let query = supabase.from('products').select('*').order('expiry_date', { ascending: true });
+    let query = supabase
+      .from('products')
+      .select('*')
+      .eq('mode', mode)
+      .order('expiry_date', { ascending: true });
     if (filter === 'active') query = query.eq('status', 'active');
     if (filter === 'resolved') query = query.neq('status', 'active');
     const { data, error } = await query;
@@ -120,6 +130,7 @@ export async function listProducts(filter: ListFilter = 'active'): Promise<Produ
   }
   const items = await localList();
   const filtered = items.filter((p) => {
+    if (p.mode !== mode) return false;
     if (filter === 'active') return p.status === 'active';
     if (filter === 'resolved') return p.status !== 'active';
     return true;

@@ -36,6 +36,11 @@ export function useAppMode(): AppMode | null | undefined {
   return mode;
 }
 
+/** 로딩/훅 없이 현재 캐시된 모드를 즉시 읽는다 (repo.ts처럼 컴포넌트 밖에서 필요할 때 사용). */
+export function getCachedAppMode(): AppMode | null {
+  return cached ?? null;
+}
+
 export const MODE_LABELS: Record<AppMode, string> = {
   home: '가정용',
   retail: '소매점용',

@@ -47,7 +47,8 @@ create table public.products (
   quantity integer not null default 1,
   status text not null default 'active' check (status in ('active', 'consumed', 'discarded')),
   resolved_at timestamptz,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  mode text not null default 'retail' check (mode in ('home', 'retail'))
 );
 
 create index products_user_expiry_idx on public.products (user_id, expiry_date);

@@ -324,7 +324,7 @@ export default function Dashboard() {
         stickySectionHeadersEnabled={false}
       />
 
-      <Fab onPress={() => router.push('/scan')} />
+      <Fab onPress={() => router.push(mode === 'home' ? '/product-form' : '/scan')} />
     </View>
   );
 }

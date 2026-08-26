@@ -18,7 +18,7 @@ import { hasImageSearchKeys, searchProductImage } from '@/lib/barcode-lookup';
 import { autoFormatDate, isValidDateStr } from '@/lib/dates';
 import { cancelExpiryAlerts, scheduleExpiryAlerts } from '@/lib/notifications';
 import { deleteProduct, getProduct, listProducts, newId, saveProduct } from '@/lib/repo';
-import { useAppMode } from '@/lib/settings';
+import { AppMode, useAppMode } from '@/lib/settings';
 import { Product, ProductStatus } from '@/lib/types';
 
 export default function ProductForm() {
@@ -48,6 +48,8 @@ export default function ProductForm() {
   const [searching, setSearching] = useState(false);
 
   const [barcode, setBarcode] = useState<string | null>(params.barcode ?? null);
+  // 수정 시 원래 등록됐던 모드를 유지 (현재 화면 모드로 덮어쓰지 않음)
+  const [productMode, setProductMode] = useState<AppMode>(mode ?? 'retail');
 
   useEffect(() => {
     // 기존 카테고리 목록 수집
@@ -73,6 +75,7 @@ export default function ProductForm() {
         setCreatedAt(p.createdAt);
         setStatus(p.status);
         setResolvedAt(p.resolvedAt);
+        setProductMode(p.mode);
       });
     }
   }, [params.id]);
@@ -163,6 +166,7 @@ export default function ProductForm() {
         status,
         resolvedAt,
         createdAt: createdAt ?? new Date().toISOString(),
+        mode: productMode,
       };
       await saveProduct(product);
       await scheduleExpiryAlerts(product);

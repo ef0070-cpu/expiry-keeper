@@ -1,3 +1,5 @@
+import { AppMode } from './settings';
+
 export type ProductStatus = 'active' | 'consumed' | 'discarded';
 
 export const STATUS_LABELS: Record<ProductStatus, string> = {
@@ -18,6 +20,7 @@ export interface Product {
   status: ProductStatus;
   resolvedAt: string | null; // 소진/폐기 처리 시각 (ISO)
   createdAt: string;
+  mode: AppMode; // 등록 당시 앱 모드 (가정용/소매용 목록 분리용)
 }
 
 export interface BarcodeInfo {
