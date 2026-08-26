@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { upsertBarcodeCatalog } from './barcode-catalog';
 import { getCachedAppMode } from './settings';
 import { supabase } from './supabase';
 import { Product, ProductStatus } from './types';
@@ -99,17 +100,6 @@ async function uploadImageIfNeeded(p: Product): Promise<Product> {
   }
 }
 
-/** 바코드로 등록된 상품이면 이름·사진을 공용 카탈로그에 저장해, 다음 스캔 때 재사용한다. */
-async function upsertBarcodeCatalog(p: Product): Promise<void> {
-  if (!supabase || !p.barcode || !p.name.trim()) return;
-  await supabase.from('barcode_catalog').upsert({
-    barcode: p.barcode,
-    name: p.name.trim(),
-    image_uri: p.imageUri,
-    updated_at: new Date().toISOString(),
-  });
-}
-
 // ---------- 공용 API ----------
 
 export type ListFilter = 'active' | 'resolved' | 'all';
@@ -189,7 +179,7 @@ export async function saveProduct(p: Product): Promise<Product> {
     const { error } = await supabase.from('products').upsert(toRow(uploaded));
     if (error) throw new Error(error.message);
     // 실패해도 상품 저장 자체는 이미 끝났으니 조용히 무시한다 (best-effort).
-    upsertBarcodeCatalog(uploaded).catch(() => {});
+    upsertBarcodeCatalog(uploaded.barcode, uploaded.name, uploaded.imageUri).catch(() => {});
     return uploaded;
   }
   const items = await localList();
