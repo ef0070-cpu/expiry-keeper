@@ -1,5 +1,5 @@
-import { buildOrderShareText, formatOrderDate } from './order-share.ts';
-import type { OrderCart, OrderProduct } from './order-types.ts';
+import { buildOrderShareText, formatOrderDate } from './order-share';
+import type { OrderCart, OrderProduct } from './order-types';
 
 const products: OrderProduct[] = [
   { id: '1', name: '메로나', brand: '빙그레', price: 400, category: '바', barcode: null, imageUri: null },

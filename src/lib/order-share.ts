@@ -1,4 +1,4 @@
-import type { OrderCart, OrderProduct } from './order-types.ts';
+import type { OrderCart, OrderProduct } from './order-types';
 
 /** 'YYYY. M. D.' 형태로 날짜를 포맷한다 (프로토타입의 toLocaleDateString('ko-KR')과 동일한 표기). */
 export function formatOrderDate(date: Date): string {
