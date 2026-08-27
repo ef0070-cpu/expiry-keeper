@@ -24,7 +24,7 @@ import {
   newId,
   saveOrderProduct,
 } from '@/lib/order-repo';
-import { reportOrderProductIssue } from '@/lib/order-report';
+import { reportOrderProductIssue, submitNewOrderProduct } from '@/lib/order-report';
 import { OrderProduct, OrderStatus } from '@/lib/order-types';
 
 export default function OrderProductForm() {
@@ -50,6 +50,7 @@ export default function OrderProductForm() {
   const [checkingBarcode, setCheckingBarcode] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [reportMessage, setReportMessage] = useState('');
+  const [reportPhotoUri, setReportPhotoUri] = useState<string | null>(null);
   const [reporting, setReporting] = useState(false);
 
   useEffect(() => {
@@ -75,12 +76,20 @@ export default function OrderProductForm() {
   const pickImage = () => {
     Alert.alert('상품 사진', '사진을 어떻게 추가할까요?', [
       { text: '취소', style: 'cancel' },
-      { text: '앨범에서 선택', onPress: () => launchPicker('library') },
-      { text: '카메라 촬영', onPress: () => launchPicker('camera') },
+      { text: '앨범에서 선택', onPress: () => launchPicker('library', setImageUri) },
+      { text: '카메라 촬영', onPress: () => launchPicker('camera', setImageUri) },
     ]);
   };
 
-  const launchPicker = async (source: 'camera' | 'library') => {
+  const pickReportPhoto = () => {
+    Alert.alert('신고 사진', '사진을 어떻게 첨부할까요?', [
+      { text: '취소', style: 'cancel' },
+      { text: '앨범에서 선택', onPress: () => launchPicker('library', setReportPhotoUri) },
+      { text: '카메라 촬영', onPress: () => launchPicker('camera', setReportPhotoUri) },
+    ]);
+  };
+
+  const launchPicker = async (source: 'camera' | 'library', onPicked: (uri: string) => void) => {
     const options: ImagePicker.ImagePickerOptions = {
       mediaTypes: ['images'],
       allowsEditing: true,
@@ -99,7 +108,7 @@ export default function OrderProductForm() {
       result = await ImagePicker.launchImageLibraryAsync(options);
     }
     if (!result.canceled && result.assets[0]) {
-      setImageUri(result.assets[0].uri);
+      onPicked(result.assets[0].uri);
     }
   };
 
@@ -186,6 +195,7 @@ export default function OrderProductForm() {
         status,
       };
       await saveOrderProduct(product);
+      if (!isEdit) submitNewOrderProduct(product).catch(() => {});
       router.back();
     } catch (e) {
       Alert.alert('저장 실패', e instanceof Error ? e.message : '알 수 없는 오류');
@@ -218,9 +228,11 @@ export default function OrderProductForm() {
           status,
         },
         msg,
+        reportPhotoUri,
       );
       Alert.alert('접수 완료', '신고가 접수됐습니다. 확인 후 반영하겠습니다.');
       setReportMessage('');
+      setReportPhotoUri(null);
       setShowReport(false);
     } catch (e) {
       Alert.alert('신고 실패', e instanceof Error ? e.message : '알 수 없는 오류');
@@ -435,12 +447,35 @@ export default function OrderProductForm() {
                 <Text className="text-ink mb-1.5 text-sm font-bold">정보 오류 신고</Text>
                 <TextInput
                   className="text-ink rounded-xl border border-line bg-bg px-3 py-2 text-sm"
-                  placeholder="예: 가격이 실제로는 2,000원입니다"
+                  placeholder="예: 가격오류, 사진오류, 바코드 오류 - 실제 가격은 2,000원입니다"
                   placeholderTextColor="#BBBBBB"
                   value={reportMessage}
                   onChangeText={setReportMessage}
                   multiline
                 />
+                <View className="mt-2 flex-row items-center gap-3">
+                  <Pressable
+                    onPress={pickReportPhoto}
+                    className="items-center justify-center rounded-xl border border-line bg-bg"
+                    style={{ width: 56, height: 56 }}
+                  >
+                    {reportPhotoUri ? (
+                      <Image
+                        source={{ uri: reportPhotoUri }}
+                        style={{ width: 56, height: 56, borderRadius: 12 }}
+                        contentFit="cover"
+                      />
+                    ) : (
+                      <MaterialCommunityIcons name="camera-plus-outline" size={20} color="#888888" />
+                    )}
+                  </Pressable>
+                  <Text className="text-muted text-xs">사진 첨부 (선택)</Text>
+                  {reportPhotoUri ? (
+                    <Pressable onPress={() => setReportPhotoUri(null)}>
+                      <Text className="text-muted text-xs underline">제거</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
                 <View className="mt-2 flex-row gap-2">
                   <Pressable
                     onPress={submitReport}

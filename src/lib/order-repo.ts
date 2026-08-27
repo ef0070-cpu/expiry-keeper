@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { lookupBarcode, searchProductImage } from './barcode-lookup';
 import { upsertBarcodeCatalog } from './barcode-catalog';
 import { newId } from './repo';
+import { supabase } from './supabase';
 import { OrderCart, OrderProduct } from './order-types';
 import { DEFAULT_ORDER_PRODUCTS } from './order-seed-data';
 
@@ -10,6 +10,7 @@ export { newId };
 const PRODUCTS_KEY = 'orderProducts:v1';
 const CATEGORIES_KEY = 'orderCategories:v1';
 const CART_KEY = 'orderCart:v1';
+const APPLIED_UPDATES_KEY = 'appliedCatalogUpdateIds:v1';
 
 const DEFAULT_CATEGORIES = ['바', '콘', '튜브', '샌드/기타', '홈/컵'];
 
@@ -129,36 +130,75 @@ export async function seedDefaultOrderProducts(): Promise<number> {
   return items.length;
 }
 
+type ApprovedReportRow = {
+  id: string;
+  kind: 'new' | 'fix';
+  barcode: string | null;
+  name: string;
+  brand: string | null;
+  price: number | null;
+  category: string | null;
+  photo_uri: string | null;
+};
+
 /**
- * 바코드가 있지만 사진이 없는 발주 상품을 순서대로 훑어 lookupBarcode()로 채운다.
- * 항목 하나 채울 때마다 즉시 저장한다(중단돼도 그동안 채운 건 유지됨).
- * 공용 바코드 캐시(upsertBarcodeCatalog)에는 다시 쓰지 않는다 — 이미 캐시에서 읽어왔거나
- * 외부 API에서 새로 찾은 값을 로컬에 반영하는 것뿐이라 재기록이 불필요하다
- * (seedDefaultOrderProducts와 동일한 논리로 대량 개별 네트워크 쓰기를 피한다).
+ * 관리자가 승인한 카탈로그 변경(신제품 등록 제안 + 정보 오류 신고 수정)을 받아와 로컬 카탈로그에 반영한다.
+ * 한 번 반영한 건은 appliedCatalogUpdateIds에 기록해 다음 Update 때 중복 반영하지 않는다.
  */
-export async function fillMissingOrderPhotos(
-  onProgress?: (done: number, total: number) => void,
-): Promise<number> {
+export async function syncApprovedCatalogUpdates(): Promise<{ added: number; fixed: number }> {
+  if (!supabase) throw new Error('로그인이 필요합니다.');
+  const { data, error } = await supabase
+    .from('order_product_reports')
+    .select('id, kind, barcode, name, brand, price, category, photo_uri')
+    .eq('status', 'approved');
+  if (error) throw error;
+
+  const appliedRaw = await AsyncStorage.getItem(APPLIED_UPDATES_KEY);
+  const applied = new Set<string>(appliedRaw ? (JSON.parse(appliedRaw) as string[]) : []);
+  const rows = (data as ApprovedReportRow[] | null) ?? [];
+  const pending = rows.filter((row) => !applied.has(row.id));
+  if (pending.length === 0) return { added: 0, fixed: 0 };
+
   const items = await listOrderProducts();
-  const targets = items.filter((p) => p.barcode && !p.imageUri);
-  let filled = 0;
-  for (let i = 0; i < targets.length; i++) {
-    const target = targets[i];
-    const info = await lookupBarcode(target.barcode!, target.brand);
-    let imageUrl = info.imageUrl;
-    if (!imageUrl) {
-      const query = target.brand ? `${target.brand} ${target.name}` : target.name;
-      imageUrl = await searchProductImage(query);
-    }
-    if (imageUrl) {
-      const idx = items.findIndex((p) => p.id === target.id);
+  let added = 0;
+  let fixed = 0;
+
+  for (const row of pending) {
+    if (row.kind === 'new') {
+      const exists = row.barcode
+        ? items.some((p) => p.barcode === row.barcode)
+        : items.some((p) => p.name === row.name && p.brand === row.brand);
+      if (!exists) {
+        items.push({
+          id: newId(),
+          name: row.name,
+          brand: row.brand ?? '',
+          price: row.price ?? 0,
+          category: row.category ?? '',
+          barcode: row.barcode,
+          imageUri: row.photo_uri,
+          status: 'active',
+        });
+        added++;
+      }
+    } else {
+      const idx = row.barcode ? items.findIndex((p) => p.barcode === row.barcode) : -1;
       if (idx >= 0) {
-        items[idx] = { ...items[idx], imageUri: imageUrl };
-        await writeOrderProducts(items);
-        filled++;
+        items[idx] = {
+          ...items[idx],
+          name: row.name || items[idx].name,
+          brand: row.brand || items[idx].brand,
+          price: row.price ?? items[idx].price,
+          category: row.category || items[idx].category,
+          imageUri: row.photo_uri || items[idx].imageUri,
+        };
+        fixed++;
       }
     }
-    onProgress?.(i + 1, targets.length);
+    applied.add(row.id);
   }
-  return filled;
+
+  await writeOrderProducts(items);
+  await AsyncStorage.setItem(APPLIED_UPDATES_KEY, JSON.stringify([...applied]));
+  return { added, fixed };
 }

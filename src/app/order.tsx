@@ -10,13 +10,13 @@ import {
   addOrderCategory,
   deleteOrderCategory,
   deleteOrderProduct,
-  fillMissingOrderPhotos,
   getOrderCart,
   listOrderCategories,
   listOrderProducts,
   renameOrderCategory,
   seedDefaultOrderProducts,
   setOrderCartQuantity,
+  syncApprovedCatalogUpdates,
 } from '@/lib/order-repo';
 import { OrderCart, OrderProduct, OrderStatus } from '@/lib/order-types';
 import { matchesSearch } from '@/lib/korean-search';
@@ -38,8 +38,7 @@ export default function Order() {
   const [categoryInput, setCategoryInput] = useState('');
   const [showCategoryInput, setShowCategoryInput] = useState(false);
   const [seeding, setSeeding] = useState(false);
-  const [filling, setFilling] = useState(false);
-  const [fillProgress, setFillProgress] = useState({ done: 0, total: 0 });
+  const [updating, setUpdating] = useState(false);
   const scanParams = useLocalSearchParams<{ scannedBarcode?: string; nonce?: string }>();
 
   const load = useCallback(async () => {
@@ -76,10 +75,6 @@ export default function Order() {
   }, [products, query, selectedCategory]);
 
   const totalCount = Object.values(cart).reduce((sum, qty) => sum + qty, 0);
-  const missingPhotoCount = useMemo(
-    () => products.filter((p) => p.barcode && !p.imageUri).length,
-    [products],
-  );
 
   const changeQty = async (productId: string, delta: number) => {
     const current = cart[productId] ?? 0;
@@ -190,24 +185,24 @@ export default function Order() {
     }
   };
 
-  const onFillPhotos = async () => {
+  const onUpdate = async () => {
     if (!hasImageSearchKeys()) {
-      Alert.alert('로그인 필요', '사진 자동 채우기를 사용하려면 로그인이 필요합니다.');
+      Alert.alert('로그인 필요', 'Update를 사용하려면 로그인이 필요합니다.');
       return;
     }
-    setFilling(true);
-    setFillProgress({ done: 0, total: 0 });
+    setUpdating(true);
     try {
-      const count = await fillMissingOrderPhotos((done, total) =>
-        setFillProgress({ done, total }),
-      );
+      const { added, fixed } = await syncApprovedCatalogUpdates();
       await load();
+      const total = added + fixed;
       Alert.alert(
-        count > 0 ? '완료' : '알림',
-        count > 0 ? `${count}개 사진을 채웠습니다.` : '채울 수 있는 사진을 찾지 못했습니다.',
+        total > 0 ? '업데이트 완료' : '알림',
+        total > 0 ? `${total}건 반영됐습니다 (신규 ${added}, 수정 ${fixed}).` : '새로운 업데이트가 없습니다.',
       );
+    } catch (e) {
+      Alert.alert('업데이트 실패', e instanceof Error ? e.message : '알 수 없는 오류');
     } finally {
-      setFilling(false);
+      setUpdating(false);
     }
   };
 
@@ -244,19 +239,13 @@ export default function Order() {
         ) : null}
       </View>
 
-      {missingPhotoCount > 0 ? (
-        <Pressable
-          onPress={onFillPhotos}
-          disabled={filling}
-          className="mx-4 mt-2.5 items-center rounded-xl border border-line bg-paper py-2.5 active:opacity-70"
-        >
-          <Text className="text-ink text-sm font-medium">
-            {filling
-              ? `${fillProgress.done} / ${fillProgress.total} 처리 중...`
-              : `사진 없는 상품 ${missingPhotoCount}개 — 자동으로 채우기`}
-          </Text>
-        </Pressable>
-      ) : null}
+      <Pressable
+        onPress={onUpdate}
+        disabled={updating}
+        className="mx-4 mt-2.5 items-center rounded-xl border border-line bg-paper py-2.5 active:opacity-70"
+      >
+        <Text className="text-ink text-sm font-medium">{updating ? '업데이트 중...' : 'Update'}</Text>
+      </Pressable>
 
       <View className="mt-2.5 px-4" style={{ gap: 8 }}>
         <View className="flex-row flex-wrap" style={{ gap: 8 }}>
