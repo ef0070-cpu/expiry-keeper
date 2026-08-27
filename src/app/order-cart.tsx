@@ -2,6 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Alert, FlatList, Pressable, Share, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Chip from '@/components/Chip';
 import {
   clearOrderCart,
@@ -14,6 +15,7 @@ import { OrderCart, OrderProduct } from '@/lib/order-types';
 import { listProductCategories } from '@/lib/repo';
 
 export default function OrderCartScreen() {
+  const insets = useSafeAreaInsets();
   const [cart, setCart] = useState<OrderCart>({});
   const [products, setProducts] = useState<OrderProduct[]>([]);
   const [branches, setBranches] = useState<string[]>([]);
@@ -131,7 +133,10 @@ export default function OrderCartScreen() {
         }
       />
 
-      <View className="border-t border-line bg-paper p-4">
+      <View
+        className="border-t border-line bg-paper px-4 pt-4"
+        style={{ paddingBottom: Math.max(insets.bottom, 16) + 16 }}
+      >
         <Text className="text-muted mb-3 text-sm">총 합계: {total}박스</Text>
         <Pressable
           onPress={share}
