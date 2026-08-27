@@ -24,6 +24,7 @@ import {
   newId,
   saveOrderProduct,
 } from '@/lib/order-repo';
+import { reportOrderProductIssue } from '@/lib/order-report';
 import { OrderProduct, OrderStatus } from '@/lib/order-types';
 
 export default function OrderProductForm() {
@@ -47,6 +48,9 @@ export default function OrderProductForm() {
   const [busy, setBusy] = useState(false);
   const [searching, setSearching] = useState(false);
   const [checkingBarcode, setCheckingBarcode] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  const [reportMessage, setReportMessage] = useState('');
+  const [reporting, setReporting] = useState(false);
 
   useEffect(() => {
     listOrderCategories().then((list) => {
@@ -187,6 +191,41 @@ export default function OrderProductForm() {
       Alert.alert('저장 실패', e instanceof Error ? e.message : '알 수 없는 오류');
     } finally {
       setBusy(false);
+    }
+  };
+
+  const submitReport = async () => {
+    const msg = reportMessage.trim();
+    if (!msg) {
+      Alert.alert('입력 확인', '신고 내용을 입력해 주세요.');
+      return;
+    }
+    if (!hasImageSearchKeys()) {
+      Alert.alert('로그인 필요', '신고 기능을 사용하려면 로그인이 필요합니다.');
+      return;
+    }
+    setReporting(true);
+    try {
+      await reportOrderProductIssue(
+        {
+          id: params.id ?? '',
+          name: name.trim(),
+          brand: brand.trim(),
+          price: Number(price) || 0,
+          category,
+          barcode: barcode.trim() || null,
+          imageUri,
+          status,
+        },
+        msg,
+      );
+      Alert.alert('접수 완료', '신고가 접수됐습니다. 확인 후 반영하겠습니다.');
+      setReportMessage('');
+      setShowReport(false);
+    } catch (e) {
+      Alert.alert('신고 실패', e instanceof Error ? e.message : '알 수 없는 오류');
+    } finally {
+      setReporting(false);
     }
   };
 
@@ -388,6 +427,50 @@ export default function OrderProductForm() {
             )}
           </Pressable>
         </View>
+
+        {isEdit ? (
+          <View className="mt-4">
+            {showReport ? (
+              <View className="rounded-xl border border-line bg-paper p-3">
+                <Text className="text-ink mb-1.5 text-sm font-bold">정보 오류 신고</Text>
+                <TextInput
+                  className="text-ink rounded-xl border border-line bg-bg px-3 py-2 text-sm"
+                  placeholder="예: 가격이 실제로는 2,000원입니다"
+                  placeholderTextColor="#BBBBBB"
+                  value={reportMessage}
+                  onChangeText={setReportMessage}
+                  multiline
+                />
+                <View className="mt-2 flex-row gap-2">
+                  <Pressable
+                    onPress={submitReport}
+                    disabled={reporting}
+                    className="flex-1 items-center rounded-xl bg-primary py-2.5 active:opacity-80"
+                  >
+                    {reporting ? (
+                      <ActivityIndicator color="#FFFFFF" size="small" />
+                    ) : (
+                      <Text className="text-paper text-sm font-bold">제출</Text>
+                    )}
+                  </Pressable>
+                  <Pressable
+                    onPress={() => {
+                      setShowReport(false);
+                      setReportMessage('');
+                    }}
+                    className="items-center justify-center px-3"
+                  >
+                    <Text className="text-muted text-sm">취소</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : (
+              <Pressable onPress={() => setShowReport(true)} className="items-center py-2">
+                <Text className="text-muted text-xs underline">정보 오류 신고</Text>
+              </Pressable>
+            )}
+          </View>
+        ) : null}
       </ScrollView>
     </KeyboardAvoidingView>
   );
