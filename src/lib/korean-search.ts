@@ -20,15 +20,15 @@ function isChosungOnly(text: string): boolean {
 
 /**
  * 일반 부분일치 또는 초성(자음) 검색으로 target이 query와 매칭되는지 확인한다.
- * 초성 변환 비교는 검색어가 온전히 자음으로만 이뤄졌을 때만 적용한다 — 일반 글자
- * 검색어까지 초성으로 바꿔 비교하면 우연히 초성이 겹치는 무관한 상품이 걸린다
- * (예: "월드" → ㅇㄷ, "마이디저트"의 "이디" → ㅇㄷ로 우연히 일치).
+ * 초성 변환 비교는 검색어가 온전히 자음으로만 이뤄졌을 때만, 그리고 target의
+ * 맨 앞부터 순서대로 일치할 때만 적용한다 — 중간에서 우연히 초성이 겹치는
+ * 무관한 상품(예: "ㅇㄷ" 검색 시 "마이디저트"의 "이디" 부분)이 걸리는 것을 막는다.
  */
 export function matchesSearch(target: string, query: string): boolean {
   const t = target.toLowerCase();
   const q = query.trim().toLowerCase();
   if (!q) return true;
   if (t.includes(q)) return true;
-  if (isChosungOnly(q)) return toChosung(t).includes(q);
+  if (isChosungOnly(q)) return toChosung(t).startsWith(q);
   return false;
 }
