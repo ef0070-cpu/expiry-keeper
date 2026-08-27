@@ -109,7 +109,8 @@ export default function OrderProductForm() {
       return;
     }
     setSearching(true);
-    const url = await searchProductImage(name.trim());
+    const query = brand.trim() ? `${brand.trim()} ${name.trim()}` : name.trim();
+    const url = await searchProductImage(query);
     setSearching(false);
     if (url) setImageUri(url);
     else Alert.alert('검색 결과 없음', '이미지를 찾지 못했습니다. 직접 촬영해 주세요.');
@@ -126,7 +127,7 @@ export default function OrderProductForm() {
       return;
     }
     setCheckingBarcode(true);
-    const info = await lookupBarcode(v);
+    const info = await lookupBarcode(v, brand.trim() || undefined);
     setCheckingBarcode(false);
     if (!info.name && !info.imageUrl) {
       Alert.alert('조회 결과 없음', '일치하는 정보를 찾지 못했습니다. 직접 입력해 주세요.');

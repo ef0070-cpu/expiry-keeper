@@ -75,13 +75,14 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
-    const { barcode } = await req.json();
+    const { barcode, brand } = await req.json();
     if (!barcode || typeof barcode !== 'string') {
       return new Response(JSON.stringify({ error: 'barcode required' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+    const brandHint = typeof brand === 'string' ? brand.trim() : '';
 
     const [kr, naver, off] = await Promise.all([
       lookupFoodSafetyKorea(barcode),
@@ -97,7 +98,8 @@ Deno.serve(async (req) => {
     const name = best.name;
     let imageUrl = best.imageUrl;
     if (name && !imageUrl) {
-      imageUrl = await searchProductImage(name);
+      const query = brandHint ? `${brandHint} ${name}` : name;
+      imageUrl = await searchProductImage(query);
     }
 
     return new Response(JSON.stringify({ name, imageUrl }), {

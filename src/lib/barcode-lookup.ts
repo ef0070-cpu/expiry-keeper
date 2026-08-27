@@ -6,7 +6,7 @@ import { BarcodeInfo } from './types';
  * 실제 조회(식품안전나라/Open Food Facts/이미지 검색)는 Supabase Edge Function `barcode-lookup`이
  * 서버 측에서 수행한다 — API 키가 앱 번들에 포함되지 않도록 하기 위함.
  */
-export async function lookupBarcode(barcode: string): Promise<BarcodeInfo> {
+export async function lookupBarcode(barcode: string, brand?: string): Promise<BarcodeInfo> {
   if (!supabase) return { name: null, imageUrl: null };
 
   // 우리 앱 사용자가 이미 등록해둔 상품이면 외부 API보다 먼저, 무료로, 더 정확하게 찾는다.
@@ -18,7 +18,7 @@ export async function lookupBarcode(barcode: string): Promise<BarcodeInfo> {
   if (cached) return { name: cached.name, imageUrl: cached.image_uri };
 
   const { data, error } = await supabase.functions.invoke('barcode-lookup', {
-    body: { barcode },
+    body: { barcode, brand },
   });
   if (error || !data) return { name: null, imageUrl: null };
   return { name: data.name ?? null, imageUrl: data.imageUrl ?? null };

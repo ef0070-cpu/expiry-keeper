@@ -144,7 +144,7 @@ export async function fillMissingOrderPhotos(
   let filled = 0;
   for (let i = 0; i < targets.length; i++) {
     const target = targets[i];
-    const info = await lookupBarcode(target.barcode!);
+    const info = await lookupBarcode(target.barcode!, target.brand);
     if (info.imageUrl) {
       const idx = items.findIndex((p) => p.id === target.id);
       if (idx >= 0) {
