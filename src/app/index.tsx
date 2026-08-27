@@ -12,6 +12,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import Chip from '@/components/Chip';
 import Fab from '@/components/Fab';
 import ProductCard from '@/components/ProductCard';
 import SummaryHeader from '@/components/SummaryHeader';
@@ -326,28 +327,5 @@ export default function Dashboard() {
 
       <Fab onPress={() => router.push(mode === 'home' ? '/product-form' : '/scan')} />
     </View>
-  );
-}
-
-function Chip({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      className={`justify-center rounded-full border px-3.5 py-1.5 ${
-        active ? 'border-primary bg-primary' : 'border-line bg-paper'
-      }`}
-    >
-      <Text className={`text-sm font-medium ${active ? 'text-paper' : 'text-muted'}`}>
-        {label}
-      </Text>
-    </Pressable>
   );
 }
