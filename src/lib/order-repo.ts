@@ -16,7 +16,8 @@ const DEFAULT_CATEGORIES = ['바', '콘', '튜브', '샌드/기타', '홈/컵'];
 
 export async function listOrderProducts(): Promise<OrderProduct[]> {
   const raw = await AsyncStorage.getItem(PRODUCTS_KEY);
-  return raw ? (JSON.parse(raw) as OrderProduct[]) : [];
+  const items = raw ? (JSON.parse(raw) as OrderProduct[]) : [];
+  return items.map((p) => ({ status: 'active' as const, ...p }));
 }
 
 async function writeOrderProducts(items: OrderProduct[]): Promise<void> {

@@ -1,3 +1,5 @@
+export type OrderStatus = 'active' | 'discontinued' | 'paused';
+
 export interface OrderProduct {
   id: string;
   name: string;
@@ -6,6 +8,7 @@ export interface OrderProduct {
   category: string;
   barcode: string | null;
   imageUri: string | null;
+  status?: OrderStatus;
 }
 
 export type OrderCart = Record<string, number>;
