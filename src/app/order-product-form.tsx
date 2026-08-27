@@ -109,8 +109,17 @@ export default function OrderProductForm() {
       return;
     }
     setSearching(true);
-    const query = brand.trim() ? `${brand.trim()} ${name.trim()}` : name.trim();
-    const url = await searchProductImage(query);
+    // 바코드가 있으면 정확도가 더 높은 바코드 기반 조회를 먼저 시도하고,
+    // 못 찾았을 때만 상품명(+브랜드) 기반 웹 이미지 검색으로 보완한다.
+    let url: string | null = null;
+    if (barcode.trim()) {
+      const info = await lookupBarcode(barcode.trim(), brand.trim() || undefined);
+      url = info.imageUrl;
+    }
+    if (!url) {
+      const query = brand.trim() ? `${brand.trim()} ${name.trim()}` : name.trim();
+      url = await searchProductImage(query);
+    }
     setSearching(false);
     if (url) setImageUri(url);
     else Alert.alert('검색 결과 없음', '이미지를 찾지 못했습니다. 직접 촬영해 주세요.');
