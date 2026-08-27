@@ -5,10 +5,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, FlatList, Pressable, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Chip from '@/components/Chip';
+import { hasImageSearchKeys } from '@/lib/barcode-lookup';
 import {
   addOrderCategory,
   deleteOrderCategory,
   deleteOrderProduct,
+  fillMissingOrderPhotos,
   getOrderCart,
   listOrderCategories,
   listOrderProducts,
@@ -34,6 +36,8 @@ export default function Order() {
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [categoryInput, setCategoryInput] = useState('');
   const [seeding, setSeeding] = useState(false);
+  const [filling, setFilling] = useState(false);
+  const [fillProgress, setFillProgress] = useState({ done: 0, total: 0 });
   const scanParams = useLocalSearchParams<{ scannedBarcode?: string; nonce?: string }>();
 
   const load = useCallback(async () => {
@@ -71,6 +75,10 @@ export default function Order() {
   }, [products, query, selectedCategory]);
 
   const totalCount = Object.values(cart).reduce((sum, qty) => sum + qty, 0);
+  const missingPhotoCount = useMemo(
+    () => products.filter((p) => p.barcode && !p.imageUri).length,
+    [products],
+  );
 
   const changeQty = async (productId: string, delta: number) => {
     const current = cart[productId] ?? 0;
@@ -175,6 +183,27 @@ export default function Order() {
     }
   };
 
+  const onFillPhotos = async () => {
+    if (!hasImageSearchKeys()) {
+      Alert.alert('로그인 필요', '사진 자동 채우기를 사용하려면 로그인이 필요합니다.');
+      return;
+    }
+    setFilling(true);
+    setFillProgress({ done: 0, total: 0 });
+    try {
+      const count = await fillMissingOrderPhotos((done, total) =>
+        setFillProgress({ done, total }),
+      );
+      await load();
+      Alert.alert(
+        count > 0 ? '완료' : '알림',
+        count > 0 ? `${count}개 사진을 채웠습니다.` : '채울 수 있는 사진을 찾지 못했습니다.',
+      );
+    } finally {
+      setFilling(false);
+    }
+  };
+
   return (
     <View className="flex-1 bg-bg">
       <Stack.Screen
@@ -207,6 +236,20 @@ export default function Order() {
           </Pressable>
         ) : null}
       </View>
+
+      {missingPhotoCount > 0 ? (
+        <Pressable
+          onPress={onFillPhotos}
+          disabled={filling}
+          className="mx-4 mt-2.5 items-center rounded-xl border border-line bg-paper py-2.5 active:opacity-70"
+        >
+          <Text className="text-ink text-sm font-medium">
+            {filling
+              ? `${fillProgress.done} / ${fillProgress.total} 처리 중...`
+              : `사진 없는 상품 ${missingPhotoCount}개 — 자동으로 채우기`}
+          </Text>
+        </Pressable>
+      ) : null}
 
       <View className="mt-2.5 px-4" style={{ gap: 8 }}>
         <View className="flex-row flex-wrap" style={{ gap: 8 }}>
