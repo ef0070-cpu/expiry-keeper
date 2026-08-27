@@ -18,7 +18,7 @@ export function buildOrderShareText(
     if (qty <= 0) return;
     const product = products.find((p) => p.id === id);
     if (!product) return;
-    lines.push(`• ${product.name}(${product.brand}): ${qty}박스`);
+    lines.push(`• ${product.name}: ${qty}박스`);
     total += qty;
   });
   lines.push('');
