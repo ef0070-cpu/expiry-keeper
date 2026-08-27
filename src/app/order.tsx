@@ -2,10 +2,10 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, FlatList, Pressable, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Pressable, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Chip from '@/components/Chip';
-import { hasImageSearchKeys } from '@/lib/barcode-lookup';
+import { hasImageSearchKeys, lookupBarcode } from '@/lib/barcode-lookup';
 import {
   addOrderCategory,
   deleteOrderCategory,
@@ -19,6 +19,7 @@ import {
   setOrderCartQuantity,
 } from '@/lib/order-repo';
 import { OrderCart, OrderProduct, OrderStatus } from '@/lib/order-types';
+import { BarcodeInfo } from '@/lib/types';
 
 const STATUS_META: Record<OrderStatus, { label: string; color: string }> = {
   active: { label: '시판중', color: '#2E7D32' },
@@ -39,6 +40,9 @@ export default function Order() {
   const [filling, setFilling] = useState(false);
   const [fillProgress, setFillProgress] = useState({ done: 0, total: 0 });
   const scanParams = useLocalSearchParams<{ scannedBarcode?: string; nonce?: string }>();
+  const [scannedBarcode, setScannedBarcode] = useState<string | null>(null);
+  const [lookupResult, setLookupResult] = useState<BarcodeInfo | null>(null);
+  const [lookingUp, setLookingUp] = useState(false);
 
   const load = useCallback(async () => {
     const [productList, categoryList, cartData] = await Promise.all([
@@ -58,8 +62,42 @@ export default function Order() {
   );
 
   useEffect(() => {
-    if (scanParams.scannedBarcode) setQuery(scanParams.scannedBarcode);
+    if (scanParams.scannedBarcode) {
+      setQuery(scanParams.scannedBarcode);
+      setScannedBarcode(scanParams.scannedBarcode);
+      setLookupResult(null);
+    }
   }, [scanParams.scannedBarcode, scanParams.nonce]);
+
+  useEffect(() => {
+    if (!scannedBarcode) return;
+    if (query !== scannedBarcode) {
+      // 사용자가 검색어를 직접 수정함 — 스캔 배너를 더 이상 보여주지 않는다
+      setScannedBarcode(null);
+      setLookupResult(null);
+      setLookingUp(false);
+      return;
+    }
+    const registeredLocally = products.some((p) => p.barcode === scannedBarcode);
+    if (registeredLocally) {
+      setLookingUp(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLookingUp(true);
+    lookupBarcode(scannedBarcode)
+      .then((result) => {
+        if (!cancelled) setLookupResult(result);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setLookingUp(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [scannedBarcode, query, products]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -236,6 +274,39 @@ export default function Order() {
           </Pressable>
         ) : null}
       </View>
+
+      {lookingUp || lookupResult?.name ? (
+        <Pressable
+          disabled={lookingUp}
+          onPress={() => {
+            if (!lookupResult?.name || !scannedBarcode) return;
+            router.push({
+              pathname: '/order-product-form',
+              params: {
+                barcode: scannedBarcode,
+                prefillName: lookupResult.name,
+                prefillImage: lookupResult.imageUrl ?? '',
+              },
+            });
+          }}
+          className="mx-4 mt-3 flex-row items-center rounded-xl border border-line bg-paper px-3 py-2.5 active:opacity-70"
+        >
+          {lookingUp ? (
+            <>
+              <ActivityIndicator size="small" color="#CC2222" />
+              <Text className="text-muted ml-2 text-sm">바코드 조회 중...</Text>
+            </>
+          ) : (
+            <>
+              <MaterialCommunityIcons name="barcode-scan" size={18} color="#CC2222" />
+              <Text className="text-ink ml-2 flex-1 text-sm" numberOfLines={1}>
+                바코드 조회: {lookupResult!.name}
+              </Text>
+              <Text className="text-primary text-sm font-bold">등록하기</Text>
+            </>
+          )}
+        </Pressable>
+      ) : null}
 
       {missingPhotoCount > 0 ? (
         <Pressable
