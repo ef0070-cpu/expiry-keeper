@@ -36,6 +36,7 @@ export default function Order() {
   const [selectedCategory, setSelectedCategory] = useState('전체');
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [categoryInput, setCategoryInput] = useState('');
+  const [showCategoryInput, setShowCategoryInput] = useState(false);
   const [seeding, setSeeding] = useState(false);
   const [filling, setFilling] = useState(false);
   const [fillProgress, setFillProgress] = useState({ done: 0, total: 0 });
@@ -135,6 +136,7 @@ export default function Order() {
       setEditingCategory(null);
     } else {
       await addOrderCategory(v);
+      setShowCategoryInput(false);
     }
     setCategoryInput('');
     load();
@@ -142,6 +144,11 @@ export default function Order() {
 
   const cancelCategoryEdit = () => {
     setEditingCategory(null);
+    setCategoryInput('');
+  };
+
+  const closeCategoryInput = () => {
+    setShowCategoryInput(false);
     setCategoryInput('');
   };
 
@@ -338,27 +345,34 @@ export default function Order() {
               onLongPress={() => onLongPressCategory(c)}
             />
           ))}
+          <Chip label="+" active={false} onPress={() => setShowCategoryInput(true)} />
         </View>
-        <View className="flex-row gap-2">
-          <TextInput
-            className="text-ink flex-1 rounded-xl border border-line bg-paper px-3 py-2 text-sm"
-            placeholder="새 카테고리 입력 (예: 컵)"
-            placeholderTextColor="#BBBBBB"
-            value={categoryInput}
-            onChangeText={setCategoryInput}
-          />
-          <Pressable
-            onPress={submitCategory}
-            className="items-center justify-center rounded-xl border border-line bg-paper px-4 active:opacity-70"
-          >
-            <Text className="text-ink text-sm font-medium">{editingCategory ? '수정' : '추가'}</Text>
-          </Pressable>
-          {editingCategory ? (
-            <Pressable onPress={cancelCategoryEdit} className="items-center justify-center px-2">
+        {showCategoryInput || editingCategory ? (
+          <View className="flex-row gap-2">
+            <TextInput
+              className="text-ink flex-1 rounded-xl border border-line bg-paper px-3 py-2 text-sm"
+              placeholder="새 카테고리 입력 (예: 컵)"
+              placeholderTextColor="#BBBBBB"
+              value={categoryInput}
+              onChangeText={setCategoryInput}
+              autoFocus
+            />
+            <Pressable
+              onPress={submitCategory}
+              className="items-center justify-center rounded-xl border border-line bg-paper px-4 active:opacity-70"
+            >
+              <Text className="text-ink text-sm font-medium">
+                {editingCategory ? '수정' : '추가'}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={editingCategory ? cancelCategoryEdit : closeCategoryInput}
+              className="items-center justify-center px-2"
+            >
               <Text className="text-muted text-sm">취소</Text>
             </Pressable>
-          ) : null}
-        </View>
+          </View>
+        ) : null}
       </View>
 
       <FlatList
