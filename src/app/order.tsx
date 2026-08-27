@@ -12,6 +12,7 @@ import {
   listOrderCategories,
   listOrderProducts,
   renameOrderCategory,
+  seedDefaultOrderProducts,
   setOrderCartQuantity,
 } from '@/lib/order-repo';
 import { OrderCart, OrderProduct } from '@/lib/order-types';
@@ -24,6 +25,7 @@ export default function Order() {
   const [selectedCategory, setSelectedCategory] = useState('전체');
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [categoryInput, setCategoryInput] = useState('');
+  const [seeding, setSeeding] = useState(false);
   const scanParams = useLocalSearchParams<{ scannedBarcode?: string; nonce?: string }>();
 
   const load = useCallback(async () => {
@@ -151,6 +153,20 @@ export default function Order() {
     ]);
   };
 
+  const onSeedDefaults = async () => {
+    setSeeding(true);
+    try {
+      const count = await seedDefaultOrderProducts();
+      await load();
+      Alert.alert(
+        count > 0 ? '불러오기 완료' : '알림',
+        count > 0 ? `기본 상품 ${count}건을 불러왔습니다.` : '이미 등록된 상품이 있어 건너뛰었습니다.',
+      );
+    } finally {
+      setSeeding(false);
+    }
+  };
+
   return (
     <View className="flex-1 bg-bg">
       <Stack.Screen
@@ -242,6 +258,15 @@ export default function Order() {
             <Text className="text-muted mt-1 text-sm">
               오른쪽 위 + 버튼을 눌러 상품을 등록해 보세요
             </Text>
+            <Pressable
+              onPress={onSeedDefaults}
+              disabled={seeding}
+              className="mt-4 rounded-xl border border-line bg-paper px-4 py-2.5 active:opacity-70"
+            >
+              <Text className="text-ink text-sm font-medium">
+                {seeding ? '불러오는 중...' : '기본 상품 불러오기 (아이스크림 388종)'}
+              </Text>
+            </Pressable>
           </View>
         }
       />
