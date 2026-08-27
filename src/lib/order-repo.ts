@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { upsertBarcodeCatalog } from './barcode-catalog';
 import { newId } from './repo';
 import { OrderCart, OrderProduct } from './order-types';
+import { DEFAULT_ORDER_PRODUCTS } from './order-seed-data';
 
 export { newId };
 
@@ -110,4 +111,18 @@ export async function setOrderCartQuantity(productId: string, qty: number): Prom
 
 export async function clearOrderCart(): Promise<void> {
   await writeOrderCart({});
+}
+
+/**
+ * 발주 카탈로그가 완전히 비어 있을 때만 icemoa.com 기반 기본 상품 목록을 채운다.
+ * 이미 상품이 하나라도 있으면 아무것도 하지 않고 0을 반환한다 (사용자 데이터를 덮어쓰지 않기 위함).
+ * 대량(388건) 삽입이므로 개별 저장(saveOrderProduct)과 달리 barcode_catalog 공용 캐시에는 쓰지 않는다
+ * — 다수의 개별 네트워크 호출을 피하기 위한 의도적 단순화 (공용 캐시는 이후 스캔 시 자연히 채워짐).
+ */
+export async function seedDefaultOrderProducts(): Promise<number> {
+  const existing = await listOrderProducts();
+  if (existing.length > 0) return 0;
+  const items: OrderProduct[] = DEFAULT_ORDER_PRODUCTS.map((p) => ({ ...p, id: newId() }));
+  await writeOrderProducts(items);
+  return items.length;
 }
