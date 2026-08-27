@@ -307,7 +307,7 @@ export default function Order() {
       <FlatList
         data={filtered}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ paddingTop: 12, paddingBottom: 120 }}
+        contentContainerStyle={{ paddingTop: 12, paddingBottom: 120 + insets.bottom }}
         renderItem={({ item }) => (
           <CatalogRow
             product={item}
@@ -391,10 +391,13 @@ function CatalogRow({
       )}
       <View className="ml-3 flex-1">
         <View className="flex-row items-center" style={{ gap: 6 }}>
-          <Text className="text-ink text-base font-bold" numberOfLines={1}>
+          <Text className="text-ink flex-1 text-base font-bold" numberOfLines={1}>
             {product.name}
           </Text>
-          <View className="rounded px-1.5 py-0.5" style={{ backgroundColor: statusMeta.color }}>
+          <View
+            className="rounded px-1.5 py-0.5"
+            style={{ backgroundColor: statusMeta.color, flexShrink: 0 }}
+          >
             <Text className="text-xs font-bold" style={{ color: '#FFFFFF' }}>
               {statusMeta.label}
             </Text>
