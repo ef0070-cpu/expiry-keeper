@@ -411,16 +411,16 @@ function CatalogRow({
       <View className="flex-row items-center">
         <Pressable
           onPress={() => onChangeQty(-1)}
-          className="h-9 w-9 items-center justify-center rounded-lg border border-line bg-bg active:opacity-70"
+          className="h-11 w-11 items-center justify-center rounded-lg border border-line bg-bg active:opacity-70"
         >
-          <MaterialCommunityIcons name="minus" size={16} color="#1A1A1A" />
+          <MaterialCommunityIcons name="minus" size={20} color="#1A1A1A" />
         </Pressable>
-        <Text className="text-ink mx-3 w-6 text-center text-base font-bold">{qty}</Text>
+        <Text className="text-ink mx-3 w-7 text-center text-lg font-bold">{qty}</Text>
         <Pressable
           onPress={() => onChangeQty(1)}
-          className="h-9 w-9 items-center justify-center rounded-lg border border-line bg-bg active:opacity-70"
+          className="h-11 w-11 items-center justify-center rounded-lg border border-line bg-bg active:opacity-70"
         >
-          <MaterialCommunityIcons name="plus" size={16} color="#1A1A1A" />
+          <MaterialCommunityIcons name="plus" size={20} color="#1A1A1A" />
         </Pressable>
       </View>
     </Pressable>
