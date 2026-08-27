@@ -179,6 +179,11 @@ export default function Dashboard() {
         options={{
           headerRight: () => (
             <View className="flex-row items-center" style={{ gap: 16 }}>
+              {mode === 'retail' ? (
+                <Pressable onPress={() => router.push('/order')} hitSlop={8}>
+                  <MaterialCommunityIcons name="cart-outline" size={22} color="#1A1A1A" />
+                </Pressable>
+              ) : null}
               {mode === 'home' ? (
                 <Pressable onPress={() => router.push('/recipes')} hitSlop={8}>
                   <MaterialCommunityIcons name="chef-hat" size={22} color="#1A1A1A" />
