@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { lookupBarcode } from './barcode-lookup';
+import { lookupBarcode, searchProductImage } from './barcode-lookup';
 import { upsertBarcodeCatalog } from './barcode-catalog';
 import { newId } from './repo';
 import { OrderCart, OrderProduct } from './order-types';
@@ -145,10 +145,15 @@ export async function fillMissingOrderPhotos(
   for (let i = 0; i < targets.length; i++) {
     const target = targets[i];
     const info = await lookupBarcode(target.barcode!, target.brand);
-    if (info.imageUrl) {
+    let imageUrl = info.imageUrl;
+    if (!imageUrl) {
+      const query = target.brand ? `${target.brand} ${target.name}` : target.name;
+      imageUrl = await searchProductImage(query);
+    }
+    if (imageUrl) {
       const idx = items.findIndex((p) => p.id === target.id);
       if (idx >= 0) {
-        items[idx] = { ...items[idx], imageUri: info.imageUrl };
+        items[idx] = { ...items[idx], imageUri: imageUrl };
         await writeOrderProducts(items);
         filled++;
       }
