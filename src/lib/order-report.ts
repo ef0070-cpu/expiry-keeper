@@ -46,7 +46,8 @@ export async function reportOrderProductIssue(
 
 /**
  * 사용자가 새로 등록한 발주 상품을 카탈로그 반영 제안(kind='new')으로 접수한다.
- * 관리자 승인 전까지는 다른 사용자에게 보이지 않으며, 승인되면 "Update" 버튼으로 전체 반영된다.
+ * 정보 오류 신고와 달리 사람이 직접 값을 입력해 등록한 상품이라 위험이 낮으므로 즉시 승인 처리해
+ * 다른 사용자의 "Update" 버튼에 바로 뜨게 한다 (오류 신고는 여전히 관리자 검토 후 승인).
  * 로그인/네트워크 문제로 실패해도 로컬 등록 자체는 이미 끝난 뒤라 조용히 무시한다(best-effort).
  */
 export async function submitNewOrderProduct(product: OrderProduct): Promise<void> {
@@ -55,6 +56,7 @@ export async function submitNewOrderProduct(product: OrderProduct): Promise<void
     const photoUrl = product.imageUri ? await uploadReportPhoto(product.imageUri) : null;
     await supabase.from('order_product_reports').insert({
       kind: 'new',
+      status: 'approved',
       barcode: product.barcode,
       name: product.name,
       brand: product.brand,

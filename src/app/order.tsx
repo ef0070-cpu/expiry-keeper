@@ -8,6 +8,7 @@ import Chip from '@/components/Chip';
 import { hasImageSearchKeys } from '@/lib/barcode-lookup';
 import {
   addOrderCategory,
+  countApprovedCatalogUpdates,
   deleteOrderCategory,
   deleteOrderProduct,
   getOrderCart,
@@ -39,17 +40,20 @@ export default function Order() {
   const [showCategoryInput, setShowCategoryInput] = useState(false);
   const [seeding, setSeeding] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const [pendingUpdateCount, setPendingUpdateCount] = useState(0);
   const scanParams = useLocalSearchParams<{ scannedBarcode?: string; nonce?: string }>();
 
   const load = useCallback(async () => {
-    const [productList, categoryList, cartData] = await Promise.all([
+    const [productList, categoryList, cartData, updateCount] = await Promise.all([
       listOrderProducts(),
       listOrderCategories(),
       getOrderCart(),
+      countApprovedCatalogUpdates(),
     ]);
     setProducts(productList);
     setCategories(categoryList);
     setCart(cartData);
+    setPendingUpdateCount(updateCount);
   }, []);
 
   useFocusEffect(
@@ -241,10 +245,20 @@ export default function Order() {
 
       <Pressable
         onPress={onUpdate}
-        disabled={updating}
-        className="mx-4 mt-2.5 items-center rounded-xl border border-line bg-paper py-2.5 active:opacity-70"
+        disabled={updating || pendingUpdateCount === 0}
+        className="mx-4 mt-2.5 items-center rounded-xl py-2.5 active:opacity-70"
+        style={{ backgroundColor: pendingUpdateCount > 0 ? '#2E7D32' : '#F0F0F0' }}
       >
-        <Text className="text-ink text-sm font-medium">{updating ? '업데이트 중...' : 'Update'}</Text>
+        <Text
+          className="text-sm font-bold"
+          style={{ color: pendingUpdateCount > 0 ? '#FFFFFF' : '#999999' }}
+        >
+          {updating
+            ? '업데이트 중...'
+            : pendingUpdateCount > 0
+              ? `업데이트된 ${pendingUpdateCount}건이 있습니다`
+              : 'Update'}
+        </Text>
       </Pressable>
 
       <View className="mt-2.5 px-4" style={{ gap: 8 }}>

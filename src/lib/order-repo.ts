@@ -141,12 +141,9 @@ type ApprovedReportRow = {
   photo_uri: string | null;
 };
 
-/**
- * 관리자가 승인한 카탈로그 변경(신제품 등록 제안 + 정보 오류 신고 수정)을 받아와 로컬 카탈로그에 반영한다.
- * 한 번 반영한 건은 appliedCatalogUpdateIds에 기록해 다음 Update 때 중복 반영하지 않는다.
- */
-export async function syncApprovedCatalogUpdates(): Promise<{ added: number; fixed: number }> {
-  if (!supabase) throw new Error('로그인이 필요합니다.');
+/** 승인됐지만 아직 이 기기에 반영 안 한 행만 걸러서 돌려준다 (appliedCatalogUpdateIds 기준). */
+async function fetchUnappliedApprovedRows(): Promise<ApprovedReportRow[]> {
+  if (!supabase) return [];
   const { data, error } = await supabase
     .from('order_product_reports')
     .select('id, kind, barcode, name, brand, price, category, photo_uri')
@@ -156,9 +153,29 @@ export async function syncApprovedCatalogUpdates(): Promise<{ added: number; fix
   const appliedRaw = await AsyncStorage.getItem(APPLIED_UPDATES_KEY);
   const applied = new Set<string>(appliedRaw ? (JSON.parse(appliedRaw) as string[]) : []);
   const rows = (data as ApprovedReportRow[] | null) ?? [];
-  const pending = rows.filter((row) => !applied.has(row.id));
+  return rows.filter((row) => !applied.has(row.id));
+}
+
+/** Update 버튼에 미리 보여줄 대기 건수. 로그인 안 됐거나 조회 실패하면 0(버튼 비활성 상태 유지). */
+export async function countApprovedCatalogUpdates(): Promise<number> {
+  try {
+    return (await fetchUnappliedApprovedRows()).length;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * 관리자가 승인한 카탈로그 변경(신제품 등록 제안 + 정보 오류 신고 수정)을 받아와 로컬 카탈로그에 반영한다.
+ * 한 번 반영한 건은 appliedCatalogUpdateIds에 기록해 다음 Update 때 중복 반영하지 않는다.
+ */
+export async function syncApprovedCatalogUpdates(): Promise<{ added: number; fixed: number }> {
+  if (!supabase) throw new Error('로그인이 필요합니다.');
+  const pending = await fetchUnappliedApprovedRows();
   if (pending.length === 0) return { added: 0, fixed: 0 };
 
+  const appliedRaw = await AsyncStorage.getItem(APPLIED_UPDATES_KEY);
+  const applied = new Set<string>(appliedRaw ? (JSON.parse(appliedRaw) as string[]) : []);
   const items = await listOrderProducts();
   let added = 0;
   let fixed = 0;
