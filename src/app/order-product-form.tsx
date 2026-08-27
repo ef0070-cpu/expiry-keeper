@@ -24,7 +24,7 @@ import {
   newId,
   saveOrderProduct,
 } from '@/lib/order-repo';
-import { OrderProduct } from '@/lib/order-types';
+import { OrderProduct, OrderStatus } from '@/lib/order-types';
 
 export default function OrderProductForm() {
   const params = useLocalSearchParams<{
@@ -43,6 +43,7 @@ export default function OrderProductForm() {
   const [categories, setCategories] = useState<string[]>([]);
   const [category, setCategory] = useState('');
   const [newCategory, setNewCategory] = useState('');
+  const [status, setStatus] = useState<OrderStatus>('active');
   const [busy, setBusy] = useState(false);
   const [searching, setSearching] = useState(false);
   const [checkingBarcode, setCheckingBarcode] = useState(false);
@@ -62,6 +63,7 @@ export default function OrderProductForm() {
         setPrice(String(p.price));
         setBarcode(p.barcode ?? '');
         setCategory(p.category);
+        setStatus(p.status ?? 'active');
       });
     }
   }, [params.id]);
@@ -167,6 +169,7 @@ export default function OrderProductForm() {
         category,
         barcode: barcode.trim() || null,
         imageUri,
+        status,
       };
       await saveOrderProduct(product);
       router.back();
@@ -328,6 +331,30 @@ export default function OrderProductForm() {
           </View>
         </View>
 
+        <View className="mt-4">
+          <Label text="납품상태" />
+          <View className="flex-row gap-2">
+            <StatusOption
+              label="시판중"
+              color="#2E7D32"
+              active={status === 'active'}
+              onPress={() => setStatus('active')}
+            />
+            <StatusOption
+              label="단종"
+              color="#C62828"
+              active={status === 'discontinued'}
+              onPress={() => setStatus('discontinued')}
+            />
+            <StatusOption
+              label="생산중단"
+              color="#F9A825"
+              active={status === 'paused'}
+              onPress={() => setStatus('paused')}
+            />
+          </View>
+        </View>
+
         <View className="mt-5 flex-row gap-3">
           {isEdit ? (
             <Pressable
@@ -358,4 +385,31 @@ export default function OrderProductForm() {
 
 function Label({ text }: { text: string }) {
   return <Text className="text-ink mb-1.5 text-sm font-bold">{text}</Text>;
+}
+
+function StatusOption({
+  label,
+  color,
+  active,
+  onPress,
+}: {
+  label: string;
+  color: string;
+  active: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      className="flex-1 items-center justify-center rounded-xl border py-2.5 active:opacity-70"
+      style={{
+        borderColor: active ? color : '#E5E5E5',
+        backgroundColor: active ? color : '#FFFFFF',
+      }}
+    >
+      <Text className="text-sm font-bold" style={{ color: active ? '#FFFFFF' : '#888888' }}>
+        {label}
+      </Text>
+    </Pressable>
+  );
 }
