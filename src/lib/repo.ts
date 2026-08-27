@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { upsertBarcodeCatalog } from './barcode-catalog';
 import { getCachedAppMode } from './settings';
+import { uploadPhotoToBucket } from './storage';
 import { supabase } from './supabase';
 import { Product, ProductStatus } from './types';
 
@@ -84,20 +85,9 @@ function toRow(p: Product): ProductRow {
 
 /** 로컬 사진(file:// 또는 content:// URI)을 Supabase Storage에 올리고 공개 URL을 돌려준다. */
 async function uploadImageIfNeeded(p: Product): Promise<Product> {
-  if (!supabase || !p.imageUri || p.imageUri.startsWith('http')) return p;
-  try {
-    const res = await fetch(p.imageUri);
-    const buffer = await res.arrayBuffer();
-    const path = `${p.id}.jpg`;
-    const { error } = await supabase.storage
-      .from('product-images')
-      .upload(path, buffer, { contentType: 'image/jpeg', upsert: true });
-    if (error) return p;
-    const { data } = supabase.storage.from('product-images').getPublicUrl(path);
-    return { ...p, imageUri: data.publicUrl };
-  } catch {
-    return p;
-  }
+  if (!p.imageUri) return p;
+  const url = await uploadPhotoToBucket(p.imageUri, 'product-images', `${p.id}.jpg`);
+  return url ? { ...p, imageUri: url } : p;
 }
 
 // ---------- 공용 API ----------

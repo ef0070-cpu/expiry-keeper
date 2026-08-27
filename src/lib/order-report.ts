@@ -1,23 +1,11 @@
 import { supabase } from './supabase';
+import { uploadPhotoToBucket } from './storage';
 import type { OrderProduct } from './order-types';
 
 /** 신고/제안 첨부 사진을 Storage에 올리고 공개 URL을 돌려준다. 실패하면 null. */
-async function uploadReportPhoto(uri: string): Promise<string | null> {
-  if (!supabase) return null;
-  if (uri.startsWith('http')) return uri;
-  try {
-    const res = await fetch(uri);
-    const buffer = await res.arrayBuffer();
-    const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
-    const { error } = await supabase.storage
-      .from('order-report-images')
-      .upload(path, buffer, { contentType: 'image/jpeg' });
-    if (error) return null;
-    const { data } = supabase.storage.from('order-report-images').getPublicUrl(path);
-    return data.publicUrl;
-  } catch {
-    return null;
-  }
+function uploadReportPhoto(uri: string): Promise<string | null> {
+  const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
+  return uploadPhotoToBucket(uri, 'order-report-images', path);
 }
 
 /**

@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { upsertBarcodeCatalog } from './barcode-catalog';
+import { submitNewOrderProduct } from './order-report';
 import { newId } from './repo';
 import { supabase } from './supabase';
 import { OrderCart, OrderProduct } from './order-types';
@@ -36,14 +37,19 @@ export async function listOrderProductsByBarcode(barcode: string): Promise<Order
   return items.filter((p) => p.barcode === barcode);
 }
 
-/** 추가/수정 겸용 저장. 바코드가 있으면 공용 바코드 캐시에도 반영한다 (best-effort). */
+/**
+ * 추가/수정 겸용 저장. 바코드가 있으면 공용 바코드 캐시에도 반영한다 (best-effort).
+ * 신규 등록(기존 id와 매칭 안 됨)이면 크라우드소싱 카탈로그 제안으로도 접수한다 (best-effort).
+ */
 export async function saveOrderProduct(p: OrderProduct): Promise<OrderProduct> {
   const items = await listOrderProducts();
   const idx = items.findIndex((x) => x.id === p.id);
-  if (idx >= 0) items[idx] = p;
-  else items.push(p);
+  const isNew = idx < 0;
+  if (isNew) items.push(p);
+  else items[idx] = p;
   await writeOrderProducts(items);
   upsertBarcodeCatalog(p.barcode, p.name, p.imageUri).catch(() => {});
+  if (isNew) submitNewOrderProduct(p).catch(() => {});
   return p;
 }
 
@@ -141,25 +147,29 @@ type ApprovedReportRow = {
   photo_uri: string | null;
 };
 
-/** 승인됐지만 아직 이 기기에 반영 안 한 행만 걸러서 돌려준다 (appliedCatalogUpdateIds 기준). */
-async function fetchUnappliedApprovedRows(): Promise<ApprovedReportRow[]> {
-  if (!supabase) return [];
+/** 승인됐지만 아직 이 기기에 반영 안 한 행과, 반영 완료 기록(appliedCatalogUpdateIds) Set을 함께 돌려준다. */
+async function fetchUnappliedApprovedRows(): Promise<{
+  rows: ApprovedReportRow[];
+  applied: Set<string>;
+}> {
+  const appliedRaw = await AsyncStorage.getItem(APPLIED_UPDATES_KEY);
+  const applied = new Set<string>(appliedRaw ? (JSON.parse(appliedRaw) as string[]) : []);
+  if (!supabase) return { rows: [], applied };
+
   const { data, error } = await supabase
     .from('order_product_reports')
     .select('id, kind, barcode, name, brand, price, category, photo_uri')
     .eq('status', 'approved');
   if (error) throw error;
 
-  const appliedRaw = await AsyncStorage.getItem(APPLIED_UPDATES_KEY);
-  const applied = new Set<string>(appliedRaw ? (JSON.parse(appliedRaw) as string[]) : []);
-  const rows = (data as ApprovedReportRow[] | null) ?? [];
-  return rows.filter((row) => !applied.has(row.id));
+  const rows = ((data as ApprovedReportRow[] | null) ?? []).filter((row) => !applied.has(row.id));
+  return { rows, applied };
 }
 
 /** Update 버튼에 미리 보여줄 대기 건수. 로그인 안 됐거나 조회 실패하면 0(버튼 비활성 상태 유지). */
 export async function countApprovedCatalogUpdates(): Promise<number> {
   try {
-    return (await fetchUnappliedApprovedRows()).length;
+    return (await fetchUnappliedApprovedRows()).rows.length;
   } catch {
     return 0;
   }
@@ -171,11 +181,9 @@ export async function countApprovedCatalogUpdates(): Promise<number> {
  */
 export async function syncApprovedCatalogUpdates(): Promise<{ added: number; fixed: number }> {
   if (!supabase) throw new Error('로그인이 필요합니다.');
-  const pending = await fetchUnappliedApprovedRows();
+  const { rows: pending, applied } = await fetchUnappliedApprovedRows();
   if (pending.length === 0) return { added: 0, fixed: 0 };
 
-  const appliedRaw = await AsyncStorage.getItem(APPLIED_UPDATES_KEY);
-  const applied = new Set<string>(appliedRaw ? (JSON.parse(appliedRaw) as string[]) : []);
   const items = await listOrderProducts();
   let added = 0;
   let fixed = 0;

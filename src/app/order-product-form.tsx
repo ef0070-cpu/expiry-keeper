@@ -24,7 +24,7 @@ import {
   newId,
   saveOrderProduct,
 } from '@/lib/order-repo';
-import { reportOrderProductIssue, submitNewOrderProduct } from '@/lib/order-report';
+import { reportOrderProductIssue } from '@/lib/order-report';
 import { OrderProduct, OrderStatus } from '@/lib/order-types';
 
 export default function OrderProductForm() {
@@ -73,21 +73,17 @@ export default function OrderProductForm() {
     }
   }, [params.id]);
 
-  const pickImage = () => {
-    Alert.alert('상품 사진', '사진을 어떻게 추가할까요?', [
+  const pickPhoto = (title: string, message: string, onPicked: (uri: string) => void) => {
+    Alert.alert(title, message, [
       { text: '취소', style: 'cancel' },
-      { text: '앨범에서 선택', onPress: () => launchPicker('library', setImageUri) },
-      { text: '카메라 촬영', onPress: () => launchPicker('camera', setImageUri) },
+      { text: '앨범에서 선택', onPress: () => launchPicker('library', onPicked) },
+      { text: '카메라 촬영', onPress: () => launchPicker('camera', onPicked) },
     ]);
   };
 
-  const pickReportPhoto = () => {
-    Alert.alert('신고 사진', '사진을 어떻게 첨부할까요?', [
-      { text: '취소', style: 'cancel' },
-      { text: '앨범에서 선택', onPress: () => launchPicker('library', setReportPhotoUri) },
-      { text: '카메라 촬영', onPress: () => launchPicker('camera', setReportPhotoUri) },
-    ]);
-  };
+  const pickImage = () => pickPhoto('상품 사진', '사진을 어떻게 추가할까요?', setImageUri);
+  const pickReportPhoto = () =>
+    pickPhoto('신고 사진', '사진을 어떻게 첨부할까요?', setReportPhotoUri);
 
   const launchPicker = async (source: 'camera' | 'library', onPicked: (uri: string) => void) => {
     const options: ImagePicker.ImagePickerOptions = {
@@ -195,7 +191,6 @@ export default function OrderProductForm() {
         status,
       };
       await saveOrderProduct(product);
-      if (!isEdit) submitNewOrderProduct(product).catch(() => {});
       router.back();
     } catch (e) {
       Alert.alert('저장 실패', e instanceof Error ? e.message : '알 수 없는 오류');

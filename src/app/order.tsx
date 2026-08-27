@@ -43,18 +43,21 @@ export default function Order() {
   const [pendingUpdateCount, setPendingUpdateCount] = useState(0);
   const scanParams = useLocalSearchParams<{ scannedBarcode?: string; nonce?: string }>();
 
-  const load = useCallback(async () => {
-    const [productList, categoryList, cartData, updateCount] = await Promise.all([
+  const loadCatalog = useCallback(async () => {
+    const [productList, categoryList, cartData] = await Promise.all([
       listOrderProducts(),
       listOrderCategories(),
       getOrderCart(),
-      countApprovedCatalogUpdates(),
     ]);
     setProducts(productList);
     setCategories(categoryList);
     setCart(cartData);
-    setPendingUpdateCount(updateCount);
   }, []);
+
+  const load = useCallback(async () => {
+    const [, updateCount] = await Promise.all([loadCatalog(), countApprovedCatalogUpdates()]);
+    setPendingUpdateCount(updateCount);
+  }, [loadCatalog]);
 
   useFocusEffect(
     useCallback(() => {
@@ -197,7 +200,8 @@ export default function Order() {
     setUpdating(true);
     try {
       const { added, fixed } = await syncApprovedCatalogUpdates();
-      await load();
+      await loadCatalog();
+      setPendingUpdateCount(0);
       const total = added + fixed;
       Alert.alert(
         total > 0 ? '업데이트 완료' : '알림',
