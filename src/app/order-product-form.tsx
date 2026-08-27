@@ -1,0 +1,323 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import Chip from '@/components/Chip';
+import { hasImageSearchKeys, searchProductImage } from '@/lib/barcode-lookup';
+import {
+  addOrderCategory,
+  deleteOrderProduct,
+  getOrderProduct,
+  listOrderCategories,
+  newId,
+  saveOrderProduct,
+} from '@/lib/order-repo';
+import { OrderProduct } from '@/lib/order-types';
+
+export default function OrderProductForm() {
+  const params = useLocalSearchParams<{
+    id?: string;
+    barcode?: string;
+    prefillName?: string;
+    prefillImage?: string;
+  }>();
+  const isEdit = !!params.id;
+
+  const [name, setName] = useState(params.prefillName ?? '');
+  const [imageUri, setImageUri] = useState<string | null>(params.prefillImage || null);
+  const [brand, setBrand] = useState('');
+  const [price, setPrice] = useState('');
+  const [barcode, setBarcode] = useState<string | null>(params.barcode ?? null);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [category, setCategory] = useState('');
+  const [newCategory, setNewCategory] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [searching, setSearching] = useState(false);
+
+  useEffect(() => {
+    listOrderCategories().then((list) => {
+      setCategories(list);
+      if (!params.id && list.length > 0) setCategory((prev) => prev || list[0]);
+    });
+
+    if (params.id) {
+      getOrderProduct(params.id).then((p) => {
+        if (!p) return;
+        setName(p.name);
+        setImageUri(p.imageUri);
+        setBrand(p.brand);
+        setPrice(String(p.price));
+        setBarcode(p.barcode);
+        setCategory(p.category);
+      });
+    }
+  }, [params.id]);
+
+  const pickImage = () => {
+    Alert.alert('상품 사진', '사진을 어떻게 추가할까요?', [
+      { text: '취소', style: 'cancel' },
+      { text: '앨범에서 선택', onPress: () => launchPicker('library') },
+      { text: '카메라 촬영', onPress: () => launchPicker('camera') },
+    ]);
+  };
+
+  const launchPicker = async (source: 'camera' | 'library') => {
+    const options: ImagePicker.ImagePickerOptions = {
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    };
+    let result: ImagePicker.ImagePickerResult;
+    if (source === 'camera') {
+      const perm = await ImagePicker.requestCameraPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert('권한 필요', '카메라 접근 권한을 허용해 주세요.');
+        return;
+      }
+      result = await ImagePicker.launchCameraAsync(options);
+    } else {
+      result = await ImagePicker.launchImageLibraryAsync(options);
+    }
+    if (!result.canceled && result.assets[0]) {
+      setImageUri(result.assets[0].uri);
+    }
+  };
+
+  const findImageOnWeb = async () => {
+    if (!name.trim()) {
+      Alert.alert('입력 확인', '먼저 상품명을 입력해 주세요.');
+      return;
+    }
+    if (!hasImageSearchKeys()) {
+      Alert.alert('로그인 필요', '이미지 검색을 사용하려면 로그인이 필요합니다.');
+      return;
+    }
+    setSearching(true);
+    const url = await searchProductImage(name.trim());
+    setSearching(false);
+    if (url) setImageUri(url);
+    else Alert.alert('검색 결과 없음', '이미지를 찾지 못했습니다. 직접 촬영해 주세요.');
+  };
+
+  const addCategory = async () => {
+    const v = newCategory.trim();
+    if (!v) return;
+    const next = await addOrderCategory(v);
+    setCategories(next);
+    setCategory(v);
+    setNewCategory('');
+  };
+
+  const save = async () => {
+    if (!name.trim()) {
+      Alert.alert('입력 확인', '상품명을 입력해 주세요.');
+      return;
+    }
+    if (!category) {
+      Alert.alert('입력 확인', '카테고리를 선택해 주세요.');
+      return;
+    }
+    const parsedPrice = Number(price);
+    if (price.trim() && Number.isNaN(parsedPrice)) {
+      Alert.alert('입력 확인', '가격은 숫자로 입력해 주세요.');
+      return;
+    }
+    setBusy(true);
+    try {
+      const product: OrderProduct = {
+        id: params.id ?? newId(),
+        name: name.trim(),
+        brand: brand.trim(),
+        price: price.trim() ? parsedPrice : 0,
+        category,
+        barcode,
+        imageUri,
+      };
+      await saveOrderProduct(product);
+      router.back();
+    } catch (e) {
+      Alert.alert('저장 실패', e instanceof Error ? e.message : '알 수 없는 오류');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = () => {
+    if (!params.id) return;
+    Alert.alert('상품 삭제', '이 상품을 삭제할까요?', [
+      { text: '취소', style: 'cancel' },
+      {
+        text: '삭제',
+        style: 'destructive',
+        onPress: async () => {
+          await deleteOrderProduct(params.id!);
+          router.back();
+        },
+      },
+    ]);
+  };
+
+  return (
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      className="flex-1"
+    >
+      <Stack.Screen options={{ title: isEdit ? '발주 상품 수정' : '발주 상품 등록' }} />
+      <ScrollView
+        className="flex-1 bg-bg"
+        contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View className="flex-row">
+          <Pressable
+            onPress={pickImage}
+            className="items-center justify-center rounded-xl border border-line bg-paper active:opacity-70"
+            style={{ width: 96, height: 96 }}
+          >
+            {imageUri ? (
+              <Image
+                source={{ uri: imageUri }}
+                style={{ width: 96, height: 96, borderRadius: 12 }}
+                contentFit="cover"
+              />
+            ) : (
+              <View className="items-center">
+                <MaterialCommunityIcons name="camera-plus-outline" size={26} color="#888888" />
+                <Text className="text-muted mt-1 text-xs">사진 추가</Text>
+              </View>
+            )}
+          </Pressable>
+
+          <View className="ml-3 flex-1">
+            <View className="flex-row items-center justify-between">
+              <Text className="text-ink text-sm font-bold">상품명 *</Text>
+              {barcode ? (
+                <View className="flex-row items-center">
+                  <MaterialCommunityIcons name="barcode" size={14} color="#888888" />
+                  <Text className="text-muted ml-1 text-xs">{barcode}</Text>
+                </View>
+              ) : null}
+            </View>
+            <TextInput
+              className="text-ink mt-1.5 rounded-xl border border-line bg-paper px-3 py-2.5 text-base"
+              placeholder="예: 메로나"
+              placeholderTextColor="#BBBBBB"
+              value={name}
+              onChangeText={setName}
+            />
+            <View className="mt-2 flex-row items-center gap-4">
+              <Pressable
+                onPress={findImageOnWeb}
+                disabled={searching}
+                className="flex-row items-center"
+              >
+                {searching ? (
+                  <ActivityIndicator size="small" color="#CC2222" />
+                ) : (
+                  <MaterialCommunityIcons name="image-search-outline" size={15} color="#CC2222" />
+                )}
+                <Text className="text-primary ml-1 text-xs font-medium">웹에서 이미지 찾기</Text>
+              </Pressable>
+              {imageUri ? (
+                <Pressable onPress={() => setImageUri(null)}>
+                  <Text className="text-muted text-xs underline">사진 제거</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          </View>
+        </View>
+
+        <View className="mt-4 flex-row gap-3">
+          <View className="flex-1">
+            <Label text="브랜드" />
+            <TextInput
+              className="text-ink rounded-xl border border-line bg-paper px-3 py-2.5 text-base"
+              placeholder="예: 빙그레"
+              placeholderTextColor="#BBBBBB"
+              value={brand}
+              onChangeText={setBrand}
+            />
+          </View>
+          <View className="flex-1">
+            <Label text="가격 (원)" />
+            <TextInput
+              className="text-ink rounded-xl border border-line bg-paper px-3 py-2.5 text-base"
+              placeholder="예: 400"
+              placeholderTextColor="#BBBBBB"
+              keyboardType="number-pad"
+              value={price}
+              onChangeText={setPrice}
+            />
+          </View>
+        </View>
+
+        <View className="mt-4">
+          <Label text="카테고리 *" />
+          {categories.length > 0 ? (
+            <View className="mb-2 flex-row flex-wrap gap-2">
+              {categories.map((c) => (
+                <Chip key={c} label={c} active={category === c} onPress={() => setCategory(c)} />
+              ))}
+            </View>
+          ) : null}
+          <View className="flex-row gap-2">
+            <TextInput
+              className="text-ink flex-1 rounded-xl border border-line bg-paper px-3 py-2 text-sm"
+              placeholder="새 카테고리 입력 (예: 컵)"
+              placeholderTextColor="#BBBBBB"
+              value={newCategory}
+              onChangeText={setNewCategory}
+            />
+            <Pressable
+              onPress={addCategory}
+              className="items-center justify-center rounded-xl border border-line bg-paper px-4 active:opacity-70"
+            >
+              <Text className="text-ink text-sm font-medium">추가</Text>
+            </Pressable>
+          </View>
+        </View>
+
+        <View className="mt-5 flex-row gap-3">
+          {isEdit ? (
+            <Pressable
+              onPress={remove}
+              className="flex-1 items-center rounded-xl border border-line bg-paper py-3.5 active:opacity-70"
+            >
+              <Text className="text-primary text-base font-medium">삭제</Text>
+            </Pressable>
+          ) : null}
+          <Pressable
+            onPress={save}
+            disabled={busy}
+            className={`items-center rounded-xl bg-primary py-3.5 active:opacity-80 ${
+              isEdit ? 'flex-[2]' : 'flex-1'
+            }`}
+          >
+            {busy ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text className="text-paper text-base font-bold">{isEdit ? '수정 저장' : '등록'}</Text>
+            )}
+          </Pressable>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
+
+function Label({ text }: { text: string }) {
+  return <Text className="text-ink mb-1.5 text-sm font-bold">{text}</Text>;
+}
