@@ -6,6 +6,7 @@ import { ActivityIndicator, LayoutChangeEvent, Pressable, Text, View } from 'rea
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { lookupBarcode } from '@/lib/barcode-lookup';
 import { listProductsByBarcode } from '@/lib/repo';
+import { listOrderProductsByBarcode } from '@/lib/order-repo';
 
 // 가이드 사각형 크기 (아래 오버레이의 h-40 w-72 와 동일한 값, px 단위)
 const GUIDE_W = 288;
@@ -71,6 +72,30 @@ export default function Scan() {
       router.dismissTo({
         pathname: '/',
         params: { scannedBarcode: data, nonce: String(Date.now()) },
+      });
+      return;
+    }
+
+    if (params.mode === 'order') {
+      // 발주 모드: 카탈로그에 이미 있으면 검색어만 채우고, 없으면 신규 등록 화면으로 보낸다.
+      setLooking(true);
+      const [info, duplicates] = await Promise.all([
+        lookupBarcode(data),
+        listOrderProductsByBarcode(data),
+      ]);
+      setLooking(false);
+
+      if (duplicates.length > 0) {
+        router.dismissTo({
+          pathname: '/order',
+          params: { scannedBarcode: data, nonce: String(Date.now()) },
+        });
+        return;
+      }
+
+      router.replace({
+        pathname: '/order-product-form',
+        params: { barcode: data, prefillName: info.name ?? '', prefillImage: info.imageUrl ?? '' },
       });
       return;
     }
@@ -159,7 +184,9 @@ export default function Scan() {
           style={{ bottom: Math.max(insets.bottom, 48) + 24 }}
         >
           <Pressable
-            onPress={() => router.replace('/product-form')}
+            onPress={() =>
+              router.replace(params.mode === 'order' ? '/order-product-form' : '/product-form')
+            }
             className="rounded-full border border-paper/60 bg-ink/50 px-6 py-3 active:opacity-70"
           >
             <Text className="text-paper text-base font-medium">바코드 없이 직접 입력</Text>
