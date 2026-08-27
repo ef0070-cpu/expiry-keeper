@@ -390,19 +390,9 @@ function CatalogRow({
         </View>
       )}
       <View className="ml-3 flex-1">
-        <View className="flex-row items-center" style={{ gap: 6 }}>
-          <Text className="text-ink flex-1 text-base font-bold" numberOfLines={1}>
-            {product.name}
-          </Text>
-          <View
-            className="rounded px-1.5 py-0.5"
-            style={{ backgroundColor: statusMeta.color, flexShrink: 0 }}
-          >
-            <Text className="text-xs font-bold" style={{ color: '#FFFFFF' }}>
-              {statusMeta.label}
-            </Text>
-          </View>
-        </View>
+        <Text className="text-ink text-base font-bold" numberOfLines={1}>
+          {product.name}
+        </Text>
         <Text className="text-muted mt-0.5 text-sm">
           {product.brand} · {product.price.toLocaleString()}원
         </Text>
@@ -410,20 +400,27 @@ function CatalogRow({
           <Text className="text-muted mt-0.5 text-xs">{product.barcode}</Text>
         ) : null}
       </View>
-      <View className="flex-row items-center">
-        <Pressable
-          onPress={() => onChangeQty(-1)}
-          className="h-9 w-9 items-center justify-center rounded-lg border border-line bg-bg active:opacity-70"
-        >
-          <MaterialCommunityIcons name="minus" size={16} color="#1A1A1A" />
-        </Pressable>
-        <Text className="text-ink mx-3 w-6 text-center text-base font-bold">{qty}</Text>
-        <Pressable
-          onPress={() => onChangeQty(1)}
-          className="h-9 w-9 items-center justify-center rounded-lg border border-line bg-bg active:opacity-70"
-        >
-          <MaterialCommunityIcons name="plus" size={16} color="#1A1A1A" />
-        </Pressable>
+      <View className="items-end">
+        <View className="mb-1.5 rounded px-1.5 py-0.5" style={{ backgroundColor: statusMeta.color }}>
+          <Text className="text-xs font-bold" style={{ color: '#FFFFFF' }}>
+            {statusMeta.label}
+          </Text>
+        </View>
+        <View className="flex-row items-center">
+          <Pressable
+            onPress={() => onChangeQty(-1)}
+            className="h-9 w-9 items-center justify-center rounded-lg border border-line bg-bg active:opacity-70"
+          >
+            <MaterialCommunityIcons name="minus" size={16} color="#1A1A1A" />
+          </Pressable>
+          <Text className="text-ink mx-3 w-6 text-center text-base font-bold">{qty}</Text>
+          <Pressable
+            onPress={() => onChangeQty(1)}
+            className="h-9 w-9 items-center justify-center rounded-lg border border-line bg-bg active:opacity-70"
+          >
+            <MaterialCommunityIcons name="plus" size={16} color="#1A1A1A" />
+          </Pressable>
+        </View>
       </View>
     </Pressable>
   );
