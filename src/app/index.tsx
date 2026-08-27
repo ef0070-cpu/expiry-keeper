@@ -19,6 +19,7 @@ import SummaryHeader from '@/components/SummaryHeader';
 import { lookupBarcode } from '@/lib/barcode-lookup';
 import { SECTION_ORDER, SECTION_TITLES, SectionKey, daysUntil, sectionOf } from '@/lib/dates';
 import { cancelExpiryAlerts } from '@/lib/notifications';
+import { matchesSearch } from '@/lib/korean-search';
 import { deleteProduct, listProducts, resolveProduct } from '@/lib/repo';
 import { useAppMode } from '@/lib/settings';
 import { BarcodeInfo, Product } from '@/lib/types';
@@ -71,15 +72,14 @@ export default function Dashboard() {
   }, [products]);
 
   const sections = useMemo(() => {
-    const q = query.trim().toLowerCase();
     const filtered = products.filter((p) => {
       if (selectedCategories.size > 0 && !p.categories.some((c) => selectedCategories.has(c)))
         return false;
-      if (!q) return true;
+      if (!query.trim()) return true;
       return (
-        p.name.toLowerCase().includes(q) ||
-        (p.barcode ?? '').includes(q) ||
-        (p.memo ?? '').toLowerCase().includes(q)
+        matchesSearch(p.name, query) ||
+        (p.barcode ?? '').includes(query.trim()) ||
+        matchesSearch(p.memo ?? '', query)
       );
     });
     const grouped = new Map<SectionKey, Product[]>();

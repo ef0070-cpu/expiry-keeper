@@ -19,6 +19,7 @@ import {
   setOrderCartQuantity,
 } from '@/lib/order-repo';
 import { OrderCart, OrderProduct, OrderStatus } from '@/lib/order-types';
+import { matchesSearch } from '@/lib/korean-search';
 
 const STATUS_META: Record<OrderStatus, { label: string; color: string }> = {
   active: { label: '시판중', color: '#2E7D32' },
@@ -63,14 +64,13 @@ export default function Order() {
   }, [scanParams.scannedBarcode, scanParams.nonce]);
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
     return products.filter((p) => {
       if (selectedCategory !== '전체' && p.category !== selectedCategory) return false;
-      if (!q) return true;
+      if (!query.trim()) return true;
       return (
-        p.name.toLowerCase().includes(q) ||
-        p.brand.toLowerCase().includes(q) ||
-        (p.barcode ?? '').includes(q)
+        matchesSearch(p.name, query) ||
+        matchesSearch(p.brand, query) ||
+        (p.barcode ?? '').includes(query.trim())
       );
     });
   }, [products, query, selectedCategory]);
