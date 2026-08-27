@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { lookupBarcode } from './barcode-lookup';
 import { upsertBarcodeCatalog } from './barcode-catalog';
 import { newId } from './repo';
 import { OrderCart, OrderProduct } from './order-types';
@@ -126,4 +127,33 @@ export async function seedDefaultOrderProducts(): Promise<number> {
   const items: OrderProduct[] = DEFAULT_ORDER_PRODUCTS.map((p) => ({ ...p, id: newId() }));
   await writeOrderProducts(items);
   return items.length;
+}
+
+/**
+ * 바코드가 있지만 사진이 없는 발주 상품을 순서대로 훑어 lookupBarcode()로 채운다.
+ * 항목 하나 채울 때마다 즉시 저장한다(중단돼도 그동안 채운 건 유지됨).
+ * 공용 바코드 캐시(upsertBarcodeCatalog)에는 다시 쓰지 않는다 — 이미 캐시에서 읽어왔거나
+ * 외부 API에서 새로 찾은 값을 로컬에 반영하는 것뿐이라 재기록이 불필요하다
+ * (seedDefaultOrderProducts와 동일한 논리로 대량 개별 네트워크 쓰기를 피한다).
+ */
+export async function fillMissingOrderPhotos(
+  onProgress?: (done: number, total: number) => void,
+): Promise<number> {
+  const items = await listOrderProducts();
+  const targets = items.filter((p) => p.barcode && !p.imageUri);
+  let filled = 0;
+  for (let i = 0; i < targets.length; i++) {
+    const target = targets[i];
+    const info = await lookupBarcode(target.barcode!);
+    if (info.imageUrl) {
+      const idx = items.findIndex((p) => p.id === target.id);
+      if (idx >= 0) {
+        items[idx] = { ...items[idx], imageUri: info.imageUrl };
+        await writeOrderProducts(items);
+        filled++;
+      }
+    }
+    onProgress?.(i + 1, targets.length);
+  }
+  return filled;
 }
