@@ -15,7 +15,7 @@ import {
   View,
 } from 'react-native';
 import Chip from '@/components/Chip';
-import { hasImageSearchKeys, searchProductImage } from '@/lib/barcode-lookup';
+import { hasImageSearchKeys, lookupBarcode, searchProductImage } from '@/lib/barcode-lookup';
 import {
   addOrderCategory,
   deleteOrderProduct,
@@ -39,12 +39,13 @@ export default function OrderProductForm() {
   const [imageUri, setImageUri] = useState<string | null>(params.prefillImage || null);
   const [brand, setBrand] = useState('');
   const [price, setPrice] = useState('');
-  const [barcode, setBarcode] = useState<string | null>(params.barcode ?? null);
+  const [barcode, setBarcode] = useState(params.barcode ?? '');
   const [categories, setCategories] = useState<string[]>([]);
   const [category, setCategory] = useState('');
   const [newCategory, setNewCategory] = useState('');
   const [busy, setBusy] = useState(false);
   const [searching, setSearching] = useState(false);
+  const [checkingBarcode, setCheckingBarcode] = useState(false);
 
   useEffect(() => {
     listOrderCategories().then((list) => {
@@ -59,7 +60,7 @@ export default function OrderProductForm() {
         setImageUri(p.imageUri);
         setBrand(p.brand);
         setPrice(String(p.price));
-        setBarcode(p.barcode);
+        setBarcode(p.barcode ?? '');
         setCategory(p.category);
       });
     }
@@ -112,6 +113,27 @@ export default function OrderProductForm() {
     else Alert.alert('검색 결과 없음', '이미지를 찾지 못했습니다. 직접 촬영해 주세요.');
   };
 
+  const checkBarcode = async () => {
+    const v = barcode.trim();
+    if (!v) {
+      Alert.alert('입력 확인', '바코드를 입력해 주세요.');
+      return;
+    }
+    if (!hasImageSearchKeys()) {
+      Alert.alert('로그인 필요', '바코드 조회를 사용하려면 로그인이 필요합니다.');
+      return;
+    }
+    setCheckingBarcode(true);
+    const info = await lookupBarcode(v);
+    setCheckingBarcode(false);
+    if (!info.name && !info.imageUrl) {
+      Alert.alert('조회 결과 없음', '일치하는 정보를 찾지 못했습니다. 직접 입력해 주세요.');
+      return;
+    }
+    if (info.name && !name.trim()) setName(info.name);
+    if (info.imageUrl && !imageUri) setImageUri(info.imageUrl);
+  };
+
   const addCategory = async () => {
     const v = newCategory.trim();
     if (!v) return;
@@ -143,7 +165,7 @@ export default function OrderProductForm() {
         brand: brand.trim(),
         price: price.trim() ? parsedPrice : 0,
         category,
-        barcode,
+        barcode: barcode.trim() || null,
         imageUri,
       };
       await saveOrderProduct(product);
@@ -202,15 +224,7 @@ export default function OrderProductForm() {
           </Pressable>
 
           <View className="ml-3 flex-1">
-            <View className="flex-row items-center justify-between">
-              <Text className="text-ink text-sm font-bold">상품명 *</Text>
-              {barcode ? (
-                <View className="flex-row items-center">
-                  <MaterialCommunityIcons name="barcode" size={14} color="#888888" />
-                  <Text className="text-muted ml-1 text-xs">{barcode}</Text>
-                </View>
-              ) : null}
-            </View>
+            <Text className="text-ink text-sm font-bold">상품명 *</Text>
             <TextInput
               className="text-ink mt-1.5 rounded-xl border border-line bg-paper px-3 py-2.5 text-base"
               placeholder="예: 메로나"
@@ -237,6 +251,30 @@ export default function OrderProductForm() {
                 </Pressable>
               ) : null}
             </View>
+          </View>
+        </View>
+
+        <View className="mt-4">
+          <Label text="바코드" />
+          <View className="flex-row gap-2">
+            <TextInput
+              className="text-ink flex-1 rounded-xl border border-line bg-paper px-3 py-2.5 text-base"
+              placeholder="바코드 번호 입력 또는 스캔"
+              placeholderTextColor="#BBBBBB"
+              value={barcode}
+              onChangeText={setBarcode}
+            />
+            <Pressable
+              onPress={checkBarcode}
+              disabled={checkingBarcode}
+              className="items-center justify-center rounded-xl border border-line bg-paper px-4 active:opacity-70"
+            >
+              {checkingBarcode ? (
+                <ActivityIndicator size="small" color="#CC2222" />
+              ) : (
+                <Text className="text-ink text-sm font-medium">조회</Text>
+              )}
+            </Pressable>
           </View>
         </View>
 
