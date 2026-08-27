@@ -51,16 +51,18 @@ export default function RootLayout() {
           <Stack.Screen name="scan" options={{ title: '바코드 스캔' }} />
           <Stack.Screen name="product-form" options={{ title: '상품 등록' }} />
           <Stack.Screen name="product-duplicates" options={{ title: '이미 등록된 상품' }} />
+          <Stack.Screen name="stats" options={{ title: '소진·폐기 통계' }} />
+          <Stack.Screen name="recipes" options={{ title: '레시피 추천' }} />
+          <Stack.Screen name="recipe-video" options={{ title: '레시피 영상' }} />
+          <Stack.Screen name="settings" options={{ title: '설정' }} />
+        </Stack.Protected>
+        <Stack.Protected guard={authed && mode === 'retail'}>
           <Stack.Screen name="order" options={{ title: '발주 관리' }} />
           <Stack.Screen name="order-product-form" options={{ title: '발주 상품' }} />
           <Stack.Screen
             name="order-cart"
             options={{ title: '발주 내역', presentation: 'modal' }}
           />
-          <Stack.Screen name="stats" options={{ title: '소진·폐기 통계' }} />
-          <Stack.Screen name="recipes" options={{ title: '레시피 추천' }} />
-          <Stack.Screen name="recipe-video" options={{ title: '레시피 영상' }} />
-          <Stack.Screen name="settings" options={{ title: '설정' }} />
         </Stack.Protected>
         <Stack.Protected guard={authed && mode === null}>
           <Stack.Screen name="mode-select" options={{ headerShown: false }} />

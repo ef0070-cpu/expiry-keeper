@@ -224,8 +224,12 @@ export async function listProductsByBarcode(barcode: string): Promise<Product[]>
 
 /** 재고관리 상품들에 쓰인 카테고리(매장 등)를 중복 없이 정렬해 반환한다. */
 export async function listProductCategories(): Promise<string[]> {
-  const items = await listProducts();
-  const set = new Set<string>();
-  items.forEach((p) => p.categories.forEach((c) => set.add(c)));
-  return [...set].sort();
+  try {
+    const items = await listProducts();
+    const set = new Set<string>();
+    items.forEach((p) => p.categories.forEach((c) => set.add(c)));
+    return [...set].sort();
+  } catch {
+    return [];
+  }
 }

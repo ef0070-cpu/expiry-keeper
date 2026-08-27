@@ -7,10 +7,11 @@ export async function upsertBarcodeCatalog(
   imageUri: string | null,
 ): Promise<void> {
   if (!supabase || !barcode || !name.trim()) return;
-  await supabase.from('barcode_catalog').upsert({
+  const row: Record<string, unknown> = {
     barcode,
     name: name.trim(),
-    image_uri: imageUri,
     updated_at: new Date().toISOString(),
-  });
+  };
+  if (imageUri?.startsWith('http')) row.image_uri = imageUri;
+  await supabase.from('barcode_catalog').upsert(row);
 }
