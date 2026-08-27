@@ -399,28 +399,29 @@ function CatalogRow({
         {product.barcode ? (
           <Text className="text-muted mt-0.5 text-xs">{product.barcode}</Text>
         ) : null}
-      </View>
-      <View className="items-end">
-        <View className="mb-1.5 rounded px-1.5 py-0.5" style={{ backgroundColor: statusMeta.color }}>
+        <View
+          className="mt-1 self-start rounded px-1.5 py-0.5"
+          style={{ backgroundColor: statusMeta.color }}
+        >
           <Text className="text-xs font-bold" style={{ color: '#FFFFFF' }}>
             {statusMeta.label}
           </Text>
         </View>
-        <View className="flex-row items-center">
-          <Pressable
-            onPress={() => onChangeQty(-1)}
-            className="h-9 w-9 items-center justify-center rounded-lg border border-line bg-bg active:opacity-70"
-          >
-            <MaterialCommunityIcons name="minus" size={16} color="#1A1A1A" />
-          </Pressable>
-          <Text className="text-ink mx-3 w-6 text-center text-base font-bold">{qty}</Text>
-          <Pressable
-            onPress={() => onChangeQty(1)}
-            className="h-9 w-9 items-center justify-center rounded-lg border border-line bg-bg active:opacity-70"
-          >
-            <MaterialCommunityIcons name="plus" size={16} color="#1A1A1A" />
-          </Pressable>
-        </View>
+      </View>
+      <View className="flex-row items-center">
+        <Pressable
+          onPress={() => onChangeQty(-1)}
+          className="h-9 w-9 items-center justify-center rounded-lg border border-line bg-bg active:opacity-70"
+        >
+          <MaterialCommunityIcons name="minus" size={16} color="#1A1A1A" />
+        </Pressable>
+        <Text className="text-ink mx-3 w-6 text-center text-base font-bold">{qty}</Text>
+        <Pressable
+          onPress={() => onChangeQty(1)}
+          className="h-9 w-9 items-center justify-center rounded-lg border border-line bg-bg active:opacity-70"
+        >
+          <MaterialCommunityIcons name="plus" size={16} color="#1A1A1A" />
+        </Pressable>
       </View>
     </Pressable>
   );
