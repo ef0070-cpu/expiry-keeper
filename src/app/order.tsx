@@ -3,6 +3,7 @@ import { Image } from 'expo-image';
 import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, FlatList, Pressable, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Chip from '@/components/Chip';
 import {
   addOrderCategory,
@@ -15,9 +16,16 @@ import {
   seedDefaultOrderProducts,
   setOrderCartQuantity,
 } from '@/lib/order-repo';
-import { OrderCart, OrderProduct } from '@/lib/order-types';
+import { OrderCart, OrderProduct, OrderStatus } from '@/lib/order-types';
+
+const STATUS_META: Record<OrderStatus, { label: string; color: string }> = {
+  active: { label: '시판중', color: '#2E7D32' },
+  discontinued: { label: '단종', color: '#C62828' },
+  paused: { label: '생산중단', color: '#F9A825' },
+};
 
 export default function Order() {
+  const insets = useSafeAreaInsets();
   const [products, setProducts] = useState<OrderProduct[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [cart, setCart] = useState<OrderCart>({});
@@ -248,6 +256,9 @@ export default function Order() {
             product={item}
             qty={cart[item.id] ?? 0}
             onChangeQty={(delta) => changeQty(item.id, delta)}
+            onPress={() =>
+              router.push({ pathname: '/order-product-form', params: { id: item.id } })
+            }
             onLongPress={() => onLongPressProduct(item)}
           />
         )}
@@ -272,7 +283,10 @@ export default function Order() {
       />
 
       {totalCount > 0 ? (
-        <View className="absolute bottom-0 left-0 right-0 p-4">
+        <View
+          className="absolute bottom-0 left-0 right-0 px-4 pt-4"
+          style={{ paddingBottom: Math.max(insets.bottom, 16) + 16 }}
+        >
           <Pressable
             onPress={() => router.push('/order-cart')}
             className="flex-row items-center justify-between rounded-2xl bg-ink px-5 py-4 active:opacity-80"
@@ -291,15 +305,19 @@ function CatalogRow({
   product,
   qty,
   onChangeQty,
+  onPress,
   onLongPress,
 }: {
   product: OrderProduct;
   qty: number;
   onChangeQty: (delta: number) => void;
+  onPress: () => void;
   onLongPress: () => void;
 }) {
+  const statusMeta = STATUS_META[product.status ?? 'active'];
   return (
     <Pressable
+      onPress={onPress}
       onLongPress={onLongPress}
       className="mx-4 mb-2.5 flex-row items-center rounded-xl border border-line bg-paper p-3 active:opacity-70"
     >
@@ -315,12 +333,22 @@ function CatalogRow({
         </View>
       )}
       <View className="ml-3 flex-1">
-        <Text className="text-ink text-base font-bold" numberOfLines={1}>
-          {product.name}
-        </Text>
+        <View className="flex-row items-center" style={{ gap: 6 }}>
+          <Text className="text-ink text-base font-bold" numberOfLines={1}>
+            {product.name}
+          </Text>
+          <View className="rounded px-1.5 py-0.5" style={{ backgroundColor: statusMeta.color }}>
+            <Text className="text-xs font-bold" style={{ color: '#FFFFFF' }}>
+              {statusMeta.label}
+            </Text>
+          </View>
+        </View>
         <Text className="text-muted mt-0.5 text-sm">
           {product.brand} · {product.price.toLocaleString()}원
         </Text>
+        {product.barcode ? (
+          <Text className="text-muted mt-0.5 text-xs">{product.barcode}</Text>
+        ) : null}
       </View>
       <View className="flex-row items-center">
         <Pressable
