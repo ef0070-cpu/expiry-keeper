@@ -1,18 +1,21 @@
 // 날짜는 모두 YYYY-MM-DD 문자열(로컬 기준)로 다룬다.
 
-export function todayStr(): string {
-  const d = new Date();
+function pad(n: number): string {
+  return n < 10 ? `0${n}` : String(n);
+}
+
+export function formatDate(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+export function todayStr(): string {
+  return formatDate(new Date());
 }
 
 export function addDays(base: Date, days: number): string {
   const d = new Date(base);
   d.setDate(d.getDate() + days);
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
-function pad(n: number): string {
-  return n < 10 ? `0${n}` : String(n);
+  return formatDate(d);
 }
 
 /** 오늘부터 유통기한까지 남은 일수. 지났으면 음수. */

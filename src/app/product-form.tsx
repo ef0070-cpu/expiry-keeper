@@ -1,4 +1,5 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
@@ -15,10 +16,10 @@ import {
   View,
 } from 'react-native';
 import { hasImageSearchKeys, searchProductImage } from '@/lib/barcode-lookup';
-import { autoFormatDate, isValidDateStr } from '@/lib/dates';
+import { autoFormatDate, formatDate, isValidDateStr } from '@/lib/dates';
 import { cancelExpiryAlerts, scheduleExpiryAlerts } from '@/lib/notifications';
 import { deleteProduct, getProduct, listProducts, newId, saveProduct } from '@/lib/repo';
-import { AppMode, useAppMode } from '@/lib/settings';
+import { AppMode, useAppMode, useDateInputMethod } from '@/lib/settings';
 import { Product, ProductStatus } from '@/lib/types';
 
 export default function ProductForm() {
@@ -30,11 +31,13 @@ export default function ProductForm() {
   }>();
   const isEdit = !!params.id;
   const mode = useAppMode();
+  const dateInputMethod = useDateInputMethod();
 
   const [name, setName] = useState(params.prefillName ?? '');
   const [imageUri, setImageUri] = useState<string | null>(params.prefillImage || null);
   // 새 상품이면 현재 연도를 미리 채워 월·일만 입력하면 되게 한다
   const [expiryDate, setExpiryDate] = useState(params.id ? '' : String(new Date().getFullYear()));
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
   const [memo, setMemo] = useState('');
@@ -93,6 +96,25 @@ export default function ProductForm() {
       else next.add(c);
       return next;
     });
+  };
+
+  const datePickerDisplay = Platform.select<'calendar' | 'spinner' | 'inline'>({
+    android: dateInputMethod === 'spinner' ? 'spinner' : 'calendar',
+    ios: dateInputMethod === 'spinner' ? 'spinner' : 'inline',
+    default: 'spinner',
+  });
+
+  const datePickerValue = isValidDateStr(expiryDate)
+    ? new Date(
+        Number(expiryDate.slice(0, 4)),
+        Number(expiryDate.slice(5, 7)) - 1,
+        Number(expiryDate.slice(8, 10)),
+      )
+    : new Date();
+
+  const onPickDate = (event: DateTimePickerEvent, selected?: Date) => {
+    if (Platform.OS === 'android') setShowDatePicker(false);
+    if (event.type === 'set' && selected) setExpiryDate(formatDate(selected));
   };
 
   const pickImage = () => {
@@ -269,15 +291,47 @@ export default function ProductForm() {
         <View className="mt-4 flex-row gap-3">
           <View className="flex-1">
             <Label text="유통기한 *" />
-            <TextInput
-              className="text-ink rounded-xl border border-line bg-paper px-3 py-2.5 text-base"
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor="#BBBBBB"
-              keyboardType="number-pad"
-              maxLength={10}
-              value={expiryDate}
-              onChangeText={(t) => setExpiryDate(autoFormatDate(t))}
-            />
+            {dateInputMethod === 'text' ? (
+              <TextInput
+                className="text-ink rounded-xl border border-line bg-paper px-3 py-2.5 text-base"
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor="#BBBBBB"
+                keyboardType="number-pad"
+                maxLength={10}
+                value={expiryDate}
+                onChangeText={(t) => setExpiryDate(autoFormatDate(t))}
+              />
+            ) : (
+              <Pressable
+                onPress={() => setShowDatePicker(true)}
+                className="rounded-xl border border-line bg-paper px-3 py-2.5"
+              >
+                <Text
+                  className="text-base"
+                  style={{ color: expiryDate ? '#1A1A1A' : '#BBBBBB' }}
+                >
+                  {expiryDate || 'YYYY-MM-DD'}
+                </Text>
+              </Pressable>
+            )}
+            {showDatePicker && dateInputMethod !== 'text' ? (
+              <View className="mt-2 overflow-hidden rounded-xl border border-line bg-paper">
+                <DateTimePicker
+                  value={datePickerValue}
+                  mode="date"
+                  display={datePickerDisplay}
+                  onChange={onPickDate}
+                />
+                {Platform.OS === 'ios' ? (
+                  <Pressable
+                    onPress={() => setShowDatePicker(false)}
+                    className="items-center border-t border-line py-2.5"
+                  >
+                    <Text className="text-primary text-sm font-bold">완료</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            ) : null}
           </View>
           <View>
             <Label text="수량" />

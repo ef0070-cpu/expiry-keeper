@@ -106,3 +106,52 @@ export function useAlertSettings(): AlertSettings {
   }, []);
   return settings;
 }
+
+// ---------- 유통기한 입력 방법 ----------
+
+export type DateInputMethod = 'text' | 'calendar' | 'spinner';
+
+export const DATE_INPUT_METHODS: readonly DateInputMethod[] = ['text', 'calendar', 'spinner'];
+
+export const DATE_INPUT_METHOD_META: Record<DateInputMethod, { label: string; description: string }> = {
+  text: { label: '텍스트', description: '날짜를 텍스트로 입력합니다. (YYYY-MM-DD)' },
+  calendar: { label: '달력', description: '달력에서 날짜를 선택합니다.' },
+  spinner: { label: '스피너', description: '스피너를 돌려 날짜를 선택합니다.' },
+};
+
+const DATE_INPUT_METHOD_KEY = 'dateInputMethod:v1';
+const DEFAULT_DATE_INPUT_METHOD: DateInputMethod = 'text';
+
+let dateInputMethodCache: DateInputMethod | undefined;
+const dateInputMethodListeners = new Set<() => void>();
+
+async function loadDateInputMethod(): Promise<void> {
+  if (dateInputMethodCache !== undefined) return;
+  const raw = await AsyncStorage.getItem(DATE_INPUT_METHOD_KEY);
+  dateInputMethodCache = (DATE_INPUT_METHODS as string[]).includes(raw ?? '')
+    ? (raw as DateInputMethod)
+    : DEFAULT_DATE_INPUT_METHOD;
+}
+
+export async function setDateInputMethod(method: DateInputMethod): Promise<void> {
+  dateInputMethodCache = method;
+  dateInputMethodListeners.forEach((fn) => fn());
+  await AsyncStorage.setItem(DATE_INPUT_METHOD_KEY, method);
+}
+
+/** 로딩 중에도 기본값(텍스트)을 즉시 돌려준다. */
+export function useDateInputMethod(): DateInputMethod {
+  const [method, setMethod] = useState<DateInputMethod>(
+    dateInputMethodCache ?? DEFAULT_DATE_INPUT_METHOD,
+  );
+  useEffect(() => {
+    const update = () => setMethod(dateInputMethodCache ?? DEFAULT_DATE_INPUT_METHOD);
+    dateInputMethodListeners.add(update);
+    if (dateInputMethodCache === undefined) loadDateInputMethod().then(update);
+    else update();
+    return () => {
+      dateInputMethodListeners.delete(update);
+    };
+  }, []);
+  return method;
+}

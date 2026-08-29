@@ -397,9 +397,7 @@ function CatalogRow({
         </View>
       )}
       <View className="ml-3 flex-1">
-        <Text className="text-ink text-base font-bold" numberOfLines={1}>
-          {product.name}
-        </Text>
+        <Text className="text-ink text-base font-bold">{product.name}</Text>
         <Text className="text-muted mt-0.5 text-sm">
           {product.brand} · {product.price.toLocaleString()}원
         </Text>

@@ -7,17 +7,23 @@ import { rescheduleAllExpiryAlerts } from '@/lib/notifications';
 import {
   ALERT_OFFSETS,
   AppMode,
+  DATE_INPUT_METHOD_META,
+  DATE_INPUT_METHODS,
+  DateInputMethod,
   MODE_LABELS,
   setAlertSettings,
   setAppMode,
+  setDateInputMethod,
   useAlertSettings,
   useAppMode,
+  useDateInputMethod,
 } from '@/lib/settings';
 import { isCloudMode, supabase } from '@/lib/supabase';
 
 export default function Settings() {
   const mode = useAppMode();
   const { count, hour, minute } = useAlertSettings();
+  const dateInputMethod = useDateInputMethod();
   const [deleting, setDeleting] = useState(false);
 
   const deleteAccount = () => {
@@ -78,6 +84,16 @@ export default function Settings() {
           icon="storefront-outline"
           description="매장 상품 관리 + 폐기 통계"
         />
+      </View>
+
+      <SectionTitle text="유통기한 입력 방법" />
+      <View className="overflow-hidden rounded-xl border border-line bg-paper">
+        {DATE_INPUT_METHODS.map((method, i) => (
+          <View key={method}>
+            {i > 0 ? <View className="h-px bg-line" /> : null}
+            <DateMethodRow target={method} current={dateInputMethod} />
+          </View>
+        ))}
       </View>
 
       <SectionTitle text="알림" />
@@ -220,6 +236,35 @@ function ModeRow({
       <View className="ml-3 flex-1">
         <Text className={`text-base font-bold ${active ? 'text-ink' : 'text-muted'}`}>
           {MODE_LABELS[target]}
+        </Text>
+        <Text className="text-muted mt-0.5 text-xs">{description}</Text>
+      </View>
+      <MaterialCommunityIcons
+        name={active ? 'radiobox-marked' : 'radiobox-blank'}
+        size={22}
+        color={active ? '#CC2222' : '#CCCCCC'}
+      />
+    </Pressable>
+  );
+}
+
+function DateMethodRow({
+  target,
+  current,
+}: {
+  target: DateInputMethod;
+  current: DateInputMethod;
+}) {
+  const active = current === target;
+  const { label, description } = DATE_INPUT_METHOD_META[target];
+  return (
+    <Pressable
+      onPress={() => setDateInputMethod(target)}
+      className="flex-row items-center p-4 active:opacity-70"
+    >
+      <View className="flex-1">
+        <Text className={`text-base font-bold ${active ? 'text-ink' : 'text-muted'}`}>
+          {label}
         </Text>
         <Text className="text-muted mt-0.5 text-xs">{description}</Text>
       </View>
