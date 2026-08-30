@@ -267,6 +267,8 @@ export default function OrderProductForm() {
             onPress={pickImage}
             className="items-center justify-center rounded-xl border border-line bg-paper active:opacity-70"
             style={{ width: 96, height: 96 }}
+            accessibilityRole="button"
+            accessibilityLabel={imageUri ? '사진 변경' : '사진 추가'}
           >
             {imageUri ? (
               <Image
@@ -453,6 +455,8 @@ export default function OrderProductForm() {
                     onPress={pickReportPhoto}
                     className="items-center justify-center rounded-xl border border-line bg-bg"
                     style={{ width: 56, height: 56 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={reportPhotoUri ? '신고 사진 변경' : '신고 사진 첨부'}
                   >
                     {reportPhotoUri ? (
                       <Image

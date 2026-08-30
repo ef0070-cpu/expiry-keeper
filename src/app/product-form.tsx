@@ -233,6 +233,8 @@ export default function ProductForm() {
             onPress={pickImage}
             className="items-center justify-center rounded-xl border border-line bg-paper active:opacity-70"
             style={{ width: 96, height: 96 }}
+            accessibilityRole="button"
+            accessibilityLabel={imageUri ? '사진 변경' : '사진 추가'}
           >
             {imageUri ? (
               <Image
@@ -336,9 +338,13 @@ export default function ProductForm() {
           <View>
             <Label text="수량" />
             <View className="flex-row items-center">
-              <Stepper icon="minus" onPress={() => setQuantity((n) => Math.max(1, n - 1))} />
+              <Stepper
+                icon="minus"
+                label="수량 감소"
+                onPress={() => setQuantity((n) => Math.max(1, n - 1))}
+              />
               <Text className="text-ink mx-4 text-lg font-bold">{quantity}</Text>
-              <Stepper icon="plus" onPress={() => setQuantity((n) => n + 1)} />
+              <Stepper icon="plus" label="수량 증가" onPress={() => setQuantity((n) => n + 1)} />
             </View>
           </View>
         </View>
@@ -439,11 +445,22 @@ function Label({ text }: { text: string }) {
   return <Text className="text-ink mb-1.5 text-sm font-bold">{text}</Text>;
 }
 
-function Stepper({ icon, onPress }: { icon: 'plus' | 'minus'; onPress: () => void }) {
+function Stepper({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: 'plus' | 'minus';
+  label: string;
+  onPress: () => void;
+}) {
   return (
     <Pressable
       onPress={onPress}
+      hitSlop={8}
       className="h-11 w-11 items-center justify-center rounded-xl border border-line bg-paper active:opacity-70"
+      accessibilityRole="button"
+      accessibilityLabel={label}
     >
       <MaterialCommunityIcons name={icon} size={20} color="#1A1A1A" />
     </Pressable>

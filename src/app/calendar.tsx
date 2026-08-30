@@ -166,13 +166,25 @@ export default function CalendarScreen() {
           </View>
 
           <View className="flex-row items-center">
-            <Pressable onPress={() => moveCursor(-1)} hitSlop={8} className="p-1">
+            <Pressable
+              onPress={() => moveCursor(-1)}
+              hitSlop={8}
+              className="p-1"
+              accessibilityRole="button"
+              accessibilityLabel="이전"
+            >
               <MaterialCommunityIcons name="chevron-left" size={26} color="#1A1A1A" />
             </Pressable>
             <Text className="text-ink mx-1 min-w-[110px] text-center text-base font-bold">
               {headerTitle}
             </Text>
-            <Pressable onPress={() => moveCursor(1)} hitSlop={8} className="p-1">
+            <Pressable
+              onPress={() => moveCursor(1)}
+              hitSlop={8}
+              className="p-1"
+              accessibilityRole="button"
+              accessibilityLabel="다음"
+            >
               <MaterialCommunityIcons name="chevron-right" size={26} color="#1A1A1A" />
             </Pressable>
           </View>

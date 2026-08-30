@@ -106,9 +106,9 @@ export default function Settings() {
             </Text>
           </View>
           <View className="flex-row items-center">
-            <TinyStepper icon="minus" onPress={() => changeCount(-1)} />
+            <TinyStepper icon="minus" label="알림 횟수 감소" onPress={() => changeCount(-1)} />
             <Text className="text-ink mx-3 text-lg font-bold">{count}회</Text>
-            <TinyStepper icon="plus" onPress={() => changeCount(1)} />
+            <TinyStepper icon="plus" label="알림 횟수 증가" onPress={() => changeCount(1)} />
           </View>
         </View>
 
@@ -122,19 +122,19 @@ export default function Settings() {
           <View className="items-center">
             <Text className="text-muted mb-1 text-xs">시</Text>
             <View className="flex-row items-center">
-              <TinyStepper icon="minus" onPress={() => changeHour(-1)} />
+              <TinyStepper icon="minus" label="시 감소" onPress={() => changeHour(-1)} />
               <Text className="text-ink mx-3 w-6 text-center text-base font-bold">{hour}</Text>
-              <TinyStepper icon="plus" onPress={() => changeHour(1)} />
+              <TinyStepper icon="plus" label="시 증가" onPress={() => changeHour(1)} />
             </View>
           </View>
           <View className="items-center">
             <Text className="text-muted mb-1 text-xs">분</Text>
             <View className="flex-row items-center">
-              <TinyStepper icon="minus" onPress={() => changeMinute(-5)} />
+              <TinyStepper icon="minus" label="분 감소" onPress={() => changeMinute(-5)} />
               <Text className="text-ink mx-3 w-6 text-center text-base font-bold">
                 {String(minute).padStart(2, '0')}
               </Text>
-              <TinyStepper icon="plus" onPress={() => changeMinute(5)} />
+              <TinyStepper icon="plus" label="분 증가" onPress={() => changeMinute(5)} />
             </View>
           </View>
         </View>
@@ -204,11 +204,22 @@ function formatAlertTime(hour: number, minute: number): string {
   return `${period} ${h12}:${String(minute).padStart(2, '0')}`;
 }
 
-function TinyStepper({ icon, onPress }: { icon: 'plus' | 'minus'; onPress: () => void }) {
+function TinyStepper({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: 'plus' | 'minus';
+  label: string;
+  onPress: () => void;
+}) {
   return (
     <Pressable
       onPress={onPress}
+      hitSlop={8}
       className="h-9 w-9 items-center justify-center rounded-lg border border-line bg-bg active:opacity-70"
+      accessibilityRole="button"
+      accessibilityLabel={label}
     >
       <MaterialCommunityIcons name={icon} size={16} color="#1A1A1A" />
     </Pressable>
