@@ -447,7 +447,7 @@ export default function CalendarScreen() {
               style={{ paddingBottom: Math.max(insets.bottom, 16) + 20 }}
             >
               <View className="items-center pb-2">
-                <View className="bg-muted h-1.5 w-12 rounded-full" />
+                <View style={{ width: 48, height: 6, borderRadius: 3, backgroundColor: '#9A9A9A' }} />
               </View>
               <View className="flex-row items-center justify-between">
                 <Text className="text-ink text-lg font-bold">{detailEntry.branch} 발주 내역</Text>
