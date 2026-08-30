@@ -12,12 +12,3 @@ export interface OrderProduct {
 }
 
 export type OrderCart = Record<string, number>;
-
-export interface OrderHistoryEntry {
-  id: string;
-  dateKey: string; // YYYY-MM-DD (전송한 날짜, 캘린더 그룹핑 키)
-  sentAt: string; // ISO timestamp (정렬/표시용)
-  branch: string;
-  items: { productId: string; name: string; qty: number }[];
-  totalBoxes: number;
-}

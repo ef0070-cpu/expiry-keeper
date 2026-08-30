@@ -8,15 +8,12 @@ import {
   clearOrderCart,
   getOrderCart,
   listOrderProducts,
-  newId,
-  saveOrderHistory,
   setOrderCartQuantity,
   writeOrderCart,
 } from '@/lib/order-repo';
 import { buildOrderShareText } from '@/lib/order-share';
 import { OrderCart, OrderProduct } from '@/lib/order-types';
 import { listProductCategories } from '@/lib/repo';
-import { todayStr } from '@/lib/dates';
 
 export default function OrderCartScreen() {
   const insets = useSafeAreaInsets();
@@ -90,23 +87,7 @@ export default function OrderCartScreen() {
     }
     const text = buildOrderShareText(cart, products, selectedBranch, new Date());
     try {
-      const result = await Share.share({ message: text });
-      if (result.action === Share.sharedAction) {
-        await saveOrderHistory({
-          id: newId(),
-          dateKey: todayStr(),
-          sentAt: new Date().toISOString(),
-          branch: selectedBranch,
-          items: items.map((it) => ({
-            productId: it.product.id,
-            name: it.product.name,
-            qty: it.qty,
-          })),
-          totalBoxes: total,
-        }).catch(() => {});
-        await clearOrderCart();
-        setCart({});
-      }
+      await Share.share({ message: text });
     } catch (e) {
       Alert.alert('공유 실패', e instanceof Error ? e.message : '알 수 없는 오류');
     }

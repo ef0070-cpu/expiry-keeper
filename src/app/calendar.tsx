@@ -1,22 +1,10 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import {
-  Alert,
-  FlatList,
-  Modal,
-  Pressable,
-  ScrollView,
-  Text,
-  useWindowDimensions,
-  View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Alert, FlatList, Pressable, Text, View } from 'react-native';
 import ProductCard from '@/components/ProductCard';
 import { daysUntil, todayStr } from '@/lib/dates';
 import { cancelExpiryAlerts } from '@/lib/notifications';
-import { deleteOrderHistory, listOrderHistory } from '@/lib/order-repo';
-import { OrderHistoryEntry } from '@/lib/order-types';
 import { deleteProduct, listProducts } from '@/lib/repo';
 import { Product } from '@/lib/types';
 
@@ -42,30 +30,19 @@ function pad(n: number): string {
   return n < 10 ? `0${n}` : String(n);
 }
 
-function formatTime(iso: string): string {
-  const d = new Date(iso);
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
 export default function CalendarScreen() {
-  const insets = useSafeAreaInsets();
-  const { height: windowHeight } = useWindowDimensions();
   const today = todayStr();
   const [products, setProducts] = useState<Product[]>([]);
-  const [orderHistory, setOrderHistory] = useState<OrderHistoryEntry[]>([]);
   const [mode, setMode] = useState<Mode>('day');
   const [cursorYear, setCursorYear] = useState(Number(today.slice(0, 4)));
   const [cursorMonth, setCursorMonth] = useState(Number(today.slice(5, 7))); // 1~12
   const [selectedDay, setSelectedDay] = useState(today);
   const [selectedMonth, setSelectedMonth] = useState(today.slice(0, 7)); // YYYY-MM
   const [selectedYear, setSelectedYear] = useState(today.slice(0, 4)); // YYYY
-  const [detailEntry, setDetailEntry] = useState<OrderHistoryEntry | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const [productList, historyList] = await Promise.all([listProducts(), listOrderHistory()]);
-      setProducts(productList);
-      setOrderHistory(historyList);
+      setProducts(await listProducts());
     } catch (e) {
       Alert.alert('불러오기 실패', e instanceof Error ? e.message : '알 수 없는 오류');
     }
@@ -93,32 +70,6 @@ export default function CalendarScreen() {
     (prefix: string) => products.filter((p) => p.expiryDate.startsWith(prefix)).length,
     [products],
   );
-
-  /** 발주 내역이 있는 날짜 (일 모드 달력 점 표시용) */
-  const orderDatesSet = useMemo(
-    () => new Set(orderHistory.map((e) => e.dateKey)),
-    [orderHistory],
-  );
-
-  /** 선택된 날짜의 발주 내역 */
-  const dayHistory = useMemo(
-    () => orderHistory.filter((e) => e.dateKey === selectedDay),
-    [orderHistory, selectedDay],
-  );
-
-  const confirmDeleteHistory = (entry: OrderHistoryEntry) => {
-    Alert.alert('발주 내역 삭제', `${entry.branch} 발주 내역을 삭제할까요?`, [
-      { text: '취소', style: 'cancel' },
-      {
-        text: '삭제',
-        style: 'destructive',
-        onPress: async () => {
-          await deleteOrderHistory(entry.id);
-          load();
-        },
-      },
-    ]);
-  };
 
   /** 하단 목록: 선택된 기간에 유통기한이 걸린 상품 */
   const listed = useMemo(() => {
@@ -298,14 +249,6 @@ export default function CalendarScreen() {
                           />
                         ))}
                       </View>
-                      <View className="mt-0.5 h-1.5 w-1.5">
-                        {orderDatesSet.has(dateStr) ? (
-                          <View
-                            className="h-1.5 w-1.5 rounded-full"
-                            style={{ backgroundColor: '#8B5CF6' }}
-                          />
-                        ) : null}
-                      </View>
                     </Pressable>
                   );
                 })}
@@ -393,28 +336,6 @@ export default function CalendarScreen() {
 
       {/* ── 하단 40%: 임박 목록 ── */}
       <View style={{ flex: 4 }} className="border-t border-line">
-        {mode === 'day' && dayHistory.length > 0 ? (
-          <View className="border-b border-line bg-paper px-4 pb-2 pt-3">
-            {dayHistory.map((entry) => (
-              <Pressable
-                key={entry.id}
-                onPress={() => setDetailEntry(entry)}
-                className="mb-2 rounded-lg bg-bg p-2.5 active:opacity-70"
-              >
-                <View className="flex-row items-center justify-between">
-                  <View className="flex-row items-center">
-                    <View
-                      className="mr-1.5 h-2 w-2 rounded-full"
-                      style={{ backgroundColor: '#8B5CF6' }}
-                    />
-                    <Text className="text-ink text-sm font-bold">{entry.branch} 발주 1건</Text>
-                  </View>
-                  <Text className="text-muted text-xs">{formatTime(entry.sentAt)}</Text>
-                </View>
-              </Pressable>
-            ))}
-          </View>
-        ) : null}
         <View className="flex-row items-center px-4 pb-2 pt-3">
           <MaterialCommunityIcons name="clock-alert-outline" size={18} color="#CC2222" />
           <Text className="text-ink ml-1.5 text-sm font-bold">{listLabel} 유통기한 상품</Text>
@@ -439,76 +360,6 @@ export default function CalendarScreen() {
           contentContainerStyle={{ paddingBottom: 24 }}
         />
       </View>
-
-      <Modal
-        visible={!!detailEntry}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setDetailEntry(null)}
-      >
-        <Pressable
-          className="flex-1 justify-end bg-black/40"
-          onPress={() => setDetailEntry(null)}
-        >
-          {detailEntry ? (
-            <Pressable
-              onPress={(e) => e.stopPropagation()}
-              className="rounded-t-2xl bg-paper px-5 pt-2.5"
-              style={{
-                maxHeight: Math.round(windowHeight * 0.8),
-                paddingBottom: Math.max(insets.bottom, 16) + 20,
-              }}
-            >
-              <View className="items-center pb-2">
-                <View style={{ width: 48, height: 6, borderRadius: 3, backgroundColor: '#9A9A9A' }} />
-              </View>
-              <View className="flex-row items-center justify-between">
-                <Text className="text-ink text-lg font-bold">{detailEntry.branch} 발주 내역</Text>
-                <Pressable
-                  onPress={() => setDetailEntry(null)}
-                  hitSlop={8}
-                  accessibilityRole="button"
-                  accessibilityLabel="닫기"
-                >
-                  <MaterialCommunityIcons name="close" size={22} color="#1A1A1A" />
-                </Pressable>
-              </View>
-              <Text className="text-muted mt-1 text-xs">
-                {detailEntry.dateKey} {formatTime(detailEntry.sentAt)} 전송
-              </Text>
-
-              <ScrollView className="mt-3" style={{ flexShrink: 1 }}>
-                {detailEntry.items.map((it, i) => (
-                  <View
-                    key={`${it.productId}-${i}`}
-                    className="flex-row items-center justify-between border-b border-line py-2"
-                  >
-                    <Text className="text-ink flex-1 text-sm" numberOfLines={1}>
-                      {it.name}
-                    </Text>
-                    <Text className="text-primary ml-2 text-sm font-bold">{it.qty}박스</Text>
-                  </View>
-                ))}
-              </ScrollView>
-
-              <View className="mt-3 flex-row items-center justify-between">
-                <Text className="text-ink text-sm font-bold">
-                  총 {detailEntry.totalBoxes}박스
-                </Text>
-                <Pressable
-                  onPress={() => {
-                    const entry = detailEntry;
-                    setDetailEntry(null);
-                    confirmDeleteHistory(entry);
-                  }}
-                >
-                  <Text className="text-primary text-sm underline">삭제</Text>
-                </Pressable>
-              </View>
-            </Pressable>
-          ) : null}
-        </Pressable>
-      </Modal>
     </View>
   );
 }

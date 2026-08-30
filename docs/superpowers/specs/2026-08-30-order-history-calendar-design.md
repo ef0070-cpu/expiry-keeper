@@ -1,6 +1,6 @@
 # 발주 완료 내역 캘린더 저장 Design
 
-**Status:** Approved
+**Status:** Abandoned (2026-08-30 구현 후 캘린더 팝업 레이아웃/제스처 문제가 반복돼 기능 자체를 롤백함 — 관련 코드 전부 제거됨)
 **Date:** 2026-08-30
 **Base:** main (`docs/superpowers/specs/2026-08-27-order-feature-enhancements-design.md`까지 반영된 상태)
 
