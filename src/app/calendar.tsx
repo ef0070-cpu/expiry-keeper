@@ -5,6 +5,8 @@ import { Alert, FlatList, Pressable, Text, View } from 'react-native';
 import ProductCard from '@/components/ProductCard';
 import { daysUntil, todayStr } from '@/lib/dates';
 import { cancelExpiryAlerts } from '@/lib/notifications';
+import { deleteOrderHistory, listOrderHistory } from '@/lib/order-repo';
+import { OrderHistoryEntry } from '@/lib/order-types';
 import { deleteProduct, listProducts } from '@/lib/repo';
 import { Product } from '@/lib/types';
 
@@ -30,9 +32,15 @@ function pad(n: number): string {
   return n < 10 ? `0${n}` : String(n);
 }
 
+function formatTime(iso: string): string {
+  const d = new Date(iso);
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export default function CalendarScreen() {
   const today = todayStr();
   const [products, setProducts] = useState<Product[]>([]);
+  const [orderHistory, setOrderHistory] = useState<OrderHistoryEntry[]>([]);
   const [mode, setMode] = useState<Mode>('day');
   const [cursorYear, setCursorYear] = useState(Number(today.slice(0, 4)));
   const [cursorMonth, setCursorMonth] = useState(Number(today.slice(5, 7))); // 1~12
@@ -42,7 +50,9 @@ export default function CalendarScreen() {
 
   const load = useCallback(async () => {
     try {
-      setProducts(await listProducts());
+      const [productList, historyList] = await Promise.all([listProducts(), listOrderHistory()]);
+      setProducts(productList);
+      setOrderHistory(historyList);
     } catch (e) {
       Alert.alert('불러오기 실패', e instanceof Error ? e.message : '알 수 없는 오류');
     }
@@ -70,6 +80,32 @@ export default function CalendarScreen() {
     (prefix: string) => products.filter((p) => p.expiryDate.startsWith(prefix)).length,
     [products],
   );
+
+  /** 발주 내역이 있는 날짜 (일 모드 달력 점 표시용) */
+  const orderDatesSet = useMemo(
+    () => new Set(orderHistory.map((e) => e.dateKey)),
+    [orderHistory],
+  );
+
+  /** 선택된 날짜의 발주 내역 */
+  const dayHistory = useMemo(
+    () => orderHistory.filter((e) => e.dateKey === selectedDay),
+    [orderHistory, selectedDay],
+  );
+
+  const confirmDeleteHistory = (entry: OrderHistoryEntry) => {
+    Alert.alert('발주 내역 삭제', `${entry.branch} 발주 내역을 삭제할까요?`, [
+      { text: '취소', style: 'cancel' },
+      {
+        text: '삭제',
+        style: 'destructive',
+        onPress: async () => {
+          await deleteOrderHistory(entry.id);
+          load();
+        },
+      },
+    ]);
+  };
 
   /** 하단 목록: 선택된 기간에 유통기한이 걸린 상품 */
   const listed = useMemo(() => {
@@ -249,6 +285,14 @@ export default function CalendarScreen() {
                           />
                         ))}
                       </View>
+                      <View className="mt-0.5 h-1.5 w-1.5">
+                        {orderDatesSet.has(dateStr) ? (
+                          <View
+                            className="h-1.5 w-1.5 rounded-full"
+                            style={{ backgroundColor: '#8B5CF6' }}
+                          />
+                        ) : null}
+                      </View>
                     </Pressable>
                   );
                 })}
@@ -336,6 +380,31 @@ export default function CalendarScreen() {
 
       {/* ── 하단 40%: 임박 목록 ── */}
       <View style={{ flex: 4 }} className="border-t border-line">
+        {mode === 'day' && dayHistory.length > 0 ? (
+          <View className="border-b border-line bg-paper px-4 pb-2 pt-3">
+            {dayHistory.map((entry) => (
+              <Pressable
+                key={entry.id}
+                onLongPress={() => confirmDeleteHistory(entry)}
+                className="mb-2 rounded-lg bg-bg p-2.5 active:opacity-70"
+              >
+                <View className="flex-row items-center justify-between">
+                  <View className="flex-row items-center">
+                    <View
+                      className="mr-1.5 h-2 w-2 rounded-full"
+                      style={{ backgroundColor: '#8B5CF6' }}
+                    />
+                    <Text className="text-ink text-sm font-bold">발주 내역 · {entry.branch}</Text>
+                  </View>
+                  <Text className="text-muted text-xs">{formatTime(entry.sentAt)}</Text>
+                </View>
+                <Text className="text-muted mt-1 text-xs" numberOfLines={2}>
+                  {entry.items.map((it) => `${it.name} × ${it.qty}`).join(', ')}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
         <View className="flex-row items-center px-4 pb-2 pt-3">
           <MaterialCommunityIcons name="clock-alert-outline" size={18} color="#CC2222" />
           <Text className="text-ink ml-1.5 text-sm font-bold">{listLabel} 유통기한 상품</Text>

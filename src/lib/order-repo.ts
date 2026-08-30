@@ -3,7 +3,7 @@ import { upsertBarcodeCatalog } from './barcode-catalog';
 import { submitNewOrderProduct } from './order-report';
 import { newId } from './repo';
 import { supabase } from './supabase';
-import { OrderCart, OrderProduct } from './order-types';
+import { OrderCart, OrderHistoryEntry, OrderProduct } from './order-types';
 import { DEFAULT_ORDER_PRODUCTS } from './order-seed-data';
 
 export { newId };
@@ -11,6 +11,7 @@ export { newId };
 const PRODUCTS_KEY = 'orderProducts:v1';
 const CATEGORIES_KEY = 'orderCategories:v1';
 const CART_KEY = 'orderCart:v1';
+const HISTORY_KEY = 'order_history_v1';
 const APPLIED_UPDATES_KEY = 'appliedCatalogUpdateIds:v1';
 
 const DEFAULT_CATEGORIES = ['바', '콘', '튜브', '샌드/기타', '홈/컵'];
@@ -120,6 +121,24 @@ export async function setOrderCartQuantity(productId: string, qty: number): Prom
 
 export async function clearOrderCart(): Promise<void> {
   await writeOrderCart({});
+}
+
+// ---------- 발주 완료 내역 ----------
+
+export async function listOrderHistory(): Promise<OrderHistoryEntry[]> {
+  const raw = await AsyncStorage.getItem(HISTORY_KEY);
+  return raw ? (JSON.parse(raw) as OrderHistoryEntry[]) : [];
+}
+
+export async function saveOrderHistory(entry: OrderHistoryEntry): Promise<void> {
+  const items = await listOrderHistory();
+  items.push(entry);
+  await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(items));
+}
+
+export async function deleteOrderHistory(id: string): Promise<void> {
+  const items = (await listOrderHistory()).filter((e) => e.id !== id);
+  await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(items));
 }
 
 /**
