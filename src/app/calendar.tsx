@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { Alert, FlatList, Pressable, Text, View } from 'react-native';
+import { Alert, FlatList, Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import ProductCard from '@/components/ProductCard';
 import { daysUntil, todayStr } from '@/lib/dates';
 import { cancelExpiryAlerts } from '@/lib/notifications';
@@ -47,6 +47,7 @@ export default function CalendarScreen() {
   const [selectedDay, setSelectedDay] = useState(today);
   const [selectedMonth, setSelectedMonth] = useState(today.slice(0, 7)); // YYYY-MM
   const [selectedYear, setSelectedYear] = useState(today.slice(0, 4)); // YYYY
+  const [detailEntry, setDetailEntry] = useState<OrderHistoryEntry | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -385,7 +386,7 @@ export default function CalendarScreen() {
             {dayHistory.map((entry) => (
               <Pressable
                 key={entry.id}
-                onLongPress={() => confirmDeleteHistory(entry)}
+                onPress={() => setDetailEntry(entry)}
                 className="mb-2 rounded-lg bg-bg p-2.5 active:opacity-70"
               >
                 <View className="flex-row items-center justify-between">
@@ -429,6 +430,69 @@ export default function CalendarScreen() {
           contentContainerStyle={{ paddingBottom: 24 }}
         />
       </View>
+
+      <Modal
+        visible={!!detailEntry}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDetailEntry(null)}
+      >
+        <Pressable
+          className="flex-1 items-center justify-center bg-black/40 px-6"
+          onPress={() => setDetailEntry(null)}
+        >
+          {detailEntry ? (
+            <Pressable
+              onPress={(e) => e.stopPropagation()}
+              className="w-full rounded-2xl bg-paper p-5"
+            >
+              <View className="flex-row items-center justify-between">
+                <Text className="text-ink text-lg font-bold">{detailEntry.branch} 발주 내역</Text>
+                <Pressable
+                  onPress={() => setDetailEntry(null)}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="닫기"
+                >
+                  <MaterialCommunityIcons name="close" size={22} color="#1A1A1A" />
+                </Pressable>
+              </View>
+              <Text className="text-muted mt-1 text-xs">
+                {detailEntry.dateKey} {formatTime(detailEntry.sentAt)} 전송
+              </Text>
+
+              <ScrollView className="mt-3" style={{ maxHeight: 320 }}>
+                {detailEntry.items.map((it, i) => (
+                  <View
+                    key={`${it.productId}-${i}`}
+                    className="flex-row items-center justify-between border-b border-line py-2"
+                  >
+                    <Text className="text-ink flex-1 text-sm" numberOfLines={1}>
+                      {it.name}
+                    </Text>
+                    <Text className="text-primary ml-2 text-sm font-bold">{it.qty}박스</Text>
+                  </View>
+                ))}
+              </ScrollView>
+
+              <View className="mt-3 flex-row items-center justify-between">
+                <Text className="text-ink text-sm font-bold">
+                  총 {detailEntry.totalBoxes}박스
+                </Text>
+                <Pressable
+                  onPress={() => {
+                    const entry = detailEntry;
+                    setDetailEntry(null);
+                    confirmDeleteHistory(entry);
+                  }}
+                >
+                  <Text className="text-primary text-sm underline">삭제</Text>
+                </Pressable>
+              </View>
+            </Pressable>
+          ) : null}
+        </Pressable>
+      </Modal>
     </View>
   );
 }
