@@ -1,7 +1,16 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { Alert, FlatList, Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import {
+  Alert,
+  FlatList,
+  Modal,
+  Pressable,
+  ScrollView,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ProductCard from '@/components/ProductCard';
 import { daysUntil, todayStr } from '@/lib/dates';
@@ -40,6 +49,7 @@ function formatTime(iso: string): string {
 
 export default function CalendarScreen() {
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
   const today = todayStr();
   const [products, setProducts] = useState<Product[]>([]);
   const [orderHistory, setOrderHistory] = useState<OrderHistoryEntry[]>([]);
@@ -445,7 +455,7 @@ export default function CalendarScreen() {
               onPress={(e) => e.stopPropagation()}
               className="rounded-t-2xl bg-paper px-5 pt-2.5"
               style={{
-                maxHeight: '80%',
+                maxHeight: Math.round(windowHeight * 0.8),
                 paddingBottom: Math.max(insets.bottom, 16) + 20,
               }}
             >
