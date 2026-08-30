@@ -23,6 +23,11 @@ function isChosungOnly(text: string): boolean {
  * 초성 변환 비교는 검색어가 온전히 자음으로만 이뤄졌을 때만, 그리고 target의
  * 맨 앞부터 순서대로 일치할 때만 적용한다 — 중간에서 우연히 초성이 겹치는
  * 무관한 상품(예: "ㅇㄷ" 검색 시 "마이디저트"의 "이디" 부분)이 걸리는 것을 막는다.
+ *
+ * 검색어의 공백은 매칭이 실패했을 때만 무시하고 재시도한다(target의 공백은
+ * 그대로 둔다) — target이 여러 단어일 때 공백 없는 검색어가 단어 경계를
+ * 넘어 붙는 오검색은 계속 막으면서, 사용자가 한 단어 상품명에 실수로 띄어쓴
+ * 검색어("구구스트로 베리바" → "구구스트로베리바")는 매칭되게 한다.
  */
 export function matchesSearch(target: string, query: string): boolean {
   const t = target.toLowerCase();
@@ -30,5 +35,11 @@ export function matchesSearch(target: string, query: string): boolean {
   if (!q) return true;
   if (t.includes(q)) return true;
   if (isChosungOnly(q)) return toChosung(t).startsWith(q);
+
+  const qNoSpace = q.replace(/\s+/g, '');
+  if (qNoSpace !== q) {
+    if (t.includes(qNoSpace)) return true;
+    if (isChosungOnly(qNoSpace)) return toChosung(t).startsWith(qNoSpace);
+  }
   return false;
 }
