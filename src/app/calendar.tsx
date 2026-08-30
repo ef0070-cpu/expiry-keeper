@@ -395,13 +395,10 @@ export default function CalendarScreen() {
                       className="mr-1.5 h-2 w-2 rounded-full"
                       style={{ backgroundColor: '#8B5CF6' }}
                     />
-                    <Text className="text-ink text-sm font-bold">발주 내역 · {entry.branch}</Text>
+                    <Text className="text-ink text-sm font-bold">{entry.branch} 발주 1건</Text>
                   </View>
                   <Text className="text-muted text-xs">{formatTime(entry.sentAt)}</Text>
                 </View>
-                <Text className="text-muted mt-1 text-xs" numberOfLines={2}>
-                  {entry.items.map((it) => `${it.name} × ${it.qty}`).join(', ')}
-                </Text>
               </Pressable>
             ))}
           </View>
