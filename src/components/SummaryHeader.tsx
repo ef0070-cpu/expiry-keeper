@@ -1,13 +1,21 @@
+import { memo, useMemo } from 'react';
 import { Text, View } from 'react-native';
 import { daysUntil } from '@/lib/dates';
 import { Product } from '@/lib/types';
 
-export default function SummaryHeader({ products }: { products: Product[] }) {
-  const expired = products.filter((p) => daysUntil(p.expiryDate) < 0).length;
-  const urgent = products.filter((p) => {
-    const d = daysUntil(p.expiryDate);
-    return d >= 0 && d <= 3;
-  }).length;
+function SummaryHeader({ products }: { products: Product[] }) {
+  // 두 번 filter()하며 daysUntil을 상품마다 최대 2번 호출하던 것을 단일 reduce로 합침
+  const { expired, urgent } = useMemo(() => {
+    return products.reduce(
+      (acc, p) => {
+        const d = daysUntil(p.expiryDate);
+        if (d < 0) acc.expired++;
+        else if (d <= 3) acc.urgent++;
+        return acc;
+      },
+      { expired: 0, urgent: 0 },
+    );
+  }, [products]);
 
   return (
     <View className="mx-4 mb-3 mt-2 flex-row gap-2">
@@ -17,6 +25,8 @@ export default function SummaryHeader({ products }: { products: Product[] }) {
     </View>
   );
 }
+
+export default memo(SummaryHeader);
 
 function Stat({ label, value, color }: { label: string; value: number; color: string }) {
   return (

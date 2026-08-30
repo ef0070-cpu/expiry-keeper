@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { Alert, FlatList, Pressable, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Chip from '@/components/Chip';
@@ -16,8 +16,8 @@ import {
   listOrderProducts,
   renameOrderCategory,
   seedDefaultOrderProducts,
-  setOrderCartQuantity,
   syncApprovedCatalogUpdates,
+  writeOrderCart,
 } from '@/lib/order-repo';
 import { OrderCart, OrderProduct, OrderStatus } from '@/lib/order-types';
 import { matchesSearch } from '@/lib/korean-search';
@@ -69,25 +69,37 @@ export default function Order() {
     if (scanParams.scannedBarcode) setQuery(scanParams.scannedBarcode);
   }, [scanParams.scannedBarcode, scanParams.nonce]);
 
+  // 검색어를 낮은 우선순위로 반영 — 388종 카탈로그에서 매 키 입력마다 즉시 전체
+  // 재필터링하면 저사양 기기에서 입력이 밀릴 수 있어, React가 재계산을 뒤로 미루게 한다.
+  const deferredQuery = useDeferredValue(query);
+
   const filtered = useMemo(() => {
     return products.filter((p) => {
       if (selectedCategory !== '전체' && p.category !== selectedCategory) return false;
-      if (!query.trim()) return true;
+      if (!deferredQuery.trim()) return true;
       return (
-        matchesSearch(p.name, query) ||
-        matchesSearch(p.brand, query) ||
-        (p.barcode ?? '').includes(query.trim())
+        matchesSearch(p.name, deferredQuery) ||
+        matchesSearch(p.brand, deferredQuery) ||
+        (p.barcode ?? '').includes(deferredQuery.trim())
       );
     });
-  }, [products, query, selectedCategory]);
+  }, [products, deferredQuery, selectedCategory]);
 
   const totalCount = Object.values(cart).reduce((sum, qty) => sum + qty, 0);
 
-  const changeQty = async (productId: string, delta: number) => {
-    const current = cart[productId] ?? 0;
-    const next = await setOrderCartQuantity(productId, Math.max(0, current + delta));
-    setCart(next);
-  };
+  // 낙관적 업데이트: 로컬 state 기준으로 즉시 반영하고 저장은 fire-and-forget —
+  // 이전에는 탭할 때마다 AsyncStorage를 재조회해서 빠르게 연타하면 이전 쓰기가
+  // 끝나기 전에 다음 읽기가 시작돼 증가분이 유실될 수 있었다.
+  const changeQty = useCallback((productId: string, delta: number) => {
+    setCart((prev) => {
+      const nextQty = Math.max(0, (prev[productId] ?? 0) + delta);
+      const next = { ...prev };
+      if (nextQty <= 0) delete next[productId];
+      else next[productId] = nextQty;
+      writeOrderCart(next).catch(() => {});
+      return next;
+    });
+  }, []);
 
   const submitCategory = async () => {
     const v = categoryInput.trim();
@@ -151,32 +163,39 @@ export default function Order() {
     ]);
   };
 
-  const onLongPressProduct = (p: OrderProduct) => {
-    Alert.alert(p.name, '어떻게 처리할까요?', [
-      {
-        text: '수정',
-        onPress: () => router.push({ pathname: '/order-product-form', params: { id: p.id } }),
-      },
-      {
-        text: '삭제',
-        style: 'destructive',
-        onPress: () => {
-          Alert.alert('상품 삭제', `'${p.name}' 을(를) 카탈로그에서 삭제할까요?`, [
-            { text: '취소', style: 'cancel' },
-            {
-              text: '삭제',
-              style: 'destructive',
-              onPress: async () => {
-                await deleteOrderProduct(p.id);
-                load();
-              },
-            },
-          ]);
+  const handleOpenProduct = useCallback((id: string) => {
+    router.push({ pathname: '/order-product-form', params: { id } });
+  }, []);
+
+  const onLongPressProduct = useCallback(
+    (p: OrderProduct) => {
+      Alert.alert(p.name, '어떻게 처리할까요?', [
+        {
+          text: '수정',
+          onPress: () => router.push({ pathname: '/order-product-form', params: { id: p.id } }),
         },
-      },
-      { text: '취소', style: 'cancel' },
-    ]);
-  };
+        {
+          text: '삭제',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert('상품 삭제', `'${p.name}' 을(를) 카탈로그에서 삭제할까요?`, [
+              { text: '취소', style: 'cancel' },
+              {
+                text: '삭제',
+                style: 'destructive',
+                onPress: async () => {
+                  await deleteOrderProduct(p.id);
+                  load();
+                },
+              },
+            ]);
+          },
+        },
+        { text: '취소', style: 'cancel' },
+      ]);
+    },
+    [load],
+  );
 
   const onSeedDefaults = async () => {
     setSeeding(true);
@@ -253,16 +272,24 @@ export default function Order() {
         className="mx-4 mt-2.5 items-center rounded-xl py-2.5 active:opacity-70"
         style={{ backgroundColor: pendingUpdateCount > 0 ? '#2E7D32' : '#F0F0F0' }}
       >
-        <Text
-          className="text-sm font-bold"
-          style={{ color: pendingUpdateCount > 0 ? '#FFFFFF' : '#999999' }}
-        >
-          {updating
-            ? '업데이트 중...'
-            : pendingUpdateCount > 0
-              ? `업데이트된 ${pendingUpdateCount}건이 있습니다`
-              : 'Update'}
-        </Text>
+        {updating ? (
+          <Text className="text-sm font-bold" style={{ color: '#999999' }}>
+            업데이트 중...
+          </Text>
+        ) : pendingUpdateCount > 0 ? (
+          <>
+            <Text className="text-sm font-bold" style={{ color: '#FFFFFF' }}>
+              상품 Update
+            </Text>
+            <Text className="mt-0.5 text-xs" style={{ color: '#FFFFFF' }}>
+              {pendingUpdateCount}개의 상품이 있습니다
+            </Text>
+          </>
+        ) : (
+          <Text className="text-sm font-bold" style={{ color: '#999999' }}>
+            Update 상품없음
+          </Text>
+        )}
       </Pressable>
 
       <View className="mt-2.5 px-4" style={{ gap: 8 }}>
@@ -319,11 +346,9 @@ export default function Order() {
           <CatalogRow
             product={item}
             qty={cart[item.id] ?? 0}
-            onChangeQty={(delta) => changeQty(item.id, delta)}
-            onPress={() =>
-              router.push({ pathname: '/order-product-form', params: { id: item.id } })
-            }
-            onLongPress={() => onLongPressProduct(item)}
+            onChangeQty={changeQty}
+            onPress={handleOpenProduct}
+            onLongPress={onLongPressProduct}
           />
         )}
         ListEmptyComponent={
@@ -365,7 +390,7 @@ export default function Order() {
   );
 }
 
-function CatalogRow({
+const CatalogRow = memo(function CatalogRow({
   product,
   qty,
   onChangeQty,
@@ -374,15 +399,15 @@ function CatalogRow({
 }: {
   product: OrderProduct;
   qty: number;
-  onChangeQty: (delta: number) => void;
-  onPress: () => void;
-  onLongPress: () => void;
+  onChangeQty: (id: string, delta: number) => void;
+  onPress: (id: string) => void;
+  onLongPress: (product: OrderProduct) => void;
 }) {
   const statusMeta = STATUS_META[product.status ?? 'active'];
   return (
     <Pressable
-      onPress={onPress}
-      onLongPress={onLongPress}
+      onPress={() => onPress(product.id)}
+      onLongPress={() => onLongPress(product)}
       className="mx-4 mb-2.5 flex-row items-center rounded-xl border border-line bg-paper p-3 active:opacity-70"
     >
       {product.imageUri ? (
@@ -415,14 +440,14 @@ function CatalogRow({
       </View>
       <View className="flex-row items-center">
         <Pressable
-          onPress={() => onChangeQty(-1)}
+          onPress={() => onChangeQty(product.id, -1)}
           className="h-11 w-11 items-center justify-center rounded-lg border border-line bg-bg active:opacity-70"
         >
           <MaterialCommunityIcons name="minus" size={20} color="#1A1A1A" />
         </Pressable>
         <Text className="text-ink mx-3 w-7 text-center text-lg font-bold">{qty}</Text>
         <Pressable
-          onPress={() => onChangeQty(1)}
+          onPress={() => onChangeQty(product.id, 1)}
           className="h-11 w-11 items-center justify-center rounded-lg border border-line bg-bg active:opacity-70"
         >
           <MaterialCommunityIcons name="plus" size={20} color="#1A1A1A" />
@@ -430,4 +455,4 @@ function CatalogRow({
       </View>
     </Pressable>
   );
-}
+});

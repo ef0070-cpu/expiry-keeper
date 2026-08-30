@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import { memo } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DdayBadge from './DdayBadge';
@@ -7,17 +8,17 @@ import { Product } from '@/lib/types';
 
 interface Props {
   product: Product;
-  onPress: () => void;
-  onLongPress: () => void;
+  onPress: (id: string) => void;
+  onLongPress: (product: Product) => void;
 }
 
-export default function ProductCard({ product, onPress, onLongPress }: Props) {
+function ProductCard({ product, onPress, onLongPress }: Props) {
   const days = daysUntil(product.expiryDate);
 
   return (
     <Pressable
-      onPress={onPress}
-      onLongPress={onLongPress}
+      onPress={() => onPress(product.id)}
+      onLongPress={() => onLongPress(product)}
       className="mx-4 mb-2.5 flex-row items-center rounded-xl border border-line bg-paper p-3 active:opacity-70"
     >
       {product.imageUri ? (
@@ -53,3 +54,5 @@ export default function ProductCard({ product, onPress, onLongPress }: Props) {
     </Pressable>
   );
 }
+
+export default memo(ProductCard);

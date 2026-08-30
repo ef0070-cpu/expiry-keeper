@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -71,15 +71,19 @@ export default function Dashboard() {
     return [...set].sort();
   }, [products]);
 
+  // 검색어를 낮은 우선순위로 반영 — 타이핑 중 매 키 입력마다 전체 목록을 즉시
+  // 재필터링하면 저사양 기기에서 입력이 밀릴 수 있어, React가 필터 재계산을 뒤로 미루게 한다.
+  const deferredQuery = useDeferredValue(query);
+
   const sections = useMemo(() => {
     const filtered = products.filter((p) => {
       if (selectedCategories.size > 0 && !p.categories.some((c) => selectedCategories.has(c)))
         return false;
-      if (!query.trim()) return true;
+      if (!deferredQuery.trim()) return true;
       return (
-        matchesSearch(p.name, query) ||
-        (p.barcode ?? '').includes(query.trim()) ||
-        matchesSearch(p.memo ?? '', query)
+        matchesSearch(p.name, deferredQuery) ||
+        (p.barcode ?? '').includes(deferredQuery.trim()) ||
+        matchesSearch(p.memo ?? '', deferredQuery)
       );
     });
     const grouped = new Map<SectionKey, Product[]>();
@@ -94,7 +98,7 @@ export default function Dashboard() {
       title: SECTION_TITLES[k],
       data: grouped.get(k)!.sort((a, b) => a.expiryDate.localeCompare(b.expiryDate)),
     }));
-  }, [products, query, selectedCategories]);
+  }, [products, deferredQuery, selectedCategories]);
 
   useEffect(() => {
     if (!scannedBarcode) return;
@@ -135,43 +139,56 @@ export default function Dashboard() {
     });
   };
 
-  const confirmDelete = (p: Product) => {
-    Alert.alert('상품 삭제', `'${p.name}' 을(를) 삭제할까요?\n(통계에도 남지 않습니다)`, [
-      { text: '취소', style: 'cancel' },
-      {
-        text: '삭제',
-        style: 'destructive',
-        onPress: async () => {
-          await deleteProduct(p.id);
-          await cancelExpiryAlerts(p.id);
-          load();
+  const confirmDelete = useCallback(
+    (p: Product) => {
+      Alert.alert('상품 삭제', `'${p.name}' 을(를) 삭제할까요?\n(통계에도 남지 않습니다)`, [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '삭제',
+          style: 'destructive',
+          onPress: async () => {
+            await deleteProduct(p.id);
+            await cancelExpiryAlerts(p.id);
+            load();
+          },
         },
-      },
-    ]);
-  };
+      ]);
+    },
+    [load],
+  );
 
-  const resolve = async (p: Product, status: 'consumed' | 'discarded') => {
-    try {
-      await resolveProduct(p.id, status);
-      await cancelExpiryAlerts(p.id);
-      load();
-    } catch (e) {
-      Alert.alert('처리 실패', e instanceof Error ? e.message : '알 수 없는 오류');
-    }
-  };
+  const resolve = useCallback(
+    async (p: Product, status: 'consumed' | 'discarded') => {
+      try {
+        await resolveProduct(p.id, status);
+        await cancelExpiryAlerts(p.id);
+        load();
+      } catch (e) {
+        Alert.alert('처리 실패', e instanceof Error ? e.message : '알 수 없는 오류');
+      }
+    },
+    [load],
+  );
 
-  const showActions = (p: Product) => {
-    Alert.alert(
-      p.name,
-      '어떻게 처리할까요? 소진·폐기 기록은 통계 화면에 남아요.',
-      [
-        { text: '소진 완료', onPress: () => resolve(p, 'consumed') },
-        { text: '폐기', onPress: () => resolve(p, 'discarded') },
-        { text: '삭제…', style: 'destructive', onPress: () => confirmDelete(p) },
-      ],
-      { cancelable: true },
-    );
-  };
+  const showActions = useCallback(
+    (p: Product) => {
+      Alert.alert(
+        p.name,
+        '어떻게 처리할까요? 소진·폐기 기록은 통계 화면에 남아요.',
+        [
+          { text: '소진 완료', onPress: () => resolve(p, 'consumed') },
+          { text: '폐기', onPress: () => resolve(p, 'discarded') },
+          { text: '삭제…', style: 'destructive', onPress: () => confirmDelete(p) },
+        ],
+        { cancelable: true },
+      );
+    },
+    [resolve, confirmDelete],
+  );
+
+  const handleOpenProduct = useCallback((id: string) => {
+    router.push({ pathname: '/product-form', params: { id } });
+  }, []);
 
   return (
     <View className="flex-1 bg-bg">
@@ -299,13 +316,7 @@ export default function Dashboard() {
           </View>
         )}
         renderItem={({ item }) => (
-          <ProductCard
-            product={item}
-            onPress={() =>
-              router.push({ pathname: '/product-form', params: { id: item.id } })
-            }
-            onLongPress={() => showActions(item)}
-          />
+          <ProductCard product={item} onPress={handleOpenProduct} onLongPress={showActions} />
         )}
         ListEmptyComponent={
           <View className="mt-24 items-center">

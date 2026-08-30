@@ -104,7 +104,7 @@ export async function getOrderCart(): Promise<OrderCart> {
   return raw ? (JSON.parse(raw) as OrderCart) : {};
 }
 
-async function writeOrderCart(cart: OrderCart): Promise<void> {
+export async function writeOrderCart(cart: OrderCart): Promise<void> {
   await AsyncStorage.setItem(CART_KEY, JSON.stringify(cart));
 }
 
