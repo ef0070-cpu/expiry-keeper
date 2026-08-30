@@ -2,6 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Alert, FlatList, Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ProductCard from '@/components/ProductCard';
 import { daysUntil, todayStr } from '@/lib/dates';
 import { cancelExpiryAlerts } from '@/lib/notifications';
@@ -38,6 +39,7 @@ function formatTime(iso: string): string {
 }
 
 export default function CalendarScreen() {
+  const insets = useSafeAreaInsets();
   const today = todayStr();
   const [products, setProducts] = useState<Product[]>([]);
   const [orderHistory, setOrderHistory] = useState<OrderHistoryEntry[]>([]);
@@ -431,18 +433,22 @@ export default function CalendarScreen() {
       <Modal
         visible={!!detailEntry}
         transparent
-        animationType="fade"
+        animationType="slide"
         onRequestClose={() => setDetailEntry(null)}
       >
         <Pressable
-          className="flex-1 items-center justify-center bg-black/40 px-6"
+          className="flex-1 justify-end bg-black/40"
           onPress={() => setDetailEntry(null)}
         >
           {detailEntry ? (
             <Pressable
               onPress={(e) => e.stopPropagation()}
-              className="w-full rounded-2xl bg-paper p-5"
+              className="rounded-t-2xl bg-paper px-5 pt-2.5"
+              style={{ paddingBottom: Math.max(insets.bottom, 16) + 20 }}
             >
+              <View className="items-center pb-2">
+                <View className="bg-muted h-1.5 w-12 rounded-full" />
+              </View>
               <View className="flex-row items-center justify-between">
                 <Text className="text-ink text-lg font-bold">{detailEntry.branch} 발주 내역</Text>
                 <Pressable
