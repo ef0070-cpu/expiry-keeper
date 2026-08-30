@@ -2,6 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ddayLabel } from '@/lib/dates';
 import { rescheduleAllExpiryAlerts } from '@/lib/notifications';
 import {
@@ -25,6 +26,7 @@ export default function Settings() {
   const { count, hour, minute } = useAlertSettings();
   const dateInputMethod = useDateInputMethod();
   const [deleting, setDeleting] = useState(false);
+  const insets = useSafeAreaInsets();
 
   const deleteAccount = () => {
     Alert.alert(
@@ -68,7 +70,10 @@ export default function Settings() {
   };
 
   return (
-    <ScrollView className="flex-1 bg-bg" contentContainerStyle={{ padding: 16 }}>
+    <ScrollView
+      className="flex-1 bg-bg"
+      contentContainerStyle={{ padding: 16, paddingBottom: Math.max(insets.bottom, 16) + 16 }}
+    >
       <SectionTitle text="사용 모드" />
       <View className="overflow-hidden rounded-xl border border-line bg-paper">
         <ModeRow
