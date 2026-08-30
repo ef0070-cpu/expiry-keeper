@@ -61,7 +61,13 @@ export default function RootLayout() {
           <Stack.Screen name="order-product-form" options={{ title: '발주 상품' }} />
           <Stack.Screen
             name="order-cart"
-            options={{ title: '발주 내역', presentation: 'modal' }}
+            options={{
+              headerShown: false,
+              presentation: 'formSheet',
+              sheetAllowedDetents: [0.9],
+              sheetCornerRadius: 24,
+              sheetGrabberVisible: true,
+            }}
           />
         </Stack.Protected>
         <Stack.Protected guard={authed && mode === null}>

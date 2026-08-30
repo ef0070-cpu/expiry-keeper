@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Alert, FlatList, Pressable, Share, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -114,7 +114,21 @@ export default function OrderCartScreen() {
 
   return (
     <View className="flex-1 bg-bg">
-      <View className="border-b border-line bg-paper px-4 pb-3 pt-4">
+      <View className="items-center bg-paper pb-1 pt-2">
+        <View className="h-1 w-10 rounded-full bg-line" />
+      </View>
+      <View className="flex-row items-center justify-between bg-paper px-4 pb-2">
+        <Text className="text-ink text-lg font-bold">발주 내역</Text>
+        <Pressable
+          onPress={() => router.back()}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="닫기"
+        >
+          <MaterialCommunityIcons name="close" size={22} color="#1A1A1A" />
+        </Pressable>
+      </View>
+      <View className="border-b border-line bg-paper px-4 pb-3 pt-1">
         <Text className="text-ink mb-2 text-sm font-bold">매장</Text>
         {branches.length > 0 ? (
           <View className="flex-row flex-wrap" style={{ gap: 8 }}>
