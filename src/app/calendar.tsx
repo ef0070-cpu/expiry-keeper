@@ -1,5 +1,4 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import * as Clipboard from 'expo-clipboard';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Alert, FlatList, Modal, Pressable, ScrollView, Text, View } from 'react-native';
@@ -7,7 +6,6 @@ import ProductCard from '@/components/ProductCard';
 import { daysUntil, todayStr } from '@/lib/dates';
 import { cancelExpiryAlerts } from '@/lib/notifications';
 import { deleteOrderHistory, listOrderHistory } from '@/lib/order-repo';
-import { buildOrderHistoryCopyText } from '@/lib/order-share';
 import { OrderHistoryEntry } from '@/lib/order-types';
 import { deleteProduct, listProducts } from '@/lib/repo';
 import { Product } from '@/lib/types';
@@ -108,11 +106,6 @@ export default function CalendarScreen() {
         },
       },
     ]);
-  };
-
-  const copyHistory = async (entry: OrderHistoryEntry) => {
-    await Clipboard.setStringAsync(buildOrderHistoryCopyText(entry));
-    Alert.alert('복사 완료', '발주 내역이 클립보드에 복사되었습니다.');
   };
 
   /** 하단 목록: 선택된 기간에 유통기한이 걸린 상품 */
@@ -455,24 +448,14 @@ export default function CalendarScreen() {
             >
               <View className="flex-row items-center justify-between">
                 <Text className="text-ink text-lg font-bold">{detailEntry.branch} 발주 내역</Text>
-                <View className="flex-row items-center" style={{ gap: 14 }}>
-                  <Pressable
-                    onPress={() => copyHistory(detailEntry)}
-                    hitSlop={8}
-                    accessibilityRole="button"
-                    accessibilityLabel="복사"
-                  >
-                    <MaterialCommunityIcons name="content-copy" size={20} color="#1A1A1A" />
-                  </Pressable>
-                  <Pressable
-                    onPress={() => setDetailEntry(null)}
-                    hitSlop={8}
-                    accessibilityRole="button"
-                    accessibilityLabel="닫기"
-                  >
-                    <MaterialCommunityIcons name="close" size={22} color="#1A1A1A" />
-                  </Pressable>
-                </View>
+                <Pressable
+                  onPress={() => setDetailEntry(null)}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="닫기"
+                >
+                  <MaterialCommunityIcons name="close" size={22} color="#1A1A1A" />
+                </Pressable>
               </View>
               <Text className="text-muted mt-1 text-xs">
                 {detailEntry.dateKey} {formatTime(detailEntry.sentAt)} 전송
