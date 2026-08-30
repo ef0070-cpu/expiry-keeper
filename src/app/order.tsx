@@ -239,10 +239,20 @@ export default function Order() {
         options={{
           headerRight: () => (
             <View className="flex-row items-center" style={{ gap: 16 }}>
-              <Pressable onPress={() => router.push('/scan?mode=order')} hitSlop={8}>
+              <Pressable
+                onPress={() => router.push('/scan?mode=order')}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="바코드 스캔"
+              >
                 <MaterialCommunityIcons name="barcode-scan" size={22} color="#1A1A1A" />
               </Pressable>
-              <Pressable onPress={() => router.push('/order-product-form')} hitSlop={8}>
+              <Pressable
+                onPress={() => router.push('/order-product-form')}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="발주 상품 등록"
+              >
                 <MaterialCommunityIcons name="plus" size={22} color="#1A1A1A" />
               </Pressable>
             </View>
@@ -260,7 +270,12 @@ export default function Order() {
           onChangeText={setQuery}
         />
         {query ? (
-          <Pressable onPress={() => setQuery('')} hitSlop={8}>
+          <Pressable
+            onPress={() => setQuery('')}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="검색어 지우기"
+          >
             <MaterialCommunityIcons name="close-circle" size={18} color="#BBBBBB" />
           </Pressable>
         ) : null}
