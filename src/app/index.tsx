@@ -197,22 +197,47 @@ export default function Dashboard() {
           headerRight: () => (
             <View className="flex-row items-center" style={{ gap: 16 }}>
               {mode === 'retail' ? (
-                <Pressable onPress={() => router.push('/order')} hitSlop={8}>
+                <Pressable
+                  onPress={() => router.push('/order')}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="발주 관리"
+                >
                   <MaterialCommunityIcons name="cart-outline" size={22} color="#1A1A1A" />
                 </Pressable>
               ) : null}
               {mode === 'home' ? (
-                <Pressable onPress={() => router.push('/recipes')} hitSlop={8}>
+                <Pressable
+                  onPress={() => router.push('/recipes')}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="레시피 추천"
+                >
                   <MaterialCommunityIcons name="chef-hat" size={22} color="#1A1A1A" />
                 </Pressable>
               ) : null}
-              <Pressable onPress={() => router.push('/stats')} hitSlop={8}>
+              <Pressable
+                onPress={() => router.push('/stats')}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="소진·폐기 통계"
+              >
                 <MaterialCommunityIcons name="chart-box-outline" size={22} color="#1A1A1A" />
               </Pressable>
-              <Pressable onPress={() => router.push('/calendar')} hitSlop={8}>
+              <Pressable
+                onPress={() => router.push('/calendar')}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="캘린더"
+              >
                 <MaterialCommunityIcons name="calendar-month-outline" size={22} color="#1A1A1A" />
               </Pressable>
-              <Pressable onPress={() => router.push('/settings')} hitSlop={8}>
+              <Pressable
+                onPress={() => router.push('/settings')}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="설정"
+              >
                 <MaterialCommunityIcons name="cog-outline" size={22} color="#888888" />
               </Pressable>
             </View>
@@ -231,7 +256,12 @@ export default function Dashboard() {
           onChangeText={setQuery}
         />
         {query ? (
-          <Pressable onPress={() => setQuery('')} hitSlop={8}>
+          <Pressable
+            onPress={() => setQuery('')}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="검색어 지우기"
+          >
             <MaterialCommunityIcons name="close-circle" size={18} color="#BBBBBB" />
           </Pressable>
         ) : null}
