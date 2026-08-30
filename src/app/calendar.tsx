@@ -444,7 +444,10 @@ export default function CalendarScreen() {
             <Pressable
               onPress={(e) => e.stopPropagation()}
               className="rounded-t-2xl bg-paper px-5 pt-2.5"
-              style={{ paddingBottom: Math.max(insets.bottom, 16) + 20 }}
+              style={{
+                maxHeight: '80%',
+                paddingBottom: Math.max(insets.bottom, 16) + 20,
+              }}
             >
               <View className="items-center pb-2">
                 <View style={{ width: 48, height: 6, borderRadius: 3, backgroundColor: '#9A9A9A' }} />
@@ -464,7 +467,7 @@ export default function CalendarScreen() {
                 {detailEntry.dateKey} {formatTime(detailEntry.sentAt)} 전송
               </Text>
 
-              <ScrollView className="mt-3" style={{ maxHeight: 320 }}>
+              <ScrollView className="mt-3" style={{ flexShrink: 1 }}>
                 {detailEntry.items.map((it, i) => (
                   <View
                     key={`${it.productId}-${i}`}
