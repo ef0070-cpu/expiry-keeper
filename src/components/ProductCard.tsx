@@ -1,8 +1,7 @@
-import { Image } from 'expo-image';
 import { memo } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DdayBadge from './DdayBadge';
+import Thumbnail from './Thumbnail';
 import { daysUntil } from '@/lib/dates';
 import { Product } from '@/lib/types';
 
@@ -21,17 +20,7 @@ function ProductCard({ product, onPress, onLongPress }: Props) {
       onLongPress={() => onLongPress(product)}
       className="mx-4 mb-2.5 flex-row items-center rounded-xl border border-line bg-paper p-3 active:opacity-70"
     >
-      {product.imageUri ? (
-        <Image
-          source={{ uri: product.imageUri }}
-          style={{ width: 64, height: 64, borderRadius: 8, backgroundColor: '#F0F0F0' }}
-          contentFit="cover"
-        />
-      ) : (
-        <View className="h-16 w-16 items-center justify-center rounded-lg bg-bg">
-          <MaterialCommunityIcons name="image-off-outline" size={24} color="#BBBBBB" />
-        </View>
-      )}
+      <Thumbnail uri={product.imageUri} size={64} radius={8} iconSize={24} />
 
       <View className="ml-3 flex-1">
         <Text className="text-ink text-base font-bold" numberOfLines={1}>

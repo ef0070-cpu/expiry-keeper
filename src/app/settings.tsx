@@ -107,7 +107,12 @@ export default function Settings() {
           </View>
           <View className="flex-row items-center">
             <TinyStepper icon="minus" label="알림 횟수 감소" onPress={() => changeCount(-1)} />
-            <Text className="text-ink mx-3 text-lg font-bold">{count}회</Text>
+            <Text
+              className="text-ink mx-3 text-lg font-bold"
+              style={{ fontVariant: ['tabular-nums'] }}
+            >
+              {count}회
+            </Text>
             <TinyStepper icon="plus" label="알림 횟수 증가" onPress={() => changeCount(1)} />
           </View>
         </View>

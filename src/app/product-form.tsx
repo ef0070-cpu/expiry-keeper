@@ -343,7 +343,12 @@ export default function ProductForm() {
                 label="수량 감소"
                 onPress={() => setQuantity((n) => Math.max(1, n - 1))}
               />
-              <Text className="text-ink mx-4 text-lg font-bold">{quantity}</Text>
+              <Text
+                className="text-ink mx-4 text-lg font-bold"
+                style={{ fontVariant: ['tabular-nums'] }}
+              >
+                {quantity}
+              </Text>
               <Stepper icon="plus" label="수량 증가" onPress={() => setQuantity((n) => n + 1)} />
             </View>
           </View>

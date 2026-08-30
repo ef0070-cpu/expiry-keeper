@@ -5,6 +5,7 @@ import { memo, useCallback, useDeferredValue, useEffect, useMemo, useState } fro
 import { Alert, FlatList, Pressable, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Chip from '@/components/Chip';
+import Thumbnail from '@/components/Thumbnail';
 import { hasImageSearchKeys } from '@/lib/barcode-lookup';
 import {
   addOrderCategory,
@@ -425,17 +426,7 @@ const CatalogRow = memo(function CatalogRow({
       onLongPress={() => onLongPress(product)}
       className="mx-4 mb-2.5 flex-row items-center rounded-xl border border-line bg-paper p-3 active:opacity-70"
     >
-      {product.imageUri ? (
-        <Image
-          source={{ uri: product.imageUri }}
-          style={{ width: 56, height: 56, borderRadius: 8, backgroundColor: '#F0F0F0' }}
-          contentFit="cover"
-        />
-      ) : (
-        <View className="h-14 w-14 items-center justify-center rounded-lg bg-bg">
-          <MaterialCommunityIcons name="image-off-outline" size={22} color="#BBBBBB" />
-        </View>
-      )}
+      <Thumbnail uri={product.imageUri} size={56} radius={8} iconSize={22} />
       <View className="ml-3 flex-1">
         <Text className="text-ink text-base font-bold">{product.name}</Text>
         <Text className="text-muted mt-0.5 text-sm">
@@ -460,7 +451,12 @@ const CatalogRow = memo(function CatalogRow({
         >
           <MaterialCommunityIcons name="minus" size={20} color="#1A1A1A" />
         </Pressable>
-        <Text className="text-ink mx-3 w-7 text-center text-lg font-bold">{qty}</Text>
+        <Text
+          className="text-ink mx-3 w-7 text-center text-lg font-bold"
+          style={{ fontVariant: ['tabular-nums'] }}
+        >
+          {qty}
+        </Text>
         <Pressable
           onPress={() => onChangeQty(product.id, 1)}
           className="h-11 w-11 items-center justify-center rounded-lg border border-line bg-bg active:opacity-70"
