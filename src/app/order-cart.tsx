@@ -114,8 +114,8 @@ export default function OrderCartScreen() {
 
   return (
     <View className="flex-1 bg-bg">
-      <View className="items-center bg-paper pb-1 pt-2">
-        <View className="h-1 w-10 rounded-full bg-line" />
+      <View className="items-center bg-paper pb-2 pt-2.5">
+        <View className="bg-muted h-1.5 w-12 rounded-full" />
       </View>
       <View className="flex-row items-center justify-between bg-paper px-4 pb-2">
         <Text className="text-ink text-lg font-bold">발주 내역</Text>
