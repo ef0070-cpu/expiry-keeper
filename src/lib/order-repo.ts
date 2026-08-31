@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { upsertBarcodeCatalog } from './barcode-catalog';
-import { submitNewOrderProduct } from './order-report';
+import { submitCatalogPhotoFill, submitNewOrderProduct } from './order-report';
 import { newId } from './repo';
 import { supabase } from './supabase';
 import { OrderCart, OrderProduct } from './order-types';
@@ -45,11 +45,16 @@ export async function saveOrderProduct(p: OrderProduct): Promise<OrderProduct> {
   const items = await listOrderProducts();
   const idx = items.findIndex((x) => x.id === p.id);
   const isNew = idx < 0;
+  const hadNoPhoto = !isNew && !items[idx].imageUri;
   if (isNew) items.push(p);
   else items[idx] = p;
   await writeOrderProducts(items);
   upsertBarcodeCatalog(p.barcode, p.name, p.imageUri).catch(() => {});
-  if (isNew) submitNewOrderProduct(p).catch(() => {});
+  if (isNew) {
+    submitNewOrderProduct(p).catch(() => {});
+  } else if (hadNoPhoto && p.imageUri && p.barcode) {
+    submitCatalogPhotoFill(p.barcode, p.imageUri).catch(() => {});
+  }
   return p;
 }
 
