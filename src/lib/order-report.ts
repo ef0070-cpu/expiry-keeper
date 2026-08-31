@@ -83,3 +83,41 @@ export async function submitCatalogPhotoFill(barcode: string, photoUri: string):
     // best-effort
   }
 }
+
+const PHOTO_FLAG_THRESHOLD = 2;
+
+/**
+ * 카탈로그 사진이 실제 상품과 다르다는 신고를 접수한다.
+ * 같은 바코드를 서로 다른 사용자 PHOTO_FLAG_THRESHOLD명 이상이 신고하면
+ * 관리자 검토 없이 즉시 사진을 초기화(clear_photo:true)한다.
+ * order_photo_flags의 PK가 (barcode, reporter_id)라 동일 유저의 중복 신고는 upsert로 자동 무시된다.
+ */
+export async function flagCatalogPhoto(barcode: string): Promise<{ cleared: boolean }> {
+  if (!supabase) throw new Error('로그인이 필요합니다.');
+
+  const { error: insertError } = await supabase
+    .from('order_photo_flags')
+    .upsert({ barcode }, { onConflict: 'barcode,reporter_id' });
+  if (insertError) throw insertError;
+
+  const { count, error: countError } = await supabase
+    .from('order_photo_flags')
+    .select('reporter_id', { count: 'exact', head: true })
+    .eq('barcode', barcode);
+  if (countError) throw countError;
+  if ((count ?? 0) < PHOTO_FLAG_THRESHOLD) return { cleared: false };
+
+  const { error: clearError } = await supabase.from('order_product_reports').insert({
+    kind: 'photo_fill',
+    status: 'approved',
+    barcode,
+    name: '',
+    brand: '',
+    price: null,
+    category: '',
+    photo_uri: null,
+    clear_photo: true,
+  });
+  if (clearError) throw clearError;
+  return { cleared: true };
+}
