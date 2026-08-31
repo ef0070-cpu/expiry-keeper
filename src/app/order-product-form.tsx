@@ -73,23 +73,32 @@ export default function OrderProductForm() {
     }
   }, [params.id]);
 
-  const pickPhoto = (title: string, message: string, onPicked: (uri: string) => void) => {
+  const pickPhoto = (
+    title: string,
+    message: string,
+    onPicked: (uri: string) => void,
+    aspect?: [number, number]
+  ) => {
     Alert.alert(title, message, [
       { text: '취소', style: 'cancel' },
-      { text: '앨범에서 선택', onPress: () => launchPicker('library', onPicked) },
-      { text: '카메라 촬영', onPress: () => launchPicker('camera', onPicked) },
+      { text: '앨범에서 선택', onPress: () => launchPicker('library', onPicked, aspect) },
+      { text: '카메라 촬영', onPress: () => launchPicker('camera', onPicked, aspect) },
     ]);
   };
 
-  const pickImage = () => pickPhoto('상품 사진', '사진을 어떻게 추가할까요?', setImageUri);
+  const pickImage = () => pickPhoto('상품 사진', '사진을 어떻게 추가할까요?', setImageUri, [1, 1]);
   const pickReportPhoto = () =>
     pickPhoto('신고 사진', '사진을 어떻게 첨부할까요?', setReportPhotoUri);
 
-  const launchPicker = async (source: 'camera' | 'library', onPicked: (uri: string) => void) => {
+  const launchPicker = async (
+    source: 'camera' | 'library',
+    onPicked: (uri: string) => void,
+    aspect?: [number, number]
+  ) => {
     const options: ImagePicker.ImagePickerOptions = {
       mediaTypes: ['images'],
       allowsEditing: true,
-      aspect: [1, 1],
+      ...(aspect ? { aspect } : {}),
       quality: 0.7,
     };
     let result: ImagePicker.ImagePickerResult;
@@ -444,7 +453,7 @@ export default function OrderProductForm() {
                 <Text className="text-ink mb-1.5 text-sm font-bold">정보 오류 신고</Text>
                 <TextInput
                   className="text-ink rounded-xl border border-line bg-bg px-3 py-2 text-sm"
-                  placeholder="예: 가격오류, 사진오류, 바코드 오류 - 실제 가격은 2,000원입니다"
+                  placeholder="예시:가격오류,사진오류,바코드오류등 신고 해주시면 반영 됩니다"
                   placeholderTextColor="#BBBBBB"
                   value={reportMessage}
                   onChangeText={setReportMessage}
