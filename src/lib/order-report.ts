@@ -56,3 +56,30 @@ export async function submitNewOrderProduct(product: OrderProduct): Promise<void
     // best-effort
   }
 }
+
+/**
+ * 바코드 카탈로그에 아직 사진이 없는 상품에, 사용자가 자기 발주상품을 편집하며 추가한 사진을
+ * 관리자 검토 없이 즉시 반영되는 카탈로그 수정 제안(kind:'photo_fill')으로 접수한다.
+ * kind:'fix'(정보 오류 신고)는 RLS가 자동승인 insert를 막아둔 관리자 승인 전용 경로라 재사용할 수 없다.
+ * name/brand/price/category는 비워 보내 기존 병합 로직(syncApprovedCatalogUpdates)이
+ * 사진 외 다른 필드를 건드리지 않도록 한다. best-effort — 실패해도 로컬 저장 흐름을 막지 않는다.
+ */
+export async function submitCatalogPhotoFill(barcode: string, photoUri: string): Promise<void> {
+  if (!supabase) return;
+  try {
+    const photoUrl = await uploadReportPhoto(photoUri);
+    if (!photoUrl) return;
+    await supabase.from('order_product_reports').insert({
+      kind: 'photo_fill',
+      status: 'approved',
+      barcode,
+      name: '',
+      brand: '',
+      price: null,
+      category: '',
+      photo_uri: photoUrl,
+    });
+  } catch {
+    // best-effort
+  }
+}
