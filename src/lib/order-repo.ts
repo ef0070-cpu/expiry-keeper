@@ -143,13 +143,14 @@ export async function seedDefaultOrderProducts(): Promise<number> {
 
 type ApprovedReportRow = {
   id: string;
-  kind: 'new' | 'fix';
+  kind: 'new' | 'fix' | 'photo_fill';
   barcode: string | null;
   name: string;
   brand: string | null;
   price: number | null;
   category: string | null;
   photo_uri: string | null;
+  clear_photo: boolean | null;
 };
 
 /** 승인됐지만 아직 이 기기에 반영 안 한 행과, 반영 완료 기록(appliedCatalogUpdateIds) Set을 함께 돌려준다. */
@@ -163,7 +164,7 @@ async function fetchUnappliedApprovedRows(): Promise<{
 
   const { data, error } = await supabase
     .from('order_product_reports')
-    .select('id, kind, barcode, name, brand, price, category, photo_uri')
+    .select('id, kind, barcode, name, brand, price, category, photo_uri, clear_photo')
     .eq('status', 'approved');
   if (error) throw error;
 
@@ -220,7 +221,7 @@ export async function syncApprovedCatalogUpdates(): Promise<{ added: number; fix
           brand: row.brand || items[idx].brand,
           price: row.price ?? items[idx].price,
           category: row.category || items[idx].category,
-          imageUri: row.photo_uri || items[idx].imageUri,
+          imageUri: row.clear_photo ? null : row.photo_uri || items[idx].imageUri,
         };
         fixed++;
       }
