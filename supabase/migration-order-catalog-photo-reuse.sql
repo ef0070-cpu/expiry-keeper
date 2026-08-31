@@ -7,6 +7,10 @@
 -- clear_photo 외 필드가 전부 비어 있을 때만 status='approved' insert를 허용한다.
 -- Supabase 대시보드 > SQL Editor 에 붙여넣고 실행하세요.
 -- (order_product_reports, order-report-images 버킷은 이미 존재해야 함)
+-- 주의: 이 기능이 포함된 앱 버전을 배포하기 "전에" 반드시 이 마이그레이션을 먼저 실행할 것.
+-- clear_photo 컬럼을 모르는 구버전 앱은 clear_photo:true 행을 그냥 "반영됨" 처리만 하고
+-- 실제로는 아무 동작도 하지 않으므로(appliedCatalogUpdateIds에 기록됨), 구버전 기기에서는
+-- 그 초기화가 영구히 유실된다.
 
 alter table public.order_product_reports
   add column if not exists clear_photo boolean not null default false;
@@ -19,6 +23,13 @@ create policy "order_product_reports insert" on public.order_product_reports
       status = 'pending'
       or (kind = 'new' and status = 'approved')
       or (
+        -- 이 조건은 photo_fill 행이 name/brand/price/category 같은 다른 필드를 건드리지
+        -- "못하게" 필드 단위로만 막는다. "빈 사진 슬롯만 채워야 한다"거나 "2명 합의가 필요하다"는
+        -- 불변조건은 RLS가 알 수 있는 정보가 아니라(직전 상태를 모름) 여기서 강제할 수 없고,
+        -- 전적으로 애플리케이션 코드(submitCatalogPhotoFill의 barcode_catalog 확인, flagCatalogPhoto의
+        -- 임계치 로직)가 책임진다. 즉 이 앱 UI를 거치지 않고 인증된 세션만으로 직접 insert하는
+        -- 클라이언트는 임의 바코드에 대해 photo_fill이나 clear_photo:true 행을 마음대로 넣을 수 있다 —
+        -- "백엔드 함수 없음" 아키텍처의 알려진, 감수하기로 한 트레이드오프이며 지금 고칠 대상이 아니다.
         kind = 'photo_fill' and status = 'approved'
         and name = '' and (brand is null or brand = '') and price is null
         and (category is null or category = '') and message is null

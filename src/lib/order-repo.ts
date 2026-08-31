@@ -40,6 +40,8 @@ export async function listOrderProductsByBarcode(barcode: string): Promise<Order
 /**
  * 추가/수정 겸용 저장. 바코드가 있으면 공용 바코드 캐시에도 반영한다 (best-effort).
  * 신규 등록(기존 id와 매칭 안 됨)이면 크라우드소싱 카탈로그 제안으로도 접수한다 (best-effort).
+ * 기존 상품 수정이고 이 기기에 사진이 없었는데 사진이 새로 추가된 경우, 카탈로그 사진
+ * 자동채우기(submitCatalogPhotoFill)로도 접수한다 (best-effort).
  */
 export async function saveOrderProduct(p: OrderProduct): Promise<OrderProduct> {
   const items = await listOrderProducts();
@@ -165,7 +167,8 @@ async function fetchUnappliedApprovedRows(): Promise<{
   const { data, error } = await supabase
     .from('order_product_reports')
     .select('id, kind, barcode, name, brand, price, category, photo_uri, clear_photo')
-    .eq('status', 'approved');
+    .eq('status', 'approved')
+    .order('created_at', { ascending: true });
   if (error) throw error;
 
   const rows = ((data as ApprovedReportRow[] | null) ?? []).filter((row) => !applied.has(row.id));
