@@ -24,7 +24,7 @@ import {
   newId,
   saveOrderProduct,
 } from '@/lib/order-repo';
-import { reportOrderProductIssue } from '@/lib/order-report';
+import { flagCatalogPhoto, reportOrderProductIssue } from '@/lib/order-report';
 import { OrderProduct, OrderStatus } from '@/lib/order-types';
 
 export default function OrderProductForm() {
@@ -52,6 +52,7 @@ export default function OrderProductForm() {
   const [reportMessage, setReportMessage] = useState('');
   const [reportPhotoUri, setReportPhotoUri] = useState<string | null>(null);
   const [reporting, setReporting] = useState(false);
+  const [flaggingPhoto, setFlaggingPhoto] = useState(false);
 
   useEffect(() => {
     listOrderCategories().then((list) => {
@@ -89,6 +90,31 @@ export default function OrderProductForm() {
   const pickImage = () => pickPhoto('상품 사진', '사진을 어떻게 추가할까요?', setImageUri, [1, 1]);
   const pickReportPhoto = () =>
     pickPhoto('신고 사진', '사진을 어떻게 첨부할까요?', setReportPhotoUri);
+
+  const flagPhoto = () => {
+    const trimmedBarcode = barcode.trim();
+    if (!trimmedBarcode) return;
+    Alert.alert('사진 신고', '이 사진이 실제 상품과 다른가요?', [
+      { text: '취소', style: 'cancel' },
+      {
+        text: '신고',
+        onPress: async () => {
+          setFlaggingPhoto(true);
+          try {
+            const { cleared } = await flagCatalogPhoto(trimmedBarcode);
+            Alert.alert(
+              '접수 완료',
+              cleared ? '여러 신고가 접수되어 사진이 초기화됐습니다.' : '신고가 접수됐습니다.',
+            );
+          } catch (e) {
+            Alert.alert('신고 실패', e instanceof Error ? e.message : '알 수 없는 오류');
+          } finally {
+            setFlaggingPhoto(false);
+          }
+        },
+      },
+    ]);
+  };
 
   const launchPicker = async (
     source: 'camera' | 'library',
@@ -321,6 +347,11 @@ export default function OrderProductForm() {
                 </Pressable>
               ) : null}
             </View>
+            {isEdit && barcode.trim() && imageUri ? (
+              <Pressable onPress={flagPhoto} disabled={flaggingPhoto} className="mt-1.5">
+                <Text className="text-muted text-xs underline">사진이 실제 상품과 달라요</Text>
+              </Pressable>
+            ) : null}
           </View>
         </View>
 

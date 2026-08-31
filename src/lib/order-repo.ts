@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { upsertBarcodeCatalog } from './barcode-catalog';
-import { submitNewOrderProduct } from './order-report';
+import { submitCatalogPhotoFill, submitNewOrderProduct } from './order-report';
 import { newId } from './repo';
 import { supabase } from './supabase';
 import { OrderCart, OrderProduct } from './order-types';
@@ -40,16 +40,23 @@ export async function listOrderProductsByBarcode(barcode: string): Promise<Order
 /**
  * 추가/수정 겸용 저장. 바코드가 있으면 공용 바코드 캐시에도 반영한다 (best-effort).
  * 신규 등록(기존 id와 매칭 안 됨)이면 크라우드소싱 카탈로그 제안으로도 접수한다 (best-effort).
+ * 기존 상품 수정이고 이 기기에 사진이 없었는데 사진이 새로 추가된 경우, 카탈로그 사진
+ * 자동채우기(submitCatalogPhotoFill)로도 접수한다 (best-effort).
  */
 export async function saveOrderProduct(p: OrderProduct): Promise<OrderProduct> {
   const items = await listOrderProducts();
   const idx = items.findIndex((x) => x.id === p.id);
   const isNew = idx < 0;
+  const hadNoPhoto = !isNew && !items[idx].imageUri;
   if (isNew) items.push(p);
   else items[idx] = p;
   await writeOrderProducts(items);
   upsertBarcodeCatalog(p.barcode, p.name, p.imageUri).catch(() => {});
-  if (isNew) submitNewOrderProduct(p).catch(() => {});
+  if (isNew) {
+    submitNewOrderProduct(p).catch(() => {});
+  } else if (hadNoPhoto && p.imageUri && p.barcode) {
+    submitCatalogPhotoFill(p.barcode, p.imageUri).catch(() => {});
+  }
   return p;
 }
 
@@ -138,13 +145,14 @@ export async function seedDefaultOrderProducts(): Promise<number> {
 
 type ApprovedReportRow = {
   id: string;
-  kind: 'new' | 'fix';
+  kind: 'new' | 'fix' | 'photo_fill';
   barcode: string | null;
   name: string;
   brand: string | null;
   price: number | null;
   category: string | null;
   photo_uri: string | null;
+  clear_photo: boolean | null;
 };
 
 /** 승인됐지만 아직 이 기기에 반영 안 한 행과, 반영 완료 기록(appliedCatalogUpdateIds) Set을 함께 돌려준다. */
@@ -158,8 +166,9 @@ async function fetchUnappliedApprovedRows(): Promise<{
 
   const { data, error } = await supabase
     .from('order_product_reports')
-    .select('id, kind, barcode, name, brand, price, category, photo_uri')
-    .eq('status', 'approved');
+    .select('id, kind, barcode, name, brand, price, category, photo_uri, clear_photo')
+    .eq('status', 'approved')
+    .order('created_at', { ascending: true });
   if (error) throw error;
 
   const rows = ((data as ApprovedReportRow[] | null) ?? []).filter((row) => !applied.has(row.id));
@@ -215,7 +224,7 @@ export async function syncApprovedCatalogUpdates(): Promise<{ added: number; fix
           brand: row.brand || items[idx].brand,
           price: row.price ?? items[idx].price,
           category: row.category || items[idx].category,
-          imageUri: row.photo_uri || items[idx].imageUri,
+          imageUri: row.clear_photo ? null : row.photo_uri || items[idx].imageUri,
         };
         fixed++;
       }
