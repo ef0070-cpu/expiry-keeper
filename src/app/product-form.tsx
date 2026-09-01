@@ -15,7 +15,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { hasImageSearchKeys, searchProductImage } from '@/lib/barcode-lookup';
+import { hasImageSearchKeys, lookupBarcode, searchProductImage } from '@/lib/barcode-lookup';
 import { autoFormatDate, formatDate, isValidDateStr } from '@/lib/dates';
 import { cancelExpiryAlerts, scheduleExpiryAlerts } from '@/lib/notifications';
 import { deleteProduct, getProduct, listProducts, newId, saveProduct } from '@/lib/repo';
@@ -148,7 +148,8 @@ export default function ProductForm() {
     }
   };
 
-  /** 상품명으로 웹에서 이미지 자동 검색 */
+  /** 웹에서 이미지 자동 검색 — 바코드가 있으면 정확도가 더 높은 바코드 기반 조회를
+   * 먼저 시도하고, 못 찾았을 때만 상품명 기반 웹 이미지 검색으로 보완한다. */
   const findImageOnWeb = async () => {
     if (!name.trim()) {
       Alert.alert('입력 확인', '먼저 상품명을 입력해 주세요.');
@@ -159,7 +160,14 @@ export default function ProductForm() {
       return;
     }
     setSearching(true);
-    const url = await searchProductImage(name.trim());
+    let url: string | null = null;
+    if (barcode && barcode.trim()) {
+      const info = await lookupBarcode(barcode.trim());
+      url = info.imageUrl;
+    }
+    if (!url) {
+      url = await searchProductImage(name.trim());
+    }
     setSearching(false);
     if (url) setImageUri(url);
     else Alert.alert('검색 결과 없음', '이미지를 찾지 못했습니다. 직접 촬영해 주세요.');
