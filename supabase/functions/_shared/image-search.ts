@@ -69,3 +69,52 @@ export async function searchProductImage(query: string): Promise<string | null> 
 
   return null;
 }
+
+/**
+ * 상품명으로 웹 이미지 후보 여러 개를 검색해 반환한다(사용자가 직접 골라 적용하는 UI용).
+ * searchProductImage(단일 자동 선택)와 달리 결과를 좁히지 않고 상위 후보를 그대로 돌려준다.
+ */
+export async function searchProductImageCandidates(query: string, limit = 6): Promise<string[]> {
+  const naverId = Deno.env.get('NAVER_CLIENT_ID');
+  const naverSecret = Deno.env.get('NAVER_CLIENT_SECRET');
+  if (naverId && naverSecret) {
+    try {
+      const res = await fetch(
+        `https://openapi.naver.com/v1/search/image?query=${encodeURIComponent(query)}&display=${limit}&filter=medium`,
+        { headers: { 'X-Naver-Client-Id': naverId, 'X-Naver-Client-Secret': naverSecret } },
+      );
+      if (res.ok) {
+        const json = await res.json();
+        const items: { link?: string; doc_url?: string }[] = json?.items ?? [];
+        const urls = items
+          .filter((it) => it.link && isLikelyProductImage(it.doc_url))
+          .map((it) => it.link!);
+        if (urls.length > 0) return urls.slice(0, limit);
+      }
+    } catch {
+      // fall through to kakao
+    }
+  }
+
+  const kakaoKey = Deno.env.get('KAKAO_REST_KEY');
+  if (kakaoKey) {
+    try {
+      const res = await fetch(
+        `https://dapi.kakao.com/v2/search/image?query=${encodeURIComponent(query)}&size=${limit}`,
+        { headers: { Authorization: `KakaoAK ${kakaoKey}` } },
+      );
+      if (res.ok) {
+        const json = await res.json();
+        const docs: { image_url?: string; doc_url?: string }[] = json?.documents ?? [];
+        const urls = docs
+          .filter((d) => d.image_url && isLikelyProductImage(d.doc_url))
+          .map((d) => d.image_url!);
+        if (urls.length > 0) return urls.slice(0, limit);
+      }
+    } catch {
+      // no more fallbacks
+    }
+  }
+
+  return [];
+}

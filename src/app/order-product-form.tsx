@@ -15,7 +15,8 @@ import {
   View,
 } from 'react-native';
 import Chip from '@/components/Chip';
-import { hasImageSearchKeys, lookupBarcode, searchProductImage } from '@/lib/barcode-lookup';
+import ImageCandidatesModal from '@/components/ImageCandidatesModal';
+import { hasImageSearchKeys, lookupBarcode, searchProductImageCandidates } from '@/lib/barcode-lookup';
 import {
   addOrderCategory,
   deleteOrderProduct,
@@ -54,6 +55,7 @@ export default function OrderProductForm() {
   const [reportCopyright, setReportCopyright] = useState(false);
   const [reporting, setReporting] = useState(false);
   const [flaggingPhoto, setFlaggingPhoto] = useState(false);
+  const [imageCandidates, setImageCandidates] = useState<string[] | null>(null);
 
   useEffect(() => {
     listOrderCategories().then((list) => {
@@ -154,20 +156,24 @@ export default function OrderProductForm() {
       return;
     }
     setSearching(true);
-    // 바코드가 있으면 정확도가 더 높은 바코드 기반 조회를 먼저 시도하고,
-    // 못 찾았을 때만 상품명(+브랜드) 기반 웹 이미지 검색으로 보완한다.
-    let url: string | null = null;
+    // 바코드 매칭 이미지(있으면)를 1순위 후보로 넣고, 상품명(+브랜드) 검색 결과를 더해
+    // 사용자가 직접 고르게 한다 — 자동으로 하나를 확정 적용하지 않는다.
+    const candidates: string[] = [];
     if (barcode.trim()) {
       const info = await lookupBarcode(barcode.trim(), brand.trim() || undefined);
-      url = info.imageUrl;
+      if (info.imageUrl) candidates.push(info.imageUrl);
     }
-    if (!url) {
-      const query = brand.trim() ? `${brand.trim()} ${name.trim()}` : name.trim();
-      url = await searchProductImage(query);
+    const query = brand.trim() ? `${brand.trim()} ${name.trim()}` : name.trim();
+    const found = await searchProductImageCandidates(query);
+    for (const url of found) {
+      if (!candidates.includes(url)) candidates.push(url);
     }
     setSearching(false);
-    if (url) setImageUri(url);
-    else Alert.alert('검색 결과 없음', '이미지를 찾지 못했습니다. 직접 촬영해 주세요.');
+    if (candidates.length === 0) {
+      Alert.alert('검색 결과 없음', '이미지를 찾지 못했습니다. 직접 촬영해 주세요.');
+      return;
+    }
+    setImageCandidates(candidates);
   };
 
   const checkBarcode = async () => {
@@ -300,6 +306,15 @@ export default function OrderProductForm() {
       className="flex-1"
     >
       <Stack.Screen options={{ title: isEdit ? '발주 상품 수정' : '발주 상품 등록' }} />
+      <ImageCandidatesModal
+        visible={imageCandidates !== null}
+        candidates={imageCandidates ?? []}
+        onSelect={(url) => {
+          setImageUri(url);
+          setImageCandidates(null);
+        }}
+        onClose={() => setImageCandidates(null)}
+      />
       <ScrollView
         className="flex-1 bg-bg"
         contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
@@ -360,6 +375,9 @@ export default function OrderProductForm() {
                 <Text className="text-muted text-xs underline">사진이 실제 상품과 달라요</Text>
               </Pressable>
             ) : null}
+            <Text className="text-muted mt-1.5 text-xs">
+              이 사진은 같은 상품을 등록하는 다른 매장에도 함께 보여질 수 있어요
+            </Text>
           </View>
         </View>
 

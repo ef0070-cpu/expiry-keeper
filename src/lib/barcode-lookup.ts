@@ -24,14 +24,17 @@ export async function lookupBarcode(barcode: string, brand?: string): Promise<Ba
   return { name: data.name ?? null, imageUrl: data.imageUrl ?? null };
 }
 
-/** 상품명으로 웹 이미지 검색 (Edge Function `image-search` 경유, 네이버 우선·카카오 폴백) */
-export async function searchProductImage(query: string): Promise<string | null> {
-  if (!supabase) return null;
+/**
+ * 상품명으로 웹 이미지 후보 여러 개를 검색한다(Edge Function `image-search` 경유, 네이버
+ * 우선·카카오 폴백). 사용자가 직접 골라 적용하도록 자동 선택 없이 후보 목록만 돌려준다.
+ */
+export async function searchProductImageCandidates(query: string): Promise<string[]> {
+  if (!supabase) return [];
   const { data, error } = await supabase.functions.invoke('image-search', {
     body: { query },
   });
-  if (error || !data) return null;
-  return data.imageUrl ?? null;
+  if (error || !data) return [];
+  return data.imageUrls ?? [];
 }
 
 /** 이미지 검색 기능을 쓸 수 있는지 (Edge Function 호출에는 클라우드 모드가 필요) */

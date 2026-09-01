@@ -15,7 +15,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { hasImageSearchKeys, lookupBarcode, searchProductImage } from '@/lib/barcode-lookup';
+import ImageCandidatesModal from '@/components/ImageCandidatesModal';
+import { hasImageSearchKeys, lookupBarcode, searchProductImageCandidates } from '@/lib/barcode-lookup';
 import { autoFormatDate, formatDate, isValidDateStr } from '@/lib/dates';
 import { cancelExpiryAlerts, scheduleExpiryAlerts } from '@/lib/notifications';
 import { deleteProduct, getProduct, listProducts, newId, saveProduct } from '@/lib/repo';
@@ -49,6 +50,7 @@ export default function ProductForm() {
   const [newCategory, setNewCategory] = useState('');
   const [busy, setBusy] = useState(false);
   const [searching, setSearching] = useState(false);
+  const [imageCandidates, setImageCandidates] = useState<string[] | null>(null);
 
   const [barcode, setBarcode] = useState<string | null>(params.barcode ?? null);
   // 수정 시 원래 등록됐던 모드를 유지 (현재 화면 모드로 덮어쓰지 않음)
@@ -148,8 +150,8 @@ export default function ProductForm() {
     }
   };
 
-  /** 웹에서 이미지 자동 검색 — 바코드가 있으면 정확도가 더 높은 바코드 기반 조회를
-   * 먼저 시도하고, 못 찾았을 때만 상품명 기반 웹 이미지 검색으로 보완한다. */
+  /** 웹에서 이미지 후보 검색 — 바코드 매칭 이미지(있으면)를 1순위 후보로 넣고 상품명
+   * 검색 결과를 더해 사용자가 직접 고르게 한다. 자동으로 하나를 확정 적용하지 않는다. */
   const findImageOnWeb = async () => {
     if (!name.trim()) {
       Alert.alert('입력 확인', '먼저 상품명을 입력해 주세요.');
@@ -160,17 +162,21 @@ export default function ProductForm() {
       return;
     }
     setSearching(true);
-    let url: string | null = null;
+    const candidates: string[] = [];
     if (barcode && barcode.trim()) {
       const info = await lookupBarcode(barcode.trim());
-      url = info.imageUrl;
+      if (info.imageUrl) candidates.push(info.imageUrl);
     }
-    if (!url) {
-      url = await searchProductImage(name.trim());
+    const found = await searchProductImageCandidates(name.trim());
+    for (const url of found) {
+      if (!candidates.includes(url)) candidates.push(url);
     }
     setSearching(false);
-    if (url) setImageUri(url);
-    else Alert.alert('검색 결과 없음', '이미지를 찾지 못했습니다. 직접 촬영해 주세요.');
+    if (candidates.length === 0) {
+      Alert.alert('검색 결과 없음', '이미지를 찾지 못했습니다. 직접 촬영해 주세요.');
+      return;
+    }
+    setImageCandidates(candidates);
   };
 
   const save = async () => {
@@ -230,6 +236,15 @@ export default function ProductForm() {
       className="flex-1"
     >
       <Stack.Screen options={{ title: isEdit ? '상품 수정' : '상품 등록' }} />
+      <ImageCandidatesModal
+        visible={imageCandidates !== null}
+        candidates={imageCandidates ?? []}
+        onSelect={(url) => {
+          setImageUri(url);
+          setImageCandidates(null);
+        }}
+        onClose={() => setImageCandidates(null)}
+      />
       <ScrollView
         className="flex-1 bg-bg"
         contentContainerStyle={{ padding: 16, paddingBottom: 32 }}

@@ -1,5 +1,5 @@
 import { corsHeaders } from '../_shared/cors.ts';
-import { searchProductImage } from '../_shared/image-search.ts';
+import { searchProductImageCandidates } from '../_shared/image-search.ts';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -13,8 +13,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    const imageUrl = await searchProductImage(query);
-    return new Response(JSON.stringify({ imageUrl }), {
+    const imageUrls = await searchProductImageCandidates(query);
+    return new Response(JSON.stringify({ imageUrls }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (e) {
