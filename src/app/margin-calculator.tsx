@@ -1,17 +1,20 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { computeMissing, MarginField, MarginInputs } from '@/lib/margin';
 
-const FIELDS: {
-  key: MarginField;
-  label: string;
-  suffix: string;
-  keyboardType: 'number-pad' | 'decimal-pad';
-}[] = [
-  { key: 'cost', label: '원가', suffix: '원', keyboardType: 'number-pad' },
-  { key: 'margin', label: '마진율', suffix: '%', keyboardType: 'decimal-pad' },
-  { key: 'price', label: '판매가', suffix: '원', keyboardType: 'number-pad' },
+const FIELDS: { key: MarginField; label: string; suffix: string }[] = [
+  { key: 'cost', label: '원가', suffix: '원' },
+  { key: 'margin', label: '마진율', suffix: '%' },
+  { key: 'price', label: '판매가', suffix: '원' },
+];
+
+const KEYPAD_ROWS: string[][] = [
+  ['7', '8', '9'],
+  ['4', '5', '6'],
+  ['1', '2', '3'],
+  ['C', '0', '⌫'],
 ];
 
 function parseNum(text: string): number {
@@ -31,6 +34,7 @@ export default function MarginCalculator() {
   });
   const [editedOrder, setEditedOrder] = useState<MarginField[]>([]);
   const [marginError, setMarginError] = useState(false);
+  const [activeField, setActiveField] = useState<MarginField>('cost');
 
   const onChangeField = (key: MarginField, text: string) => {
     const nextOrder = [key, ...editedOrder.filter((k) => k !== key)].slice(0, 2);
@@ -69,29 +73,36 @@ export default function MarginCalculator() {
     setMarginError(nextMarginError);
   };
 
+  const onKeyPress = (key: string) => {
+    const current = values[activeField];
+    if (key === 'C') {
+      onChangeField(activeField, '');
+    } else if (key === '⌫') {
+      onChangeField(activeField, current.slice(0, -1));
+    } else {
+      onChangeField(activeField, current + key);
+    }
+  };
+
   return (
     <>
       <Stack.Screen options={{ title: '원가 계산기' }} />
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        className="flex-1"
-      >
-        <ScrollView
-          className="flex-1 bg-bg"
-          contentContainerStyle={{ padding: 16 }}
-          keyboardShouldPersistTaps="handled"
-        >
+      <View className="flex-1 bg-bg">
+        <ScrollView contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
           {FIELDS.map((f) => (
             <View key={f.key} className="mb-4">
               <Text className="text-ink mb-1.5 text-sm font-bold">
                 {f.label} ({f.suffix})
               </Text>
               <TextInput
-                className="text-ink rounded-xl border border-line bg-paper px-3 py-2.5 text-base"
+                className={`text-ink rounded-xl border bg-paper px-3 py-2.5 text-base ${
+                  activeField === f.key ? 'border-primary' : 'border-line'
+                }`}
                 placeholder="0"
                 placeholderTextColor="#BBBBBB"
-                keyboardType={f.keyboardType}
+                showSoftInputOnFocus={false}
                 value={values[f.key]}
+                onFocus={() => setActiveField(f.key)}
                 onChangeText={(t) => onChangeField(f.key, t)}
               />
               {f.key === 'margin' && marginError ? (
@@ -100,7 +111,31 @@ export default function MarginCalculator() {
             </View>
           ))}
         </ScrollView>
-      </KeyboardAvoidingView>
+
+        <View className="gap-2 p-4">
+          {KEYPAD_ROWS.map((row, i) => (
+            <View key={i} className="flex-row gap-2">
+              {row.map((key) => (
+                <Pressable
+                  key={key}
+                  onPress={() => onKeyPress(key)}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    key === 'C' ? '지우기' : key === '⌫' ? '한 글자 지우기' : `숫자 ${key}`
+                  }
+                  className="flex-1 items-center justify-center rounded-xl border border-line bg-paper py-4 active:opacity-70"
+                >
+                  {key === '⌫' ? (
+                    <MaterialCommunityIcons name="backspace-outline" size={20} color="#1A1A1A" />
+                  ) : (
+                    <Text className="text-ink text-xl font-bold">{key}</Text>
+                  )}
+                </Pressable>
+              ))}
+            </View>
+          ))}
+        </View>
+      </View>
     </>
   );
 }
