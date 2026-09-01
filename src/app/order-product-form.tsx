@@ -87,7 +87,7 @@ export default function OrderProductForm() {
     ]);
   };
 
-  const pickImage = () => pickPhoto('상품 사진', '사진을 어떻게 추가할까요?', setImageUri, [1, 1]);
+  const pickImage = () => pickPhoto('상품 사진', '사진을 어떻게 추가할까요?', setImageUri);
   const pickReportPhoto = () =>
     pickPhoto('신고 사진', '사진을 어떻게 첨부할까요?', setReportPhotoUri);
 
