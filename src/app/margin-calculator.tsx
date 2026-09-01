@@ -2,6 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { computeMissing, MarginField, MarginInputs } from '@/lib/margin';
 
 const FIELDS: { key: MarginField; label: string; suffix: string }[] = [
@@ -35,6 +36,7 @@ export default function MarginCalculator() {
   const [editedOrder, setEditedOrder] = useState<MarginField[]>([]);
   const [marginError, setMarginError] = useState(false);
   const [activeField, setActiveField] = useState<MarginField>('cost');
+  const insets = useSafeAreaInsets();
 
   const onChangeField = (key: MarginField, text: string) => {
     const nextOrder = [key, ...editedOrder.filter((k) => k !== key)].slice(0, 2);
@@ -112,7 +114,10 @@ export default function MarginCalculator() {
           ))}
         </ScrollView>
 
-        <View className="gap-2 p-4">
+        <View
+          className="gap-2 p-4"
+          style={{ paddingBottom: Math.max(insets.bottom, 16) }}
+        >
           {KEYPAD_ROWS.map((row, i) => (
             <View key={i} className="flex-row gap-2">
               {row.map((key) => (
