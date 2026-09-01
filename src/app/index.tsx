@@ -192,6 +192,16 @@ export default function Dashboard() {
             <View className="flex-row items-center" style={{ gap: 16 }}>
               {mode === 'retail' ? (
                 <Pressable
+                  onPress={() => router.push('/margin-calculator')}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="원가 계산기"
+                >
+                  <MaterialCommunityIcons name="calculator-variant" size={22} color="#1A1A1A" />
+                </Pressable>
+              ) : null}
+              {mode === 'retail' ? (
+                <Pressable
                   onPress={() => router.push('/order')}
                   hitSlop={8}
                   accessibilityRole="button"
