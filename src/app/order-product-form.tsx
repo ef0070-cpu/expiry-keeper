@@ -51,6 +51,7 @@ export default function OrderProductForm() {
   const [showReport, setShowReport] = useState(false);
   const [reportMessage, setReportMessage] = useState('');
   const [reportPhotoUri, setReportPhotoUri] = useState<string | null>(null);
+  const [reportCopyright, setReportCopyright] = useState(false);
   const [reporting, setReporting] = useState(false);
   const [flaggingPhoto, setFlaggingPhoto] = useState(false);
 
@@ -259,10 +260,17 @@ export default function OrderProductForm() {
         },
         msg,
         reportPhotoUri,
+        reportCopyright,
       );
-      Alert.alert('접수 완료', '신고가 접수됐습니다. 확인 후 반영하겠습니다.');
+      Alert.alert(
+        '접수 완료',
+        reportCopyright
+          ? '저작권 신고가 접수됐습니다. 해당 사진이 즉시 초기화됐습니다.'
+          : '신고가 접수됐습니다. 확인 후 반영하겠습니다.',
+      );
       setReportMessage('');
       setReportPhotoUri(null);
+      setReportCopyright(false);
       setShowReport(false);
     } catch (e) {
       Alert.alert('신고 실패', e instanceof Error ? e.message : '알 수 없는 오류');
@@ -515,6 +523,22 @@ export default function OrderProductForm() {
                     </Pressable>
                   ) : null}
                 </View>
+                <Pressable
+                  onPress={() => setReportCopyright((v) => !v)}
+                  className="mt-2 flex-row items-center"
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: reportCopyright }}
+                  accessibilityLabel="제 사진의 저작권을 침해했어요"
+                >
+                  <MaterialCommunityIcons
+                    name={reportCopyright ? 'checkbox-marked' : 'checkbox-blank-outline'}
+                    size={20}
+                    color={reportCopyright ? '#CC2222' : '#888888'}
+                  />
+                  <Text className="text-ink ml-1.5 text-xs">
+                    제 사진의 저작권을 침해했어요 (체크 시 사진 즉시 초기화)
+                  </Text>
+                </Pressable>
                 <View className="mt-2 flex-row gap-2">
                   <Pressable
                     onPress={submitReport}
@@ -531,6 +555,7 @@ export default function OrderProductForm() {
                     onPress={() => {
                       setShowReport(false);
                       setReportMessage('');
+                      setReportCopyright(false);
                     }}
                     className="items-center justify-center px-3"
                   >

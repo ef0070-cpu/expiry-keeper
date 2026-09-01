@@ -12,11 +12,17 @@ function uploadReportPhoto(uri: string): Promise<string | null> {
  * 발주 상품 기본정보(가격 등) 오류를 신고한다.
  * 신고 내용은 order_product_reports 테이블에 쌓이고, 관리자가 Supabase 대시보드에서
  * 직접 확인 후 order-seed-data.ts를 고쳐 앱 업데이트로 반영한다 (별도 관리자 화면 없음).
+ *
+ * isCopyright가 true면(저작권 신고) 통지-삭제 원칙에 따라 관리자 승인을 기다리지 않고
+ * 접수 즉시 해당 바코드의 카탈로그 사진을 초기화한다(flagCatalogPhoto의 초기화 로직과 동일
+ * 패턴 재사용). 신고 자체는 is_copyright:true로 기록되어 관리자가 나중에 대시보드에서
+ * 따로 확인할 수 있다.
  */
 export async function reportOrderProductIssue(
   product: OrderProduct,
   message: string,
   photoUri?: string | null,
+  isCopyright?: boolean,
 ): Promise<void> {
   if (!supabase) throw new Error('로그인이 필요합니다.');
   const photoUrl = photoUri ? await uploadReportPhoto(photoUri) : null;
@@ -28,8 +34,27 @@ export async function reportOrderProductIssue(
     category: product.category,
     message,
     photo_uri: photoUrl,
+    is_copyright: !!isCopyright,
   });
   if (error) throw error;
+
+  if (isCopyright && product.barcode) {
+    await supabase.from('order_product_reports').insert({
+      kind: 'photo_fill',
+      status: 'approved',
+      barcode: product.barcode,
+      name: '',
+      brand: '',
+      price: null,
+      category: '',
+      photo_uri: null,
+      clear_photo: true,
+    });
+    await supabase
+      .from('barcode_catalog')
+      .update({ image_uri: null })
+      .eq('barcode', product.barcode);
+  }
 }
 
 /**
