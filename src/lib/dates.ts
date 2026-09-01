@@ -33,25 +33,35 @@ export function ddayLabel(days: number): string {
   return `D-${days}`;
 }
 
-export type SectionKey = 'expired' | 'today' | 'soon' | 'week' | 'later';
+export type SignalKey = 'red' | 'yellow' | 'green';
 
-export function sectionOf(days: number): SectionKey {
-  if (days < 0) return 'expired';
-  if (days === 0) return 'today';
-  if (days <= 3) return 'soon';
-  if (days <= 7) return 'week';
-  return 'later';
+export function signalOf(days: number): SignalKey {
+  if (days <= 7) return 'red';
+  if (days <= 30) return 'yellow';
+  return 'green';
 }
 
-export const SECTION_TITLES: Record<SectionKey, string> = {
-  expired: '유통기한 만료',
-  today: '오늘까지',
-  soon: '3일 이내',
-  week: '7일 이내',
-  later: '여유 있음',
+export const SIGNAL_TITLES: Record<SignalKey, string> = {
+  red: '만료·7일 이내',
+  yellow: '임박(한달 이내)',
+  green: '여유 있음(한달 이상)',
 };
 
-export const SECTION_ORDER: SectionKey[] = ['expired', 'today', 'soon', 'week', 'later'];
+export const SIGNAL_ORDER: SignalKey[] = ['red', 'yellow', 'green'];
+
+// 배지/섹션 점/통계 카드에서 공통으로 사용하는 배경색
+export const SIGNAL_BG: Record<SignalKey, string> = {
+  red: 'bg-primary',
+  yellow: 'bg-warn',
+  green: 'bg-ok',
+};
+
+// 통계 카드 비활성 상태의 숫자 색
+export const SIGNAL_TEXT: Record<SignalKey, string> = {
+  red: 'text-primary',
+  yellow: 'text-warn',
+  green: 'text-ok',
+};
 
 /** YYYY-MM-DD 형식인지 + 실제 존재하는 날짜인지 검사 */
 export function isValidDateStr(s: string): boolean {

@@ -17,26 +17,19 @@ import Fab from '@/components/Fab';
 import ProductCard from '@/components/ProductCard';
 import SummaryHeader from '@/components/SummaryHeader';
 import { lookupBarcode } from '@/lib/barcode-lookup';
-import { SECTION_ORDER, SECTION_TITLES, SectionKey, daysUntil, sectionOf } from '@/lib/dates';
+import { SIGNAL_ORDER, SIGNAL_TITLES, SIGNAL_BG, SignalKey, daysUntil, signalOf } from '@/lib/dates';
 import { cancelExpiryAlerts } from '@/lib/notifications';
 import { matchesSearch } from '@/lib/korean-search';
 import { deleteProduct, listProducts, resolveProduct } from '@/lib/repo';
 import { useAppMode } from '@/lib/settings';
 import { BarcodeInfo, Product } from '@/lib/types';
 
-const SECTION_DOT: Record<SectionKey, string> = {
-  expired: 'bg-ink',
-  today: 'bg-primary',
-  soon: 'bg-warn',
-  week: 'bg-warn',
-  later: 'bg-ok',
-};
-
 export default function Dashboard() {
   const mode = useAppMode();
   const [products, setProducts] = useState<Product[]>([]);
   const [query, setQuery] = useState('');
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
+  const [signalFilter, setSignalFilter] = useState<SignalKey | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const scanParams = useLocalSearchParams<{ scannedBarcode?: string; nonce?: string }>();
   const [scannedBarcode, setScannedBarcode] = useState<string | null>(null);
@@ -79,6 +72,7 @@ export default function Dashboard() {
     const filtered = products.filter((p) => {
       if (selectedCategories.size > 0 && !p.categories.some((c) => selectedCategories.has(c)))
         return false;
+      if (signalFilter && signalOf(daysUntil(p.expiryDate)) !== signalFilter) return false;
       if (!deferredQuery.trim()) return true;
       return (
         matchesSearch(p.name, deferredQuery) ||
@@ -86,19 +80,19 @@ export default function Dashboard() {
         matchesSearch(p.memo ?? '', deferredQuery)
       );
     });
-    const grouped = new Map<SectionKey, Product[]>();
+    const grouped = new Map<SignalKey, Product[]>();
     filtered.forEach((p) => {
-      const key = sectionOf(daysUntil(p.expiryDate));
+      const key = signalOf(daysUntil(p.expiryDate));
       const arr = grouped.get(key) ?? [];
       arr.push(p);
       grouped.set(key, arr);
     });
-    return SECTION_ORDER.filter((k) => grouped.has(k)).map((k) => ({
+    return SIGNAL_ORDER.filter((k) => grouped.has(k)).map((k) => ({
       key: k,
-      title: SECTION_TITLES[k],
+      title: SIGNAL_TITLES[k],
       data: grouped.get(k)!.sort((a, b) => a.expiryDate.localeCompare(b.expiryDate)),
     }));
-  }, [products, deferredQuery, selectedCategories]);
+  }, [products, deferredQuery, selectedCategories, signalFilter]);
 
   useEffect(() => {
     if (!scannedBarcode) return;
@@ -337,10 +331,16 @@ export default function Dashboard() {
       <SectionList
         sections={sections}
         keyExtractor={(item) => item.id}
-        ListHeaderComponent={<SummaryHeader products={products} />}
+        ListHeaderComponent={
+          <SummaryHeader
+            products={products}
+            activeSignal={signalFilter}
+            onSelectSignal={setSignalFilter}
+          />
+        }
         renderSectionHeader={({ section }) => (
           <View className="mx-4 mb-2 mt-3 flex-row items-center">
-            <View className={`${SECTION_DOT[section.key as SectionKey]} h-2 w-2 rounded-full`} />
+            <View className={`${SIGNAL_BG[section.key as SignalKey]} h-2 w-2 rounded-full`} />
             <Text className="text-ink ml-2 text-sm font-bold">{section.title}</Text>
             <Text className="text-muted ml-1.5 text-sm">{section.data.length}</Text>
           </View>
