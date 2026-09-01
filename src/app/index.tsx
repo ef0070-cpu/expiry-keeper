@@ -193,17 +193,21 @@ export default function Dashboard() {
               {mode === 'retail' ? (
                 <Pressable
                   onPress={() => router.push('/margin-calculator')}
-                  hitSlop={8}
+                  hitSlop={12}
                   accessibilityRole="button"
                   accessibilityLabel="원가 계산기"
                 >
-                  <MaterialCommunityIcons name="calculator-variant" size={22} color="#1A1A1A" />
+                  <MaterialCommunityIcons
+                    name="calculator-variant-outline"
+                    size={22}
+                    color="#1A1A1A"
+                  />
                 </Pressable>
               ) : null}
               {mode === 'retail' ? (
                 <Pressable
                   onPress={() => router.push('/order')}
-                  hitSlop={8}
+                  hitSlop={12}
                   accessibilityRole="button"
                   accessibilityLabel="발주 관리"
                 >
@@ -213,7 +217,7 @@ export default function Dashboard() {
               {mode === 'home' ? (
                 <Pressable
                   onPress={() => router.push('/recipes')}
-                  hitSlop={8}
+                  hitSlop={12}
                   accessibilityRole="button"
                   accessibilityLabel="레시피 추천"
                 >
@@ -222,7 +226,7 @@ export default function Dashboard() {
               ) : null}
               <Pressable
                 onPress={() => router.push('/stats')}
-                hitSlop={8}
+                hitSlop={12}
                 accessibilityRole="button"
                 accessibilityLabel="소진·폐기 통계"
               >
@@ -230,7 +234,7 @@ export default function Dashboard() {
               </Pressable>
               <Pressable
                 onPress={() => router.push('/calendar')}
-                hitSlop={8}
+                hitSlop={12}
                 accessibilityRole="button"
                 accessibilityLabel="캘린더"
               >
@@ -238,7 +242,7 @@ export default function Dashboard() {
               </Pressable>
               <Pressable
                 onPress={() => router.push('/settings')}
-                hitSlop={8}
+                hitSlop={12}
                 accessibilityRole="button"
                 accessibilityLabel="설정"
               >

@@ -209,6 +209,16 @@ export default function Settings() {
           label="소진·폐기 통계"
           onPress={() => router.push('/stats')}
         />
+        {mode === 'retail' ? (
+          <>
+            <View className="h-px bg-line" />
+            <LinkRow
+              icon="calculator-variant-outline"
+              label="원가 계산기"
+              onPress={() => router.push('/margin-calculator')}
+            />
+          </>
+        ) : null}
         {isCloudMode ? (
           <>
             <View className="h-px bg-line" />
