@@ -13,6 +13,7 @@ const PRODUCTS_KEY = 'orderProducts:v1';
 const CATEGORIES_KEY = 'orderCategories:v1';
 const CART_KEY = 'orderCart:v1';
 const REMOVED_BARCODES_KEY = 'removedOrderBarcodes:v1';
+const FLAGGED_PHOTO_KEY = 'flaggedPhotoBarcodes:v1';
 
 const DEFAULT_CATEGORIES = ['바', '콘', '튜브', '샌드/기타', '홈/컵'];
 
@@ -64,6 +65,26 @@ export async function saveOrderProduct(p: OrderProduct): Promise<OrderProduct> {
 export async function getRemovedBarcodes(): Promise<Set<string>> {
   const raw = await AsyncStorage.getItem(REMOVED_BARCODES_KEY);
   return new Set<string>(raw ? (JSON.parse(raw) as string[]) : []);
+}
+
+/** 바코드→신고 당시 사진 URL. syncOrderCatalog가 이 목록을 보고 아직 해결 안 된 신고 사진을 되살리지 않는다. */
+export async function getFlaggedPhotoBarcodes(): Promise<Map<string, string>> {
+  const raw = await AsyncStorage.getItem(FLAGGED_PHOTO_KEY);
+  return new Map(Object.entries(raw ? (JSON.parse(raw) as Record<string, string>) : {}));
+}
+
+/** 사진 신고 직후 호출: 이 바코드의 사진이 해결(카탈로그 값 변경)될 때까지 되살아나지 않게 기록한다. */
+export async function recordFlaggedPhoto(barcode: string, imageUri: string): Promise<void> {
+  const flagged = await getFlaggedPhotoBarcodes();
+  flagged.set(barcode, imageUri);
+  await AsyncStorage.setItem(FLAGGED_PHOTO_KEY, JSON.stringify(Object.fromEntries(flagged)));
+}
+
+async function clearResolvedFlaggedPhotos(barcodes: string[]): Promise<void> {
+  if (barcodes.length === 0) return;
+  const flagged = await getFlaggedPhotoBarcodes();
+  for (const b of barcodes) flagged.delete(b);
+  await AsyncStorage.setItem(FLAGGED_PHOTO_KEY, JSON.stringify(Object.fromEntries(flagged)));
 }
 
 async function recordRemovedBarcode(barcode: string | null): Promise<void> {
@@ -167,13 +188,20 @@ export async function syncOrderCatalog(): Promise<void> {
       .select('barcode, name, brand, price, category, image_uri');
     if (error || !data) return;
 
-    const [items, removedBarcodes] = await Promise.all([listOrderProducts(), getRemovedBarcodes()]);
-    const { items: merged, changed } = mergeCatalogIntoProducts(
+    const [items, removedBarcodes, flaggedPhotos] = await Promise.all([
+      listOrderProducts(),
+      getRemovedBarcodes(),
+      getFlaggedPhotoBarcodes(),
+    ]);
+    const { items: merged, changed, resolvedFlags } = mergeCatalogIntoProducts(
       items,
       data as OrderCatalogRow[],
       removedBarcodes,
+      undefined,
+      flaggedPhotos,
     );
     if (changed) await writeOrderProducts(merged);
+    await clearResolvedFlaggedPhotos(resolvedFlags);
   } catch {
     // best-effort: 오프라인 등 실패 시 기존 로컬 상태 유지
   }

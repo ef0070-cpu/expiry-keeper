@@ -24,6 +24,7 @@ import {
   getOrderProduct,
   listOrderCategories,
   newId,
+  recordFlaggedPhoto,
   saveOrderProduct,
 } from '@/lib/order-repo';
 import { flagCatalogPhoto, reportOrderProductIssue } from '@/lib/order-report';
@@ -130,8 +131,12 @@ export default function OrderProductForm() {
         text: '신고',
         onPress: async () => {
           setFlaggingPhoto(true);
+          const flaggedUri = imageUri;
           try {
             const { cleared } = await flagCatalogPhoto(trimmedBarcode);
+            // 신고 임계치 미달이면 공용 카탈로그 사진은 그대로다 — 여기 기록해두지 않으면
+            // 다음 syncOrderCatalog 때 방금 지운 로컬 사진이 도로 채워진다.
+            if (flaggedUri) await recordFlaggedPhoto(trimmedBarcode, flaggedUri);
             await clearLocalPhoto();
             Alert.alert(
               '접수 완료',
