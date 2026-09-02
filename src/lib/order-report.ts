@@ -86,7 +86,7 @@ export async function submitNewOrderProduct(product: OrderProduct): Promise<void
  * 바코드 카탈로그에 아직 사진이 없는 상품에, 사용자가 자기 발주상품을 편집하며 추가한 사진을
  * 관리자 검토 없이 즉시 반영되는 카탈로그 수정 제안(kind:'photo_fill')으로 접수한다.
  * kind:'fix'(정보 오류 신고)는 RLS가 자동승인 insert를 막아둔 관리자 승인 전용 경로라 재사용할 수 없다.
- * name/brand/price/category는 비워 보내 기존 병합 로직(syncApprovedCatalogUpdates)이
+ * name/brand/price/category는 비워 보내 기존 병합 로직(order-catalog-merge.ts의 mergeCatalogIntoProducts)이
  * 사진 외 다른 필드를 건드리지 않도록 한다. best-effort — 실패해도 로컬 저장 흐름을 막지 않는다.
  * 호출자(saveOrderProduct)는 로컬 기기의 이전 상태(사진 없음)만 보고 호출하므로, 그 사이 다른
  * 사용자가 이미 채운 사진을 덮어쓰지 않도록 여기서 공용 barcode_catalog 상태를 다시 한번 확인한다.

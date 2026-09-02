@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { upsertBarcodeCatalog } from './barcode-catalog';
+import { mergeCatalogIntoProducts, type OrderCatalogRow } from './order-catalog-merge';
 import { submitCatalogPhotoFill, submitNewOrderProduct } from './order-report';
 import { newId } from './repo';
 import { supabase } from './supabase';
@@ -11,7 +12,7 @@ export { newId };
 const PRODUCTS_KEY = 'orderProducts:v1';
 const CATEGORIES_KEY = 'orderCategories:v1';
 const CART_KEY = 'orderCart:v1';
-const APPLIED_UPDATES_KEY = 'appliedCatalogUpdateIds:v1';
+const REMOVED_BARCODES_KEY = 'removedOrderBarcodes:v1';
 
 const DEFAULT_CATEGORIES = ['바', '콘', '튜브', '샌드/기타', '홈/컵'];
 
@@ -60,9 +61,23 @@ export async function saveOrderProduct(p: OrderProduct): Promise<OrderProduct> {
   return p;
 }
 
+export async function getRemovedBarcodes(): Promise<Set<string>> {
+  const raw = await AsyncStorage.getItem(REMOVED_BARCODES_KEY);
+  return new Set<string>(raw ? (JSON.parse(raw) as string[]) : []);
+}
+
+async function recordRemovedBarcode(barcode: string | null): Promise<void> {
+  if (!barcode) return;
+  const removed = await getRemovedBarcodes();
+  removed.add(barcode);
+  await AsyncStorage.setItem(REMOVED_BARCODES_KEY, JSON.stringify([...removed]));
+}
+
 export async function deleteOrderProduct(id: string): Promise<void> {
   const items = await listOrderProducts();
+  const removed = items.find((p) => p.id === id);
   await writeOrderProducts(items.filter((p) => p.id !== id));
+  if (removed) await recordRemovedBarcode(removed.barcode);
   const cart = await getOrderCart();
   if (id in cart) {
     const next = { ...cart };
@@ -143,96 +158,23 @@ export async function seedDefaultOrderProducts(): Promise<number> {
   return items.length;
 }
 
-type ApprovedReportRow = {
-  id: string;
-  kind: 'new' | 'fix' | 'photo_fill';
-  barcode: string | null;
-  name: string;
-  brand: string | null;
-  price: number | null;
-  category: string | null;
-  photo_uri: string | null;
-  clear_photo: boolean | null;
-};
-
-/** 승인됐지만 아직 이 기기에 반영 안 한 행과, 반영 완료 기록(appliedCatalogUpdateIds) Set을 함께 돌려준다. */
-async function fetchUnappliedApprovedRows(): Promise<{
-  rows: ApprovedReportRow[];
-  applied: Set<string>;
-}> {
-  const appliedRaw = await AsyncStorage.getItem(APPLIED_UPDATES_KEY);
-  const applied = new Set<string>(appliedRaw ? (JSON.parse(appliedRaw) as string[]) : []);
-  if (!supabase) return { rows: [], applied };
-
-  const { data, error } = await supabase
-    .from('order_product_reports')
-    .select('id, kind, barcode, name, brand, price, category, photo_uri, clear_photo')
-    .eq('status', 'approved')
-    .order('created_at', { ascending: true });
-  if (error) throw error;
-
-  const rows = ((data as ApprovedReportRow[] | null) ?? []).filter((row) => !applied.has(row.id));
-  return { rows, applied };
-}
-
-/** Update 버튼에 미리 보여줄 대기 건수. 로그인 안 됐거나 조회 실패하면 0(버튼 비활성 상태 유지). */
-export async function countApprovedCatalogUpdates(): Promise<number> {
+/** 공용 카탈로그(order_catalog)를 받아와 로컬 발주 상품 목록에 병합한다. 실패(오프라인 등)하면 조용히 무시. */
+export async function syncOrderCatalog(): Promise<void> {
+  if (!supabase) return;
   try {
-    return (await fetchUnappliedApprovedRows()).rows.length;
+    const { data, error } = await supabase
+      .from('order_catalog')
+      .select('barcode, name, brand, price, category, image_uri');
+    if (error || !data) return;
+
+    const [items, removedBarcodes] = await Promise.all([listOrderProducts(), getRemovedBarcodes()]);
+    const { items: merged, changed } = mergeCatalogIntoProducts(
+      items,
+      data as OrderCatalogRow[],
+      removedBarcodes,
+    );
+    if (changed) await writeOrderProducts(merged);
   } catch {
-    return 0;
+    // best-effort: 오프라인 등 실패 시 기존 로컬 상태 유지
   }
-}
-
-/**
- * 관리자가 승인한 카탈로그 변경(신제품 등록 제안 + 정보 오류 신고 수정)을 받아와 로컬 카탈로그에 반영한다.
- * 한 번 반영한 건은 appliedCatalogUpdateIds에 기록해 다음 Update 때 중복 반영하지 않는다.
- */
-export async function syncApprovedCatalogUpdates(): Promise<{ added: number; fixed: number }> {
-  if (!supabase) throw new Error('로그인이 필요합니다.');
-  const { rows: pending, applied } = await fetchUnappliedApprovedRows();
-  if (pending.length === 0) return { added: 0, fixed: 0 };
-
-  const items = await listOrderProducts();
-  let added = 0;
-  let fixed = 0;
-
-  for (const row of pending) {
-    if (row.kind === 'new') {
-      const exists = row.barcode
-        ? items.some((p) => p.barcode === row.barcode)
-        : items.some((p) => p.name === row.name && p.brand === row.brand);
-      if (!exists) {
-        items.push({
-          id: newId(),
-          name: row.name,
-          brand: row.brand ?? '',
-          price: row.price ?? 0,
-          category: row.category ?? '',
-          barcode: row.barcode,
-          imageUri: row.photo_uri,
-          status: 'active',
-        });
-        added++;
-      }
-    } else {
-      const idx = row.barcode ? items.findIndex((p) => p.barcode === row.barcode) : -1;
-      if (idx >= 0) {
-        items[idx] = {
-          ...items[idx],
-          name: row.name || items[idx].name,
-          brand: row.brand || items[idx].brand,
-          price: row.price ?? items[idx].price,
-          category: row.category || items[idx].category,
-          imageUri: row.clear_photo ? null : row.photo_uri || items[idx].imageUri,
-        };
-        fixed++;
-      }
-    }
-    applied.add(row.id);
-  }
-
-  await writeOrderProducts(items);
-  await AsyncStorage.setItem(APPLIED_UPDATES_KEY, JSON.stringify([...applied]));
-  return { added, fixed };
 }
