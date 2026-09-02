@@ -6,10 +6,8 @@ import { Alert, FlatList, Pressable, Text, TextInput, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Chip from '@/components/Chip';
 import Thumbnail from '@/components/Thumbnail';
-import { hasImageSearchKeys } from '@/lib/barcode-lookup';
 import {
   addOrderCategory,
-  countApprovedCatalogUpdates,
   deleteOrderCategory,
   deleteOrderProduct,
   getOrderCart,
@@ -17,7 +15,7 @@ import {
   listOrderProducts,
   renameOrderCategory,
   seedDefaultOrderProducts,
-  syncApprovedCatalogUpdates,
+  syncOrderCatalog,
   writeOrderCart,
 } from '@/lib/order-repo';
 import { OrderCart, OrderProduct, OrderStatus } from '@/lib/order-types';
@@ -40,8 +38,6 @@ export default function Order() {
   const [categoryInput, setCategoryInput] = useState('');
   const [showCategoryInput, setShowCategoryInput] = useState(false);
   const [seeding, setSeeding] = useState(false);
-  const [updating, setUpdating] = useState(false);
-  const [pendingUpdateCount, setPendingUpdateCount] = useState(0);
   const scanParams = useLocalSearchParams<{ scannedBarcode?: string; nonce?: string }>();
 
   const loadCatalog = useCallback(async () => {
@@ -56,8 +52,8 @@ export default function Order() {
   }, []);
 
   const load = useCallback(async () => {
-    const [, updateCount] = await Promise.all([loadCatalog(), countApprovedCatalogUpdates()]);
-    setPendingUpdateCount(updateCount);
+    await syncOrderCatalog();
+    await loadCatalog();
   }, [loadCatalog]);
 
   useFocusEffect(
@@ -212,28 +208,6 @@ export default function Order() {
     }
   };
 
-  const onUpdate = async () => {
-    if (!hasImageSearchKeys()) {
-      Alert.alert('로그인 필요', 'Update를 사용하려면 로그인이 필요합니다.');
-      return;
-    }
-    setUpdating(true);
-    try {
-      const { added, fixed } = await syncApprovedCatalogUpdates();
-      await loadCatalog();
-      setPendingUpdateCount(0);
-      const total = added + fixed;
-      Alert.alert(
-        total > 0 ? '업데이트 완료' : '알림',
-        total > 0 ? `${total}건 반영됐습니다 (신규 ${added}, 수정 ${fixed}).` : '새로운 업데이트가 없습니다.',
-      );
-    } catch (e) {
-      Alert.alert('업데이트 실패', e instanceof Error ? e.message : '알 수 없는 오류');
-    } finally {
-      setUpdating(false);
-    }
-  };
-
   return (
     <View className="flex-1 bg-bg">
       <Stack.Screen
@@ -281,32 +255,6 @@ export default function Order() {
           </Pressable>
         ) : null}
       </View>
-
-      <Pressable
-        onPress={onUpdate}
-        disabled={updating || pendingUpdateCount === 0}
-        className="mx-4 mt-2.5 items-center rounded-xl py-2.5 active:opacity-70"
-        style={{ backgroundColor: pendingUpdateCount > 0 ? '#2E7D32' : '#F0F0F0' }}
-      >
-        {updating ? (
-          <Text className="text-sm font-bold" style={{ color: '#999999' }}>
-            업데이트 중...
-          </Text>
-        ) : pendingUpdateCount > 0 ? (
-          <>
-            <Text className="text-sm font-bold" style={{ color: '#FFFFFF' }}>
-              상품 Update
-            </Text>
-            <Text className="mt-0.5 text-xs" style={{ color: '#FFFFFF' }}>
-              {pendingUpdateCount}개의 상품이 있습니다
-            </Text>
-          </>
-        ) : (
-          <Text className="text-sm font-bold" style={{ color: '#999999' }}>
-            Update 상품없음
-          </Text>
-        )}
-      </Pressable>
 
       <View className="mt-2.5 px-4" style={{ gap: 8 }}>
         <View className="flex-row flex-wrap" style={{ gap: 8 }}>
