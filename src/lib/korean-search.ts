@@ -24,22 +24,20 @@ function isChosungOnly(text: string): boolean {
  * 맨 앞부터 순서대로 일치할 때만 적용한다 — 중간에서 우연히 초성이 겹치는
  * 무관한 상품(예: "ㅇㄷ" 검색 시 "마이디저트"의 "이디" 부분)이 걸리는 것을 막는다.
  *
- * 검색어의 공백은 매칭이 실패했을 때만 무시하고 재시도한다(target의 공백은
- * 그대로 둔다) — target이 여러 단어일 때 공백 없는 검색어가 단어 경계를
- * 넘어 붙는 오검색은 계속 막으면서, 사용자가 한 단어 상품명에 실수로 띄어쓴
- * 검색어("구구스트로 베리바" → "구구스트로베리바")는 매칭되게 한다.
+ * 공백이 있는 그대로 매칭이 실패하면, target과 query 양쪽 공백을 모두 지우고
+ * 재시도한다 — "거꾸로 수박바"(상품명)와 "거꾸로수박바"(검색어)처럼 어느 한쪽에만
+ * 공백이 있어도 서로 매칭되게 한다.
  */
 export function matchesSearch(target: string, query: string): boolean {
   const t = target.toLowerCase();
   const q = query.trim().toLowerCase();
   if (!q) return true;
   if (t.includes(q)) return true;
-  if (isChosungOnly(q)) return toChosung(t).startsWith(q);
+  if (isChosungOnly(q) && toChosung(t).startsWith(q)) return true;
 
+  const tNoSpace = t.replace(/\s+/g, '');
   const qNoSpace = q.replace(/\s+/g, '');
-  if (qNoSpace !== q) {
-    if (t.includes(qNoSpace)) return true;
-    if (isChosungOnly(qNoSpace)) return toChosung(t).startsWith(qNoSpace);
-  }
+  if (tNoSpace.includes(qNoSpace)) return true;
+  if (isChosungOnly(qNoSpace)) return toChosung(tNoSpace).startsWith(qNoSpace);
   return false;
 }

@@ -14,6 +14,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Chip from '@/components/Chip';
 import ImageCandidatesModal from '@/components/ImageCandidatesModal';
 import { hasImageSearchKeys, lookupBarcode, searchProductImageCandidates } from '@/lib/barcode-lookup';
@@ -28,6 +29,12 @@ import {
 import { flagCatalogPhoto, reportOrderProductIssue } from '@/lib/order-report';
 import { OrderProduct, OrderStatus } from '@/lib/order-types';
 
+function errorMessage(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (e && typeof e === 'object' && 'message' in e) return String((e as { message: unknown }).message);
+  return '알 수 없는 오류';
+}
+
 export default function OrderProductForm() {
   const params = useLocalSearchParams<{
     id?: string;
@@ -36,6 +43,7 @@ export default function OrderProductForm() {
     prefillImage?: string;
   }>();
   const isEdit = !!params.id;
+  const insets = useSafeAreaInsets();
 
   const [name, setName] = useState(params.prefillName ?? '');
   const [imageUri, setImageUri] = useState<string | null>(params.prefillImage || null);
@@ -94,6 +102,25 @@ export default function OrderProductForm() {
   const pickReportPhoto = () =>
     pickPhoto('신고 사진', '사진을 어떻게 첨부할까요?', setReportPhotoUri);
 
+  const clearLocalPhoto = async () => {
+    setImageUri(null);
+    if (!params.id) return;
+    try {
+      await saveOrderProduct({
+        id: params.id,
+        name: name.trim(),
+        brand: brand.trim(),
+        price: Number(price) || 0,
+        category,
+        barcode: barcode.trim() || null,
+        imageUri: null,
+        status,
+      });
+    } catch {
+      // 신고 자체는 이미 접수됐으므로 로컬 저장 실패는 조용히 무시
+    }
+  };
+
   const flagPhoto = () => {
     const trimmedBarcode = barcode.trim();
     if (!trimmedBarcode) return;
@@ -105,12 +132,15 @@ export default function OrderProductForm() {
           setFlaggingPhoto(true);
           try {
             const { cleared } = await flagCatalogPhoto(trimmedBarcode);
+            await clearLocalPhoto();
             Alert.alert(
               '접수 완료',
-              cleared ? '여러 신고가 접수되어 사진이 초기화됐습니다.' : '신고가 접수됐습니다.',
+              cleared
+                ? '여러 신고가 접수되어 사진이 초기화됐습니다.'
+                : '신고가 접수됐습니다. 이 상품의 사진도 제거해 저장했습니다.',
             );
           } catch (e) {
-            Alert.alert('신고 실패', e instanceof Error ? e.message : '알 수 없는 오류');
+            Alert.alert('신고 실패', errorMessage(e));
           } finally {
             setFlaggingPhoto(false);
           }
@@ -235,7 +265,7 @@ export default function OrderProductForm() {
       await saveOrderProduct(product);
       router.back();
     } catch (e) {
-      Alert.alert('저장 실패', e instanceof Error ? e.message : '알 수 없는 오류');
+      Alert.alert('저장 실패', errorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -279,7 +309,7 @@ export default function OrderProductForm() {
       setReportCopyright(false);
       setShowReport(false);
     } catch (e) {
-      Alert.alert('신고 실패', e instanceof Error ? e.message : '알 수 없는 오류');
+      Alert.alert('신고 실패', errorMessage(e));
     } finally {
       setReporting(false);
     }
@@ -302,7 +332,7 @@ export default function OrderProductForm() {
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       className="flex-1"
     >
       <Stack.Screen options={{ title: isEdit ? '발주 상품 수정' : '발주 상품 등록' }} />
@@ -317,7 +347,7 @@ export default function OrderProductForm() {
       />
       <ScrollView
         className="flex-1 bg-bg"
-        contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: Math.max(insets.bottom, 16) + 32 }}
         keyboardShouldPersistTaps="handled"
       >
         <View className="flex-row">
@@ -364,11 +394,6 @@ export default function OrderProductForm() {
                 )}
                 <Text className="text-primary ml-1 text-xs font-medium">웹에서 이미지 찾기</Text>
               </Pressable>
-              {imageUri ? (
-                <Pressable onPress={() => setImageUri(null)}>
-                  <Text className="text-muted text-xs underline">사진 제거</Text>
-                </Pressable>
-              ) : null}
             </View>
             {isEdit && barcode.trim() && imageUri ? (
               <Pressable onPress={flagPhoto} disabled={flaggingPhoto} className="mt-1.5">

@@ -16,4 +16,10 @@ console.assert(matchesSearch('구구스트로베리바', 'ㄱㄱ'), '초성 부�
 console.assert(matchesSearch('구구스트로베리바', '구구스트로'), '더 긴 부분일치');
 console.assert(!matchesSearch('구구바 스트로베리', '구스트'), '공백 무시 재시도가 기존 단어 경계 보호를 깨면 안 됨 (회귀 방지)');
 
+console.assert(matchesSearch('거꾸로 수박바', '거꾸로수박바'), '상품명에 공백 있고 검색어에 없어도 매칭돼야 함');
+console.assert(matchesSearch('거꾸로 수박바', '거꾸로 수박바'), '상품명과 검색어 공백이 동일하면 매칭돼야 함');
+console.assert(matchesSearch('거꾸로 수박바', '수박바'), '상품명 뒷부분 단어만 검색해도 매칭돼야 함');
+console.assert(matchesSearch('거꾸로 수박바', 'ㄱㄲㄹㅅㅂㅂ'), '상품명에 공백 있어도 공백 없는 초성 검색어가 매칭돼야 함');
+console.assert(!matchesSearch('구구바 스트로베리', 'ㄱㅅㅌ'), '초성도 공백 무시 재시도가 단어 경계 보호를 깨면 안 됨 (회귀 방지)');
+
 console.log('korean-search selfcheck OK');
