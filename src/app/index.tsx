@@ -189,65 +189,44 @@ export default function Dashboard() {
       <Stack.Screen
         options={{
           headerRight: () => (
-            <View className="flex-row items-center" style={{ gap: 16 }}>
+            <View className="flex-row items-center" style={{ gap: 10 }}>
               {mode === 'retail' ? (
-                <Pressable
+                <HeaderIcon
+                  icon="calculator-variant-outline"
+                  label="계산기"
                   onPress={() => router.push('/margin-calculator')}
-                  hitSlop={12}
-                  accessibilityRole="button"
-                  accessibilityLabel="원가 계산기"
-                >
-                  <MaterialCommunityIcons
-                    name="calculator-variant-outline"
-                    size={22}
-                    color="#1A1A1A"
-                  />
-                </Pressable>
+                />
               ) : null}
               {mode === 'retail' ? (
-                <Pressable
+                <HeaderIcon
+                  icon="cart-outline"
+                  label="발주"
                   onPress={() => router.push('/order')}
-                  hitSlop={12}
-                  accessibilityRole="button"
-                  accessibilityLabel="발주 관리"
-                >
-                  <MaterialCommunityIcons name="cart-outline" size={22} color="#1A1A1A" />
-                </Pressable>
+                />
               ) : null}
               {mode === 'home' ? (
-                <Pressable
+                <HeaderIcon
+                  icon="chef-hat"
+                  label="레시피"
                   onPress={() => router.push('/recipes')}
-                  hitSlop={12}
-                  accessibilityRole="button"
-                  accessibilityLabel="레시피 추천"
-                >
-                  <MaterialCommunityIcons name="chef-hat" size={22} color="#1A1A1A" />
-                </Pressable>
+                />
               ) : null}
-              <Pressable
+              <HeaderIcon
+                icon="chart-box-outline"
+                label="통계"
                 onPress={() => router.push('/stats')}
-                hitSlop={12}
-                accessibilityRole="button"
-                accessibilityLabel="소진·폐기 통계"
-              >
-                <MaterialCommunityIcons name="chart-box-outline" size={22} color="#1A1A1A" />
-              </Pressable>
-              <Pressable
+              />
+              <HeaderIcon
+                icon="calendar-month-outline"
+                label="캘린더"
                 onPress={() => router.push('/calendar')}
-                hitSlop={12}
-                accessibilityRole="button"
-                accessibilityLabel="캘린더"
-              >
-                <MaterialCommunityIcons name="calendar-month-outline" size={22} color="#1A1A1A" />
-              </Pressable>
-              <Pressable
+              />
+              <HeaderIcon
+                icon="cog-outline"
+                label="설정"
+                color="#888888"
                 onPress={() => router.push('/settings')}
-                hitSlop={12}
-                accessibilityRole="button"
-                accessibilityLabel="설정"
-              >
-                <MaterialCommunityIcons name="cog-outline" size={22} color="#888888" />
-              </Pressable>
+              />
             </View>
           ),
         }}
@@ -289,7 +268,7 @@ export default function Dashboard() {
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          className="mt-2.5 max-h-10"
+          className="mt-2.5"
           contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
         >
           <Chip
@@ -387,5 +366,32 @@ export default function Dashboard() {
 
       <Fab onPress={() => router.push(mode === 'home' ? '/product-form' : '/scan')} />
     </View>
+  );
+}
+
+function HeaderIcon({
+  icon,
+  label,
+  onPress,
+  color = '#1A1A1A',
+}: {
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  label: string;
+  onPress: () => void;
+  color?: string;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      hitSlop={6}
+      className="items-center"
+      accessibilityRole="button"
+      accessibilityLabel={label}
+    >
+      <MaterialCommunityIcons name={icon} size={22} color={color} />
+      <Text className="mt-0.5 text-[9px] leading-none" style={{ color }}>
+        {label}
+      </Text>
+    </Pressable>
   );
 }

@@ -87,7 +87,14 @@ export default function OrderCartScreen() {
     }
     const text = buildOrderShareText(cart, products, selectedBranch, new Date());
     try {
-      await Share.share({ message: text });
+      const result = await Share.share({ message: text });
+      // Android는 공유 대상 앱에서 실제로 전송을 완료했는지 알려주지 않는다(공유 시트를
+      // 띄운 시점에 곧바로 resolve됨) — sharedAction이면 전달 시도가 이뤄진 것으로 보고 비운다.
+      // iOS는 사용자가 취소하면 dismissedAction이 와서 이 분기를 안 타 장바구니가 보존된다.
+      if (result.action === Share.sharedAction) {
+        await clearOrderCart();
+        setCart({});
+      }
     } catch (e) {
       Alert.alert('공유 실패', e instanceof Error ? e.message : '알 수 없는 오류');
     }
@@ -151,7 +158,7 @@ export default function OrderCartScreen() {
               <MaterialCommunityIcons name="minus" size={18} color="#1A1A1A" />
             </Pressable>
             <Text
-              className="text-primary mx-2 w-14 text-center text-lg font-black"
+              className="text-primary mx-2 w-14 text-center text-sm font-bold"
               style={{ fontVariant: ['tabular-nums'] }}
             >
               {item.qty}박스

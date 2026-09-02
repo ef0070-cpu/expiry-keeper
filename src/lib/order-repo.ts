@@ -14,6 +14,7 @@ const CATEGORIES_KEY = 'orderCategories:v1';
 const CART_KEY = 'orderCart:v1';
 const REMOVED_BARCODES_KEY = 'removedOrderBarcodes:v1';
 const FLAGGED_PHOTO_KEY = 'flaggedPhotoBarcodes:v1';
+const CATEGORY_OVERRIDE_KEY = 'orderCategoryOverrides:v1';
 
 const DEFAULT_CATEGORIES = ['바', '콘', '튜브', '샌드/기타', '홈/컵'];
 
@@ -50,6 +51,7 @@ export async function saveOrderProduct(p: OrderProduct): Promise<OrderProduct> {
   const idx = items.findIndex((x) => x.id === p.id);
   const isNew = idx < 0;
   const hadNoPhoto = !isNew && !items[idx].imageUri;
+  const categoryChanged = !isNew && items[idx].category !== p.category;
   if (isNew) items.push(p);
   else items[idx] = p;
   await writeOrderProducts(items);
@@ -58,6 +60,11 @@ export async function saveOrderProduct(p: OrderProduct): Promise<OrderProduct> {
     submitNewOrderProduct(p).catch(() => {});
   } else if (hadNoPhoto && p.imageUri && p.barcode) {
     submitCatalogPhotoFill(p.barcode, p.imageUri).catch(() => {});
+  }
+  // 카테고리 수정은 공용 카탈로그 승인 절차를 안 거치므로, 다음 syncOrderCatalog가
+  // 공용 값으로 도로 덮어쓰지 않도록 이 바코드의 로컬 지정값을 기억해둔다.
+  if (categoryChanged && p.barcode) {
+    recordCategoryOverride(p.barcode, p.category).catch(() => {});
   }
   return p;
 }
@@ -85,6 +92,18 @@ async function clearResolvedFlaggedPhotos(barcodes: string[]): Promise<void> {
   const flagged = await getFlaggedPhotoBarcodes();
   for (const b of barcodes) flagged.delete(b);
   await AsyncStorage.setItem(FLAGGED_PHOTO_KEY, JSON.stringify(Object.fromEntries(flagged)));
+}
+
+/** 바코드→사용자가 이 기기에서 직접 지정한 카테고리. syncOrderCatalog가 공용 값으로 덮어쓰지 않게 막는다. */
+export async function getCategoryOverrides(): Promise<Map<string, string>> {
+  const raw = await AsyncStorage.getItem(CATEGORY_OVERRIDE_KEY);
+  return new Map(Object.entries(raw ? (JSON.parse(raw) as Record<string, string>) : {}));
+}
+
+async function recordCategoryOverride(barcode: string, category: string): Promise<void> {
+  const overrides = await getCategoryOverrides();
+  overrides.set(barcode, category);
+  await AsyncStorage.setItem(CATEGORY_OVERRIDE_KEY, JSON.stringify(Object.fromEntries(overrides)));
 }
 
 async function recordRemovedBarcode(barcode: string | null): Promise<void> {
@@ -188,14 +207,20 @@ export async function syncOrderCatalog(): Promise<void> {
       .select('barcode, name, brand, price, category, image_uri');
     if (error || !data) return;
 
-    const [items, removedBarcodes, flaggedPhotos] = await Promise.all([
+    const [items, removedBarcodes, flaggedPhotos, categoryOverrides] = await Promise.all([
       listOrderProducts(),
       getRemovedBarcodes(),
       getFlaggedPhotoBarcodes(),
+      getCategoryOverrides(),
     ]);
+    const rows = (data as OrderCatalogRow[]).map((row) =>
+      categoryOverrides.has(row.barcode)
+        ? { ...row, category: categoryOverrides.get(row.barcode)! }
+        : row,
+    );
     const { items: merged, changed, resolvedFlags } = mergeCatalogIntoProducts(
       items,
-      data as OrderCatalogRow[],
+      rows,
       removedBarcodes,
       undefined,
       flaggedPhotos,

@@ -1,3 +1,4 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { memo, useMemo } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import {
@@ -45,6 +46,14 @@ function SummaryHeader({ products, activeSignal, onSelectSignal }: Props) {
 
 export default memo(SummaryHeader);
 
+// 카드 안에서만 괄호 앞뒤로 두 줄 표기한다. SIGNAL_TITLES(index.tsx 섹션 제목에도 쓰임)는
+// 한 줄 문구 그대로 두고, 여기서만 표시용으로 나눈다.
+const SIGNAL_LABEL_LINES: Record<SignalKey, string[]> = {
+  red: ['만료·7일 이내'],
+  yellow: ['임박', '(한달 이내)'],
+  green: ['여유있음', '(한달 이상)'],
+};
+
 function SignalStat({
   signalKey,
   label,
@@ -63,14 +72,26 @@ function SignalStat({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={`${label} ${active ? '필터 해제' : '필터'}`}
-      className={`flex-1 items-center rounded-xl border py-3 ${
+      className={`relative flex-1 items-center rounded-xl border py-3 active:opacity-70 ${
         active ? `${SIGNAL_BG[signalKey]} border-transparent` : 'border-line bg-paper'
       }`}
     >
+      {!active ? (
+        <View className="absolute right-1.5 top-1.5">
+          <MaterialCommunityIcons name="filter-outline" size={12} color="#888888" />
+        </View>
+      ) : null}
       <Text className={`text-xl font-bold ${active ? 'text-paper' : SIGNAL_TEXT[signalKey]}`}>
         {value}
       </Text>
-      <Text className={`mt-0.5 text-xs ${active ? 'text-paper' : 'text-muted'}`}>{label}</Text>
+      {SIGNAL_LABEL_LINES[signalKey].map((line, i) => (
+        <Text
+          key={line}
+          className={`text-xs ${i === 0 ? 'mt-0.5' : ''} ${active ? 'text-paper' : 'text-muted'}`}
+        >
+          {line}
+        </Text>
+      ))}
     </Pressable>
   );
 }

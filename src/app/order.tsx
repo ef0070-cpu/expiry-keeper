@@ -14,6 +14,7 @@ import {
   listOrderCategories,
   listOrderProducts,
   renameOrderCategory,
+  saveOrderProduct,
   seedDefaultOrderProducts,
   syncOrderCatalog,
   writeOrderCart,
@@ -164,12 +165,36 @@ export default function Order() {
     router.push({ pathname: '/order-product-form', params: { id } });
   }, []);
 
+  // Android의 Alert.alert는 버튼을 최대 3개까지만 보여준다(4개째부터 잘림) — 그래서
+  // 이 메뉴는 '취소' 버튼 없이 3개(수정/상태 변경/삭제)만 둔다. 뒤로가기·바깥 탭으로도
+  // 닫히니 기능적으로 취소는 여전히 가능하다.
+  const onChangeStatus = useCallback(
+    (p: OrderProduct) => {
+      Alert.alert(
+        '상태 변경',
+        `'${p.name}'의 납품 상태를 선택하세요.`,
+        (Object.keys(STATUS_META) as OrderStatus[]).map((s) => ({
+          text: STATUS_META[s].label,
+          onPress: async () => {
+            await saveOrderProduct({ ...p, status: s });
+            load();
+          },
+        })),
+      );
+    },
+    [load],
+  );
+
   const onLongPressProduct = useCallback(
     (p: OrderProduct) => {
       Alert.alert(p.name, '어떻게 처리할까요?', [
         {
           text: '수정',
           onPress: () => router.push({ pathname: '/order-product-form', params: { id: p.id } }),
+        },
+        {
+          text: '상태 변경',
+          onPress: () => onChangeStatus(p),
         },
         {
           text: '삭제',
@@ -188,10 +213,9 @@ export default function Order() {
             ]);
           },
         },
-        { text: '취소', style: 'cancel' },
       ]);
     },
-    [load],
+    [load, onChangeStatus],
   );
 
   const onSeedDefaults = async () => {
@@ -384,12 +408,13 @@ const CatalogRow = memo(function CatalogRow({
           <Text className="text-muted mt-0.5 text-xs">{product.barcode}</Text>
         ) : null}
         <View
-          className="mt-1 self-start rounded px-1.5 py-0.5"
-          style={{ backgroundColor: statusMeta.color }}
+          className="mt-1 flex-row items-center self-start rounded px-1.5 py-0.5"
+          style={{ backgroundColor: statusMeta.color, gap: 2 }}
         >
           <Text className="text-xs font-bold" style={{ color: '#FFFFFF' }}>
             {statusMeta.label}
           </Text>
+          <MaterialCommunityIcons name="chevron-down" size={12} color="#FFFFFF" />
         </View>
       </View>
       <View className="flex-row items-center">

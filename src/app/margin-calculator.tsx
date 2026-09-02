@@ -90,14 +90,17 @@ export default function MarginCalculator() {
     <>
       <Stack.Screen options={{ title: '원가 계산기' }} />
       <View className="flex-1 bg-bg">
-        <ScrollView contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          contentContainerStyle={{ padding: 16, flexGrow: 1, justifyContent: 'center' }}
+          keyboardShouldPersistTaps="handled"
+        >
           {FIELDS.map((f) => (
-            <View key={f.key} className="mb-4">
-              <Text className="text-ink mb-1.5 text-sm font-bold">
+            <View key={f.key} className="mb-6">
+              <Text className="text-ink mb-2 text-base font-bold">
                 {f.label} ({f.suffix})
               </Text>
               <TextInput
-                className={`text-ink rounded-xl border bg-paper px-3 py-2.5 text-base ${
+                className={`text-ink rounded-xl border bg-paper px-4 py-4 text-xl ${
                   activeField === f.key ? 'border-primary' : 'border-line'
                 }`}
                 placeholder="0"
