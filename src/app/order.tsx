@@ -497,46 +497,43 @@ const SuggestionRow = memo(function SuggestionRow({
 }) {
   return (
     <View className="flex-row items-center border-b border-line px-3 py-2">
-      <View className="flex-1 pr-2">
+      <Pressable
+        onPress={() => onQuickAdd(product.id)}
+        className="flex-1 pr-2 active:opacity-60"
+        accessibilityRole="button"
+        accessibilityLabel={`${product.name} 1개 담기`}
+      >
         <Text className="text-ink text-sm font-bold" numberOfLines={1}>
           {product.name}
         </Text>
         <Text className="text-muted mt-0.5 text-xs" numberOfLines={1}>
           {product.brand} · {product.price.toLocaleString()}원
         </Text>
-      </View>
+      </Pressable>
       <View className="flex-row items-center">
         <Pressable
           onPress={() => onChangeQty(product.id, -1)}
-          className="h-8 w-8 items-center justify-center rounded-lg border border-line bg-bg active:opacity-70"
+          className="h-11 w-11 items-center justify-center rounded-lg border border-line bg-bg active:opacity-70"
           accessibilityRole="button"
           accessibilityLabel="수량 감소"
         >
-          <MaterialCommunityIcons name="minus" size={16} color="#1A1A1A" />
+          <MaterialCommunityIcons name="minus" size={20} color="#1A1A1A" />
         </Pressable>
         <Text
-          className="text-ink mx-2 w-5 text-center text-sm font-bold"
+          className="text-ink mx-2.5 w-6 text-center text-base font-bold"
           style={{ fontVariant: ['tabular-nums'] }}
         >
           {qty}
         </Text>
         <Pressable
           onPress={() => onChangeQty(product.id, 1)}
-          className="h-8 w-8 items-center justify-center rounded-lg border border-line bg-bg active:opacity-70"
+          className="h-11 w-11 items-center justify-center rounded-lg border border-line bg-bg active:opacity-70"
           accessibilityRole="button"
           accessibilityLabel="수량 증가"
         >
-          <MaterialCommunityIcons name="plus" size={16} color="#1A1A1A" />
+          <MaterialCommunityIcons name="plus" size={20} color="#1A1A1A" />
         </Pressable>
       </View>
-      <Pressable
-        onPress={() => onQuickAdd(product.id)}
-        className="ml-2 h-8 w-8 items-center justify-center rounded-lg bg-primary active:opacity-80"
-        accessibilityRole="button"
-        accessibilityLabel="1개 담고 검색 닫기"
-      >
-        <MaterialCommunityIcons name="cart-plus" size={16} color="#FFFFFF" />
-      </Pressable>
     </View>
   );
 });
