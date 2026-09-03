@@ -2,7 +2,16 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { BarcodeScanningResult, CameraView, useCameraPermissions } from 'expo-camera';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useRef, useState } from 'react';
-import { ActivityIndicator, LayoutChangeEvent, Pressable, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  LayoutChangeEvent,
+  Modal,
+  Pressable,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { lookupBarcode } from '@/lib/barcode-lookup';
 import { listProductsByBarcode } from '@/lib/repo';
@@ -25,6 +34,8 @@ export default function Scan() {
   const params = useLocalSearchParams<{ mode?: string }>();
   const [permission, requestPermission] = useCameraPermissions();
   const [looking, setLooking] = useState(false);
+  const [manualEntryVisible, setManualEntryVisible] = useState(false);
+  const [manualBarcode, setManualBarcode] = useState('');
   const scannedRef = useRef(false);
   const insets = useSafeAreaInsets();
   const layoutRef = useRef({ width: 0, height: 0 });
@@ -64,7 +75,11 @@ export default function Scan() {
     if (!isValidBarcode(type, data)) return;
     if (!isInsideGuide(bounds)) return;
     scannedRef.current = true;
+    await handleBarcode(data);
+  };
 
+  /** 카메라로 스캔했든 직접 입력했든, 인식된 바코드 문자열 이후 처리는 동일하다. */
+  const handleBarcode = async (data: string) => {
     if (params.mode === 'search') {
       // 검색 모드: 외부 조회 없이 스캔한 바코드만 들고 홈 화면으로 돌아간다.
       // replace 대신 dismissTo를 써서 스택에 이미 있는 홈 화면으로 되돌아가며
@@ -129,6 +144,19 @@ export default function Scan() {
     });
   };
 
+  const submitManualBarcode = async () => {
+    const data = manualBarcode.trim();
+    if (!/^\d{6,13}$/.test(data)) {
+      Alert.alert('입력 확인', '바코드는 6~13자리 숫자여야 합니다.');
+      return;
+    }
+    if (scannedRef.current) return;
+    scannedRef.current = true;
+    setManualEntryVisible(false);
+    setManualBarcode('');
+    await handleBarcode(data);
+  };
+
   if (!permission) return <View className="flex-1 bg-ink" />;
 
   if (!permission.granted) {
@@ -162,6 +190,60 @@ export default function Scan() {
         }}
         onBarcodeScanned={onScanned}
       />
+
+      {/* 직접 입력(바코드 숫자 수기 입력) 트리거 — 카메라 인식이 잘 안 될 때 사용 */}
+      <View
+        className="absolute right-4 flex-row justify-end"
+        style={{ top: Math.max(insets.top, 16) + 8 }}
+      >
+        <Pressable
+          onPress={() => setManualEntryVisible(true)}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="바코드 직접 입력"
+        >
+          <Text className="text-paper text-base font-medium">직접 입력</Text>
+        </Pressable>
+      </View>
+
+      <Modal
+        visible={manualEntryVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setManualEntryVisible(false)}
+      >
+        <View className="flex-1 items-center justify-center bg-black/60 px-8">
+          <View className="w-full rounded-2xl bg-paper p-4">
+            <Text className="text-ink mb-3 text-base font-bold">바코드 직접 입력</Text>
+            <TextInput
+              className="text-ink rounded-xl border border-line bg-bg px-3 py-2.5 text-base"
+              placeholder="바코드 숫자 입력"
+              placeholderTextColor="#BBBBBB"
+              keyboardType="number-pad"
+              value={manualBarcode}
+              onChangeText={setManualBarcode}
+              autoFocus
+            />
+            <View className="mt-3 flex-row gap-2">
+              <Pressable
+                onPress={() => {
+                  setManualEntryVisible(false);
+                  setManualBarcode('');
+                }}
+                className="flex-1 items-center rounded-xl border border-line bg-paper py-2.5 active:opacity-70"
+              >
+                <Text className="text-ink text-sm font-medium">취소</Text>
+              </Pressable>
+              <Pressable
+                onPress={submitManualBarcode}
+                className="flex-1 items-center rounded-xl bg-primary py-2.5 active:opacity-80"
+              >
+                <Text className="text-paper text-sm font-bold">확인</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* 스캔 가이드 오버레이 */}
       <View className="absolute inset-0 items-center justify-center" pointerEvents="box-none">
