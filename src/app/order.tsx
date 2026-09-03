@@ -83,6 +83,21 @@ export default function Order() {
     });
   }, [products, deferredQuery, selectedCategory]);
 
+  // 카테고리 탭과 무관하게 전체 상품에서 찾는 자동완성 제안 — 검색창 바로 아래 드롭다운으로
+  // 뜨는 용도라 5개로 제한한다 (스크롤 없는 빠른 담기 목적, 전체 목록은 아래에 그대로 있음).
+  const suggestions = useMemo(() => {
+    const q = deferredQuery.trim();
+    if (!q) return [];
+    return products
+      .filter(
+        (p) =>
+          matchesSearch(p.name, deferredQuery) ||
+          matchesSearch(p.brand, deferredQuery) ||
+          (p.barcode ?? '').includes(q),
+      )
+      .slice(0, 5);
+  }, [products, deferredQuery]);
+
   const totalCount = Object.values(cart).reduce((sum, qty) => sum + qty, 0);
 
   // 낙관적 업데이트: 로컬 state 기준으로 즉시 반영하고 저장은 fire-and-forget —
@@ -98,6 +113,16 @@ export default function Order() {
       return next;
     });
   }, []);
+
+  // 자동완성 드롭다운의 장바구니 아이콘 전용: 1개 담고 검색어를 지워 드롭다운도 함께 닫는다.
+  // 2개 이상 담고 싶으면 드롭다운 안의 -/+ 스테퍼(changeQty)로 닫지 않고 조절한다.
+  const quickAdd = useCallback(
+    (productId: string) => {
+      changeQty(productId, 1);
+      setQuery('');
+    },
+    [changeQty],
+  );
 
   const submitCategory = async () => {
     const v = categoryInput.trim();
@@ -259,24 +284,42 @@ export default function Order() {
         }}
       />
 
-      <View className="mx-4 mt-3 flex-row items-center rounded-xl border border-line bg-paper px-3">
-        <MaterialCommunityIcons name="magnify" size={20} color="#888888" />
-        <TextInput
-          className="text-ink ml-2 flex-1 py-2.5 text-base"
-          placeholder="상품명, 브랜드, 바코드 검색"
-          placeholderTextColor="#BBBBBB"
-          value={query}
-          onChangeText={setQuery}
-        />
-        {query ? (
-          <Pressable
-            onPress={() => setQuery('')}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel="검색어 지우기"
+      <View className="relative mx-4 mt-3" style={{ zIndex: 10 }}>
+        <View className="flex-row items-center rounded-xl border border-line bg-paper px-3">
+          <MaterialCommunityIcons name="magnify" size={20} color="#888888" />
+          <TextInput
+            className="text-ink ml-2 flex-1 py-2.5 text-base"
+            placeholder="상품명, 브랜드, 바코드 검색"
+            placeholderTextColor="#BBBBBB"
+            value={query}
+            onChangeText={setQuery}
+          />
+          {query ? (
+            <Pressable
+              onPress={() => setQuery('')}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="검색어 지우기"
+            >
+              <MaterialCommunityIcons name="close-circle" size={18} color="#BBBBBB" />
+            </Pressable>
+          ) : null}
+        </View>
+        {suggestions.length > 0 ? (
+          <View
+            className="absolute left-0 right-0 top-full mt-1 overflow-hidden rounded-xl border border-line bg-paper"
+            style={{ elevation: 6 }}
           >
-            <MaterialCommunityIcons name="close-circle" size={18} color="#BBBBBB" />
-          </Pressable>
+            {suggestions.map((p) => (
+              <SuggestionRow
+                key={p.id}
+                product={p}
+                qty={cart[p.id] ?? 0}
+                onChangeQty={changeQty}
+                onQuickAdd={quickAdd}
+              />
+            ))}
+          </View>
         ) : null}
       </View>
 
@@ -438,5 +481,62 @@ const CatalogRow = memo(function CatalogRow({
         </Pressable>
       </View>
     </Pressable>
+  );
+});
+
+const SuggestionRow = memo(function SuggestionRow({
+  product,
+  qty,
+  onChangeQty,
+  onQuickAdd,
+}: {
+  product: OrderProduct;
+  qty: number;
+  onChangeQty: (id: string, delta: number) => void;
+  onQuickAdd: (id: string) => void;
+}) {
+  return (
+    <View className="flex-row items-center border-b border-line px-3 py-2">
+      <View className="flex-1 pr-2">
+        <Text className="text-ink text-sm font-bold" numberOfLines={1}>
+          {product.name}
+        </Text>
+        <Text className="text-muted mt-0.5 text-xs" numberOfLines={1}>
+          {product.brand} · {product.price.toLocaleString()}원
+        </Text>
+      </View>
+      <View className="flex-row items-center">
+        <Pressable
+          onPress={() => onChangeQty(product.id, -1)}
+          className="h-8 w-8 items-center justify-center rounded-lg border border-line bg-bg active:opacity-70"
+          accessibilityRole="button"
+          accessibilityLabel="수량 감소"
+        >
+          <MaterialCommunityIcons name="minus" size={16} color="#1A1A1A" />
+        </Pressable>
+        <Text
+          className="text-ink mx-2 w-5 text-center text-sm font-bold"
+          style={{ fontVariant: ['tabular-nums'] }}
+        >
+          {qty}
+        </Text>
+        <Pressable
+          onPress={() => onChangeQty(product.id, 1)}
+          className="h-8 w-8 items-center justify-center rounded-lg border border-line bg-bg active:opacity-70"
+          accessibilityRole="button"
+          accessibilityLabel="수량 증가"
+        >
+          <MaterialCommunityIcons name="plus" size={16} color="#1A1A1A" />
+        </Pressable>
+      </View>
+      <Pressable
+        onPress={() => onQuickAdd(product.id)}
+        className="ml-2 h-8 w-8 items-center justify-center rounded-lg bg-primary active:opacity-80"
+        accessibilityRole="button"
+        accessibilityLabel="1개 담고 검색 닫기"
+      >
+        <MaterialCommunityIcons name="cart-plus" size={16} color="#FFFFFF" />
+      </Pressable>
+    </View>
   );
 });
