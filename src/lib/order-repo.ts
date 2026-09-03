@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { upsertBarcodeCatalog } from './barcode-catalog';
 import { mergeCatalogIntoProducts, type OrderCatalogRow } from './order-catalog-merge';
-import { submitCatalogPhotoFill, submitNewOrderProduct } from './order-report';
+import { submitNewOrderProduct, submitPhotoCandidate } from './order-report';
 import { newId } from './repo';
 import { supabase } from './supabase';
 import { OrderCart, OrderProduct } from './order-types';
@@ -13,7 +13,7 @@ const PRODUCTS_KEY = 'orderProducts:v1';
 const CATEGORIES_KEY = 'orderCategories:v1';
 const CART_KEY = 'orderCart:v1';
 const REMOVED_BARCODES_KEY = 'removedOrderBarcodes:v1';
-const FLAGGED_PHOTO_KEY = 'flaggedPhotoBarcodes:v1';
+const SUBMITTED_PHOTO_KEY = 'submittedPhotoCandidates:v1';
 const CATEGORY_OVERRIDE_KEY = 'orderCategoryOverrides:v1';
 
 const DEFAULT_CATEGORIES = ['바', '콘', '튜브', '샌드/기타', '홈/컵'];
@@ -40,17 +40,35 @@ export async function listOrderProductsByBarcode(barcode: string): Promise<Order
   return items.filter((p) => p.barcode === barcode);
 }
 
+async function getSubmittedPhotoCandidates(): Promise<Map<string, string>> {
+  const raw = await AsyncStorage.getItem(SUBMITTED_PHOTO_KEY);
+  return new Map(Object.entries(raw ? (JSON.parse(raw) as Record<string, string>) : {}));
+}
+
+async function recordSubmittedPhotoCandidate(barcode: string, photoUri: string): Promise<void> {
+  const map = await getSubmittedPhotoCandidates();
+  map.set(barcode, photoUri);
+  await AsyncStorage.setItem(SUBMITTED_PHOTO_KEY, JSON.stringify(Object.fromEntries(map)));
+}
+
+/** 이 바코드에 마지막으로 제출한 사진과 다를 때만 새 후보로 제출한다 (같은 사진 반복 저장 시 후보 중복 방지). */
+async function submitPhotoCandidateIfChanged(barcode: string, photoUri: string): Promise<void> {
+  const map = await getSubmittedPhotoCandidates();
+  if (map.get(barcode) === photoUri) return;
+  await submitPhotoCandidate(barcode, photoUri);
+  await recordSubmittedPhotoCandidate(barcode, photoUri);
+}
+
 /**
  * 추가/수정 겸용 저장. 바코드가 있으면 공용 바코드 캐시에도 반영한다 (best-effort).
  * 신규 등록(기존 id와 매칭 안 됨)이면 크라우드소싱 카탈로그 제안으로도 접수한다 (best-effort).
- * 기존 상품 수정이고 이 기기에 사진이 없었는데 사진이 새로 추가된 경우, 카탈로그 사진
- * 자동채우기(submitCatalogPhotoFill)로도 접수한다 (best-effort).
+ * 사진이 이전 제출과 달라졌으면 새 사진 후보로 접수한다(submitPhotoCandidateIfChanged, best-effort) —
+ * 대표 사진이 되려면 다른 사용자의 좋아요를 받아야 한다.
  */
 export async function saveOrderProduct(p: OrderProduct): Promise<OrderProduct> {
   const items = await listOrderProducts();
   const idx = items.findIndex((x) => x.id === p.id);
   const isNew = idx < 0;
-  const hadNoPhoto = !isNew && !items[idx].imageUri;
   const categoryChanged = !isNew && items[idx].category !== p.category;
   if (isNew) items.push(p);
   else items[idx] = p;
@@ -58,8 +76,8 @@ export async function saveOrderProduct(p: OrderProduct): Promise<OrderProduct> {
   upsertBarcodeCatalog(p.barcode, p.name, p.imageUri).catch(() => {});
   if (isNew) {
     submitNewOrderProduct(p).catch(() => {});
-  } else if (hadNoPhoto && p.imageUri && p.barcode) {
-    submitCatalogPhotoFill(p.barcode, p.imageUri).catch(() => {});
+  } else if (p.barcode && p.imageUri) {
+    submitPhotoCandidateIfChanged(p.barcode, p.imageUri).catch(() => {});
   }
   // 카테고리 수정은 공용 카탈로그 승인 절차를 안 거치므로, 다음 syncOrderCatalog가
   // 공용 값으로 도로 덮어쓰지 않도록 이 바코드의 로컬 지정값을 기억해둔다.
@@ -72,26 +90,6 @@ export async function saveOrderProduct(p: OrderProduct): Promise<OrderProduct> {
 export async function getRemovedBarcodes(): Promise<Set<string>> {
   const raw = await AsyncStorage.getItem(REMOVED_BARCODES_KEY);
   return new Set<string>(raw ? (JSON.parse(raw) as string[]) : []);
-}
-
-/** 바코드→신고 당시 사진 URL. syncOrderCatalog가 이 목록을 보고 아직 해결 안 된 신고 사진을 되살리지 않는다. */
-export async function getFlaggedPhotoBarcodes(): Promise<Map<string, string>> {
-  const raw = await AsyncStorage.getItem(FLAGGED_PHOTO_KEY);
-  return new Map(Object.entries(raw ? (JSON.parse(raw) as Record<string, string>) : {}));
-}
-
-/** 사진 신고 직후 호출: 이 바코드의 사진이 해결(카탈로그 값 변경)될 때까지 되살아나지 않게 기록한다. */
-export async function recordFlaggedPhoto(barcode: string, imageUri: string): Promise<void> {
-  const flagged = await getFlaggedPhotoBarcodes();
-  flagged.set(barcode, imageUri);
-  await AsyncStorage.setItem(FLAGGED_PHOTO_KEY, JSON.stringify(Object.fromEntries(flagged)));
-}
-
-async function clearResolvedFlaggedPhotos(barcodes: string[]): Promise<void> {
-  if (barcodes.length === 0) return;
-  const flagged = await getFlaggedPhotoBarcodes();
-  for (const b of barcodes) flagged.delete(b);
-  await AsyncStorage.setItem(FLAGGED_PHOTO_KEY, JSON.stringify(Object.fromEntries(flagged)));
 }
 
 /** 바코드→사용자가 이 기기에서 직접 지정한 카테고리. syncOrderCatalog가 공용 값으로 덮어쓰지 않게 막는다. */
@@ -207,10 +205,9 @@ export async function syncOrderCatalog(): Promise<void> {
       .select('barcode, name, brand, price, category, image_uri');
     if (error || !data) return;
 
-    const [items, removedBarcodes, flaggedPhotos, categoryOverrides] = await Promise.all([
+    const [items, removedBarcodes, categoryOverrides] = await Promise.all([
       listOrderProducts(),
       getRemovedBarcodes(),
-      getFlaggedPhotoBarcodes(),
       getCategoryOverrides(),
     ]);
     const rows = (data as OrderCatalogRow[]).map((row) =>
@@ -218,15 +215,8 @@ export async function syncOrderCatalog(): Promise<void> {
         ? { ...row, category: categoryOverrides.get(row.barcode)! }
         : row,
     );
-    const { items: merged, changed, resolvedFlags } = mergeCatalogIntoProducts(
-      items,
-      rows,
-      removedBarcodes,
-      undefined,
-      flaggedPhotos,
-    );
+    const { items: merged, changed } = mergeCatalogIntoProducts(items, rows, removedBarcodes);
     if (changed) await writeOrderProducts(merged);
-    await clearResolvedFlaggedPhotos(resolvedFlags);
   } catch {
     // best-effort: 오프라인 등 실패 시 기존 로컬 상태 유지
   }
