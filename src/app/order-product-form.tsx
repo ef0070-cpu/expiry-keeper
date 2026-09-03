@@ -27,7 +27,7 @@ import {
   newId,
   saveOrderProduct,
 } from '@/lib/order-repo';
-import { reportOrderProductIssue } from '@/lib/order-report';
+import { deletePhotoCandidate, reportOrderProductIssue } from '@/lib/order-report';
 import { OrderProduct, OrderStatus } from '@/lib/order-types';
 
 function errorMessage(e: unknown): string {
@@ -64,6 +64,7 @@ export default function OrderProductForm() {
   const [reportCopyright, setReportCopyright] = useState(false);
   const [reporting, setReporting] = useState(false);
   const [showPhotoCandidates, setShowPhotoCandidates] = useState(false);
+  const [removingPhoto, setRemovingPhoto] = useState(false);
   const [imageCandidates, setImageCandidates] = useState<string[] | null>(null);
 
   useEffect(() => {
@@ -158,6 +159,43 @@ export default function OrderProductForm() {
       return;
     }
     setImageCandidates(candidates);
+  };
+
+  /** 잘못된 사진을 공용 후보에서 즉시 삭제한다(관리자 승인 불필요) — 삭제되면 모든 사용자 화면에서
+   * 사라지고, DB 트리거가 다음 순위 후보(있으면)로 대표 사진을 자동 교체한다. */
+  const removePhoto = () => {
+    const trimmedBarcode = barcode.trim();
+    if (!trimmedBarcode || !imageUri) return;
+    Alert.alert('사진 제거', '이 사진을 모든 사용자에게서 제거할까요?', [
+      { text: '취소', style: 'cancel' },
+      {
+        text: '제거',
+        style: 'destructive',
+        onPress: async () => {
+          setRemovingPhoto(true);
+          try {
+            await deletePhotoCandidate(trimmedBarcode, imageUri);
+            setImageUri(null);
+            if (params.id) {
+              await saveOrderProduct({
+                id: params.id,
+                name: name.trim(),
+                brand: brand.trim(),
+                price: Number(price) || 0,
+                category,
+                barcode: trimmedBarcode || null,
+                imageUri: null,
+                status,
+              });
+            }
+          } catch (e) {
+            Alert.alert('제거 실패', errorMessage(e));
+          } finally {
+            setRemovingPhoto(false);
+          }
+        },
+      },
+    ]);
   };
 
   const checkBarcode = async () => {
@@ -353,6 +391,11 @@ export default function OrderProductForm() {
                 )}
                 <Text className="text-primary ml-1 text-xs font-medium">웹에서 이미지 찾기</Text>
               </Pressable>
+              {imageUri && barcode.trim() ? (
+                <Pressable onPress={removePhoto} disabled={removingPhoto}>
+                  <Text className="text-muted text-xs underline">사진 제거</Text>
+                </Pressable>
+              ) : null}
             </View>
             {isEdit && barcode.trim() ? (
               <Pressable onPress={() => setShowPhotoCandidates(true)} className="mt-1.5">

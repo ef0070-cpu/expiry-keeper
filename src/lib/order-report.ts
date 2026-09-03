@@ -39,16 +39,24 @@ export async function reportOrderProductIssue(
   if (error) throw error;
 
   if (isCopyright && product.barcode && product.imageUri) {
-    await supabase
-      .from('order_catalog_photos')
-      .delete()
-      .eq('barcode', product.barcode)
-      .eq('photo_uri', product.imageUri);
-    await supabase
-      .from('barcode_catalog')
-      .update({ image_uri: null })
-      .eq('barcode', product.barcode);
+    await deletePhotoCandidate(product.barcode, product.imageUri);
   }
+}
+
+/**
+ * 이 바코드의 사진 후보(photoUri와 일치하는 것)를 즉시 삭제한다. 관리자 승인 없이 바로 반영되며,
+ * 대표 사진 재계산은 DB 트리거가 알아서 다음 순위 후보(있으면)로 넘긴다. 저작권 신고의 즉시삭제
+ * 경로와 "사진 제거" 버튼이 함께 쓴다.
+ */
+export async function deletePhotoCandidate(barcode: string, photoUri: string): Promise<void> {
+  if (!supabase) throw new Error('로그인이 필요합니다.');
+  const { error } = await supabase
+    .from('order_catalog_photos')
+    .delete()
+    .eq('barcode', barcode)
+    .eq('photo_uri', photoUri);
+  if (error) throw error;
+  await supabase.from('barcode_catalog').update({ image_uri: null }).eq('barcode', barcode);
 }
 
 /**
