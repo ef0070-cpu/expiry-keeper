@@ -40,6 +40,7 @@ export default function Order() {
   const [showCategoryInput, setShowCategoryInput] = useState(false);
   const [seeding, setSeeding] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [suggestionsCollapsed, setSuggestionsCollapsed] = useState(false);
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scanParams = useLocalSearchParams<{ scannedBarcode?: string; nonce?: string }>();
 
@@ -74,6 +75,11 @@ export default function Order() {
       if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
     };
   }, []);
+
+  // 검색어를 지우면(새로 검색 시작) 접었던 드롭다운도 다음 검색부터는 기본적으로 다시 펼쳐지게 초기화.
+  useEffect(() => {
+    if (!query.trim()) setSuggestionsCollapsed(false);
+  }, [query]);
 
   // 검색어를 낮은 우선순위로 반영 — 388종 카탈로그에서 매 키 입력마다 즉시 전체
   // 재필터링하면 저사양 기기에서 입력이 밀릴 수 있어, React가 재계산을 뒤로 미루게 한다.
@@ -326,8 +332,23 @@ export default function Order() {
               <MaterialCommunityIcons name="close-circle" size={18} color="#BBBBBB" />
             </Pressable>
           ) : null}
+          {suggestions.length > 0 ? (
+            <Pressable
+              onPress={() => setSuggestionsCollapsed((v) => !v)}
+              hitSlop={8}
+              className="ml-2"
+              accessibilityRole="button"
+              accessibilityLabel={suggestionsCollapsed ? '추천 목록 펼치기' : '추천 목록 접기'}
+            >
+              <MaterialCommunityIcons
+                name={suggestionsCollapsed ? 'chevron-down' : 'chevron-up'}
+                size={20}
+                color="#888888"
+              />
+            </Pressable>
+          ) : null}
         </View>
-        {suggestions.length > 0 ? (
+        {suggestions.length > 0 && !suggestionsCollapsed ? (
           <View
             className="absolute left-0 right-0 top-full mt-1 overflow-hidden rounded-xl border border-line bg-paper"
             style={{ elevation: 6 }}
