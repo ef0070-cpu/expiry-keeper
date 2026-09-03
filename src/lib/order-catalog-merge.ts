@@ -20,38 +20,20 @@ export type OrderCatalogRow = {
  * 바코드로 매칭되면 공용 필드(name/brand/price/category/imageUri)를 카탈로그 값으로 덮어쓴다
  * (공용 값이 항상 이김). 매칭 안 되고 removedBarcodes에도 없으면 신규 상품으로 추가한다
  * (사용자가 직접 삭제한 바코드는 재생성하지 않음).
- *
- * flaggedPhotos(바코드→신고 당시 image_uri)에 있는 바코드는, 카탈로그의 image_uri가 신고 당시와
- * 그대로면(=신고 임계치 미달로 아직 공용 값이 안 바뀜) 병합 결과에서 null로 취급한다 — 그래야
- * 사용자가 방금 신고로 지운 로컬 사진이 다음 동기화 때 도로 채워지지 않는다. 카탈로그 값이
- * 신고 당시와 달라졌으면(관리자 승인 등으로 해결됨) 새 값을 그대로 받아들이고 그 바코드를
- * resolvedFlags로 돌려준다 — 호출자가 이 목록으로 로컬 신고 기록을 정리한다.
  */
 export function mergeCatalogIntoProducts(
   items: OrderProduct[],
   catalogRows: OrderCatalogRow[],
   removedBarcodes: Set<string>,
   makeId: () => string = defaultId,
-  flaggedPhotos: Map<string, string> = new Map(),
-): { items: OrderProduct[]; changed: boolean; resolvedFlags: string[] } {
+): { items: OrderProduct[]; changed: boolean } {
   const next = items.map((p) => ({ ...p }));
   const byBarcode = new Map(
     next.filter((p): p is OrderProduct & { barcode: string } => !!p.barcode).map((p) => [p.barcode, p]),
   );
   let changed = false;
-  const resolvedFlags: string[] = [];
 
   for (const row of catalogRows) {
-    const flaggedUri = flaggedPhotos.get(row.barcode);
-    let imageUri = row.image_uri;
-    if (flaggedUri !== undefined) {
-      if (imageUri === flaggedUri) {
-        imageUri = null;
-      } else {
-        resolvedFlags.push(row.barcode);
-      }
-    }
-
     const local = byBarcode.get(row.barcode);
     if (local) {
       const nextBrand = row.brand ?? '';
@@ -62,13 +44,13 @@ export function mergeCatalogIntoProducts(
         local.brand !== nextBrand ||
         local.price !== nextPrice ||
         local.category !== nextCategory ||
-        local.imageUri !== imageUri
+        local.imageUri !== row.image_uri
       ) {
         local.name = row.name;
         local.brand = nextBrand;
         local.price = nextPrice;
         local.category = nextCategory;
-        local.imageUri = imageUri;
+        local.imageUri = row.image_uri;
         changed = true;
       }
     } else if (!removedBarcodes.has(row.barcode)) {
@@ -79,12 +61,12 @@ export function mergeCatalogIntoProducts(
         price: row.price ?? 0,
         category: row.category ?? '',
         barcode: row.barcode,
-        imageUri,
+        imageUri: row.image_uri,
         status: 'active',
       });
       changed = true;
     }
   }
 
-  return { items: next, changed, resolvedFlags };
+  return { items: next, changed };
 }
