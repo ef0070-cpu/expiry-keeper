@@ -93,6 +93,15 @@ export default function Order() {
 
   // 카테고리 탭과 무관하게 전체 상품에서 찾는 자동완성 제안 — 검색창 바로 아래 드롭다운으로
   // 뜨는 용도라 5개로 제한한다 (스크롤 없는 빠른 담기 목적, 전체 목록은 아래에 그대로 있음).
+  // 우선순위: 상품명 완전일치 > 상품명 시작일치 > 그 외(브랜드/바코드 매칭, 이름 중간 포함 등).
+  // 이게 없으면 "수박바"를 검색했을 때 목록 순서상 먼저 나오는 "거꾸로 수박바" 같은
+  // 부분일치 상품이 완전일치 상품보다 위에 뜨는 문제가 생긴다.
+  const suggestionRank = (p: OrderProduct, q: string) => {
+    if (p.name === q) return 0;
+    if (p.name.startsWith(q)) return 1;
+    return 2;
+  };
+
   const suggestions = useMemo(() => {
     const q = deferredQuery.trim();
     if (!q) return [];
@@ -103,6 +112,7 @@ export default function Order() {
           matchesSearch(p.brand, deferredQuery) ||
           (p.barcode ?? '').includes(q),
       )
+      .sort((a, b) => suggestionRank(a, q) - suggestionRank(b, q))
       .slice(0, 5);
   }, [products, deferredQuery]);
 
