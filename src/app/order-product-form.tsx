@@ -17,6 +17,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Chip from '@/components/Chip';
 import ImageCandidatesModal from '@/components/ImageCandidatesModal';
+import PhotoCandidatesModal from '@/components/PhotoCandidatesModal';
 import { hasImageSearchKeys, lookupBarcode, searchProductImageCandidates } from '@/lib/barcode-lookup';
 import {
   addOrderCategory,
@@ -24,10 +25,9 @@ import {
   getOrderProduct,
   listOrderCategories,
   newId,
-  recordFlaggedPhoto,
   saveOrderProduct,
 } from '@/lib/order-repo';
-import { flagCatalogPhoto, reportOrderProductIssue } from '@/lib/order-report';
+import { reportOrderProductIssue } from '@/lib/order-report';
 import { OrderProduct, OrderStatus } from '@/lib/order-types';
 
 function errorMessage(e: unknown): string {
@@ -63,7 +63,7 @@ export default function OrderProductForm() {
   const [reportPhotoUri, setReportPhotoUri] = useState<string | null>(null);
   const [reportCopyright, setReportCopyright] = useState(false);
   const [reporting, setReporting] = useState(false);
-  const [flaggingPhoto, setFlaggingPhoto] = useState(false);
+  const [showPhotoCandidates, setShowPhotoCandidates] = useState(false);
   const [imageCandidates, setImageCandidates] = useState<string[] | null>(null);
 
   useEffect(() => {
@@ -102,57 +102,6 @@ export default function OrderProductForm() {
   const pickImage = () => pickPhoto('상품 사진', '사진을 어떻게 추가할까요?', setImageUri);
   const pickReportPhoto = () =>
     pickPhoto('신고 사진', '사진을 어떻게 첨부할까요?', setReportPhotoUri);
-
-  const clearLocalPhoto = async () => {
-    setImageUri(null);
-    if (!params.id) return;
-    try {
-      await saveOrderProduct({
-        id: params.id,
-        name: name.trim(),
-        brand: brand.trim(),
-        price: Number(price) || 0,
-        category,
-        barcode: barcode.trim() || null,
-        imageUri: null,
-        status,
-      });
-    } catch {
-      // 신고 자체는 이미 접수됐으므로 로컬 저장 실패는 조용히 무시
-    }
-  };
-
-  const flagPhoto = () => {
-    const trimmedBarcode = barcode.trim();
-    if (!trimmedBarcode) return;
-    Alert.alert('사진 신고', '이 사진이 실제 상품과 다른가요?', [
-      { text: '취소', style: 'cancel' },
-      {
-        text: '신고',
-        onPress: async () => {
-          setFlaggingPhoto(true);
-          const flaggedUri = imageUri;
-          try {
-            const { cleared } = await flagCatalogPhoto(trimmedBarcode);
-            // 신고 임계치 미달이면 공용 카탈로그 사진은 그대로다 — 여기 기록해두지 않으면
-            // 다음 syncOrderCatalog 때 방금 지운 로컬 사진이 도로 채워진다.
-            if (flaggedUri) await recordFlaggedPhoto(trimmedBarcode, flaggedUri);
-            await clearLocalPhoto();
-            Alert.alert(
-              '접수 완료',
-              cleared
-                ? '여러 신고가 접수되어 사진이 초기화됐습니다.'
-                : '신고가 접수됐습니다. 이 상품의 사진도 제거해 저장했습니다.',
-            );
-          } catch (e) {
-            Alert.alert('신고 실패', errorMessage(e));
-          } finally {
-            setFlaggingPhoto(false);
-          }
-        },
-      },
-    ]);
-  };
 
   const launchPicker = async (
     source: 'camera' | 'library',
@@ -350,6 +299,11 @@ export default function OrderProductForm() {
         }}
         onClose={() => setImageCandidates(null)}
       />
+      <PhotoCandidatesModal
+        visible={showPhotoCandidates}
+        barcode={barcode.trim()}
+        onClose={() => setShowPhotoCandidates(false)}
+      />
       <ScrollView
         className="flex-1 bg-bg"
         contentContainerStyle={{ padding: 16, paddingBottom: Math.max(insets.bottom, 16) + 32 }}
@@ -400,9 +354,9 @@ export default function OrderProductForm() {
                 <Text className="text-primary ml-1 text-xs font-medium">웹에서 이미지 찾기</Text>
               </Pressable>
             </View>
-            {isEdit && barcode.trim() && imageUri ? (
-              <Pressable onPress={flagPhoto} disabled={flaggingPhoto} className="mt-1.5">
-                <Text className="text-muted text-xs underline">사진이 실제 상품과 달라요</Text>
+            {isEdit && barcode.trim() ? (
+              <Pressable onPress={() => setShowPhotoCandidates(true)} className="mt-1.5">
+                <Text className="text-muted text-xs underline">사진 후보 보기 / 투표</Text>
               </Pressable>
             ) : null}
             <Text className="text-muted mt-1.5 text-xs">
