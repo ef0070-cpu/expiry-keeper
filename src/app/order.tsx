@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { memo, useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, FlatList, Pressable, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Chip from '@/components/Chip';
@@ -39,6 +39,8 @@ export default function Order() {
   const [categoryInput, setCategoryInput] = useState('');
   const [showCategoryInput, setShowCategoryInput] = useState(false);
   const [seeding, setSeeding] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scanParams = useLocalSearchParams<{ scannedBarcode?: string; nonce?: string }>();
 
   const loadCatalog = useCallback(async () => {
@@ -66,6 +68,12 @@ export default function Order() {
   useEffect(() => {
     if (scanParams.scannedBarcode) setQuery(scanParams.scannedBarcode);
   }, [scanParams.scannedBarcode, scanParams.nonce]);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    };
+  }, []);
 
   // 검색어를 낮은 우선순위로 반영 — 388종 카탈로그에서 매 키 입력마다 즉시 전체
   // 재필터링하면 저사양 기기에서 입력이 밀릴 수 있어, React가 재계산을 뒤로 미루게 한다.
@@ -114,12 +122,16 @@ export default function Order() {
     });
   }, []);
 
-  // 자동완성 드롭다운의 장바구니 아이콘 전용: 1개 담고 검색어를 지워 드롭다운도 함께 닫는다.
+  // 자동완성 드롭다운의 상품명 탭 전용: 1개 담고 검색어를 지워 드롭다운도 함께 닫는다.
   // 2개 이상 담고 싶으면 드롭다운 안의 -/+ 스테퍼(changeQty)로 닫지 않고 조절한다.
+  // 담긴 뒤 검색어가 바로 지워져 화면이 바뀌므로, 실제로 담겼다는 걸 알려주는 짧은 토스트를 띄운다.
   const quickAdd = useCallback(
-    (productId: string) => {
+    (productId: string, name: string) => {
       changeQty(productId, 1);
       setQuery('');
+      setToastMessage(`${name} 담았어요`);
+      if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+      toastTimeoutRef.current = setTimeout(() => setToastMessage(null), 1500);
     },
     [changeQty],
   );
@@ -323,6 +335,18 @@ export default function Order() {
         ) : null}
       </View>
 
+      {toastMessage ? (
+        <View
+          pointerEvents="none"
+          className="absolute left-0 right-0 z-20 items-center"
+          style={{ top: insets.top + 76 }}
+        >
+          <View className="rounded-full bg-ink/80 px-4 py-2">
+            <Text className="text-paper text-sm font-medium">{toastMessage}</Text>
+          </View>
+        </View>
+      ) : null}
+
       <View className="mt-2.5 px-4" style={{ gap: 8 }}>
         <View className="flex-row flex-wrap" style={{ gap: 8 }}>
           <Chip
@@ -493,12 +517,12 @@ const SuggestionRow = memo(function SuggestionRow({
   product: OrderProduct;
   qty: number;
   onChangeQty: (id: string, delta: number) => void;
-  onQuickAdd: (id: string) => void;
+  onQuickAdd: (id: string, name: string) => void;
 }) {
   return (
     <View className="flex-row items-center border-b border-line px-3 py-2">
       <Pressable
-        onPress={() => onQuickAdd(product.id)}
+        onPress={() => onQuickAdd(product.id, product.name)}
         className="flex-1 pr-2 active:opacity-60"
         accessibilityRole="button"
         accessibilityLabel={`${product.name} 1개 담기`}
