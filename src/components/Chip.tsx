@@ -15,7 +15,7 @@ export default function Chip({
     <Pressable
       onPress={onPress}
       onLongPress={onLongPress}
-      className={`justify-center rounded-full border px-3.5 py-1.5 ${
+      className={`self-start justify-center rounded-full border px-3.5 py-1.5 ${
         active ? 'border-primary bg-primary' : 'border-line bg-paper'
       }`}
     >
