@@ -18,6 +18,7 @@ import {
 import ImageCandidatesModal from '@/components/ImageCandidatesModal';
 import PhotoCandidatesModal from '@/components/PhotoCandidatesModal';
 import { hasImageSearchKeys, lookupBarcode, searchProductImageCandidates } from '@/lib/barcode-lookup';
+import { uploadPhotoToBucket } from '@/lib/storage';
 import { autoFormatDate, formatDate, isValidDateStr } from '@/lib/dates';
 import { cancelExpiryAlerts, scheduleExpiryAlerts } from '@/lib/notifications';
 import { deleteProduct, getProduct, listProducts, newId, saveProduct } from '@/lib/repo';
@@ -241,9 +242,13 @@ export default function ProductForm() {
       <ImageCandidatesModal
         visible={imageCandidates !== null}
         candidates={imageCandidates ?? []}
-        onSelect={(url) => {
-          setImageUri(url);
+        onSelect={async (url) => {
           setImageCandidates(null);
+          // 검색결과 원본 링크는 핫링크 차단·임시 링크 등으로 나중에 깨질 수 있어, 고르는 순간
+          // 우리 Storage로 재업로드해 안정적인 URL로 바꾼다. 실패하면 원본 링크라도 우선 보여준다.
+          const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
+          const hosted = await uploadPhotoToBucket(url, 'product-images', path, true);
+          setImageUri(hosted ?? url);
         }}
         onClose={() => setImageCandidates(null)}
       />
