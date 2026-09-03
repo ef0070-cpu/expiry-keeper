@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { upsertBarcodeCatalog } from './barcode-catalog';
 import { mergeCatalogIntoProducts, type OrderCatalogRow } from './order-catalog-merge';
-import { submitNewOrderProduct, submitPhotoCandidate } from './order-report';
+import { submitNewOrderProduct } from './order-report';
+import { submitPhotoCandidateIfChanged } from './photo-candidates';
 import { newId } from './repo';
 import { supabase } from './supabase';
 import { OrderCart, OrderProduct } from './order-types';
@@ -13,7 +14,6 @@ const PRODUCTS_KEY = 'orderProducts:v1';
 const CATEGORIES_KEY = 'orderCategories:v1';
 const CART_KEY = 'orderCart:v1';
 const REMOVED_BARCODES_KEY = 'removedOrderBarcodes:v1';
-const SUBMITTED_PHOTO_KEY = 'submittedPhotoCandidates:v1';
 const CATEGORY_OVERRIDE_KEY = 'orderCategoryOverrides:v1';
 
 const DEFAULT_CATEGORIES = ['바', '콘', '튜브', '샌드/기타', '홈/컵'];
@@ -38,25 +38,6 @@ export async function getOrderProduct(id: string): Promise<OrderProduct | null> 
 export async function listOrderProductsByBarcode(barcode: string): Promise<OrderProduct[]> {
   const items = await listOrderProducts();
   return items.filter((p) => p.barcode === barcode);
-}
-
-async function getSubmittedPhotoCandidates(): Promise<Map<string, string>> {
-  const raw = await AsyncStorage.getItem(SUBMITTED_PHOTO_KEY);
-  return new Map(Object.entries(raw ? (JSON.parse(raw) as Record<string, string>) : {}));
-}
-
-async function recordSubmittedPhotoCandidate(barcode: string, photoUri: string): Promise<void> {
-  const map = await getSubmittedPhotoCandidates();
-  map.set(barcode, photoUri);
-  await AsyncStorage.setItem(SUBMITTED_PHOTO_KEY, JSON.stringify(Object.fromEntries(map)));
-}
-
-/** 이 바코드에 마지막으로 제출한 사진과 다를 때만 새 후보로 제출한다 (같은 사진 반복 저장 시 후보 중복 방지). */
-async function submitPhotoCandidateIfChanged(barcode: string, photoUri: string): Promise<void> {
-  const map = await getSubmittedPhotoCandidates();
-  if (map.get(barcode) === photoUri) return;
-  const submitted = await submitPhotoCandidate(barcode, photoUri);
-  if (submitted) await recordSubmittedPhotoCandidate(barcode, photoUri);
 }
 
 /**

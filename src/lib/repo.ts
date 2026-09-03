@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { upsertBarcodeCatalog } from './barcode-catalog';
+import { submitPhotoCandidateIfChanged } from './photo-candidates';
 import { getCachedAppMode } from './settings';
 import { uploadPhotoToBucket } from './storage';
 import { supabase } from './supabase';
@@ -162,14 +163,21 @@ export async function getProduct(id: string): Promise<Product | null> {
   return items.find((p) => p.id === id) ?? null;
 }
 
-/** 추가/수정 겸용 저장 */
+/**
+ * 추가/수정 겸용 저장. 공용 바코드 캐시(barcode_catalog)에도 반영하고, 사진이 이전 제출과
+ * 달라졌으면 사진 후보로도 접수한다(둘 다 best-effort). barcode_catalog 반영을 기다린 뒤에
+ * 후보를 제출해야 한다 — 순서가 바뀌면 대표 사진 재계산이 대상 행을 못 찾아 유실된다.
+ */
 export async function saveProduct(p: Product): Promise<Product> {
   if (supabase) {
     const uploaded = await uploadImageIfNeeded(p);
     const { error } = await supabase.from('products').upsert(toRow(uploaded));
     if (error) throw new Error(error.message);
     // 실패해도 상품 저장 자체는 이미 끝났으니 조용히 무시한다 (best-effort).
-    upsertBarcodeCatalog(uploaded.barcode, uploaded.name, uploaded.imageUri).catch(() => {});
+    await upsertBarcodeCatalog(uploaded.barcode, uploaded.name, uploaded.imageUri).catch(() => {});
+    if (uploaded.barcode && uploaded.imageUri) {
+      submitPhotoCandidateIfChanged(uploaded.barcode, uploaded.imageUri).catch(() => {});
+    }
     return uploaded;
   }
   const items = await localList();

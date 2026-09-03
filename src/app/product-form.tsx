@@ -16,6 +16,7 @@ import {
   View,
 } from 'react-native';
 import ImageCandidatesModal from '@/components/ImageCandidatesModal';
+import PhotoCandidatesModal from '@/components/PhotoCandidatesModal';
 import { hasImageSearchKeys, lookupBarcode, searchProductImageCandidates } from '@/lib/barcode-lookup';
 import { autoFormatDate, formatDate, isValidDateStr } from '@/lib/dates';
 import { cancelExpiryAlerts, scheduleExpiryAlerts } from '@/lib/notifications';
@@ -51,6 +52,7 @@ export default function ProductForm() {
   const [busy, setBusy] = useState(false);
   const [searching, setSearching] = useState(false);
   const [imageCandidates, setImageCandidates] = useState<string[] | null>(null);
+  const [showPhotoCandidates, setShowPhotoCandidates] = useState(false);
 
   const [barcode, setBarcode] = useState<string | null>(params.barcode ?? null);
   // 수정 시 원래 등록됐던 모드를 유지 (현재 화면 모드로 덮어쓰지 않음)
@@ -245,6 +247,11 @@ export default function ProductForm() {
         }}
         onClose={() => setImageCandidates(null)}
       />
+      <PhotoCandidatesModal
+        visible={showPhotoCandidates}
+        barcode={barcode ?? ''}
+        onClose={() => setShowPhotoCandidates(false)}
+      />
       <ScrollView
         className="flex-1 bg-bg"
         contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
@@ -309,6 +316,11 @@ export default function ProductForm() {
                 </Pressable>
               ) : null}
             </View>
+            {barcode ? (
+              <Pressable onPress={() => setShowPhotoCandidates(true)} className="mt-1.5">
+                <Text className="text-muted text-xs underline">사진 후보 보기 / 투표</Text>
+              </Pressable>
+            ) : null}
           </View>
         </View>
 
