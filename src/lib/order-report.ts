@@ -14,9 +14,9 @@ function uploadReportPhoto(uri: string): Promise<string | null> {
  * 직접 확인 후 order-seed-data.ts를 고쳐 앱 업데이트로 반영한다 (별도 관리자 화면 없음).
  *
  * isCopyright가 true면(저작권 신고) 통지-삭제 원칙에 따라 관리자 승인을 기다리지 않고
- * 접수 즉시 해당 바코드의 카탈로그 사진을 초기화한다(flagCatalogPhoto의 초기화 로직과 동일
- * 패턴 재사용). 신고 자체는 is_copyright:true로 기록되어 관리자가 나중에 대시보드에서
- * 따로 확인할 수 있다.
+ * 접수 즉시 order_catalog_photos에서 해당 사진 후보 행을 삭제해 대표 사진 재계산 트리거가
+ * 다음 순위 후보로 자동 교체하게 한다. 신고 자체는 is_copyright:true로 기록되어 관리자가
+ * 나중에 대시보드에서 따로 확인할 수 있다.
  */
 export async function reportOrderProductIssue(
   product: OrderProduct,
@@ -60,7 +60,7 @@ export async function reportOrderProductIssue(
 export async function submitNewOrderProduct(product: OrderProduct): Promise<void> {
   if (!supabase) return;
   try {
-    await supabase.from('order_product_reports').insert({
+    const { error } = await supabase.from('order_product_reports').insert({
       kind: 'new',
       status: 'approved',
       barcode: product.barcode,
@@ -70,6 +70,7 @@ export async function submitNewOrderProduct(product: OrderProduct): Promise<void
       category: product.category,
       photo_uri: null,
     });
+    if (error) return;
     // order_catalog 행이 생성된 뒤에 사진 후보를 넣어야 한다 — 먼저 넣으면 대표 사진
     // 재계산 UPDATE가 대상 행을 못 찾아 조용히 유실된다.
     if (product.imageUri && product.barcode) {
@@ -83,16 +84,20 @@ export async function submitNewOrderProduct(product: OrderProduct): Promise<void
 /**
  * 사진 후보를 order_catalog_photos에 추가한다. 검토 없이 즉시 접수되지만, 대표 사진이 되려면
  * 다른 사용자의 좋아요를 받아야 한다(대표 선정은 DB 트리거가 득표수로 자동 결정, 여기선 후보만 추가).
- * best-effort — 실패해도 로컬 저장 흐름을 막지 않는다.
+ * best-effort — 실패해도 로컬 저장 흐름을 막지 않는다. 성공 여부는 반환값으로 알려준다
+ * (호출자가 "제출 완료"를 로컬에 기록할지 판단할 수 있도록).
  */
-export async function submitPhotoCandidate(barcode: string, photoUri: string): Promise<void> {
-  if (!supabase) return;
+export async function submitPhotoCandidate(barcode: string, photoUri: string): Promise<boolean> {
+  if (!supabase) return false;
   try {
     const photoUrl = await uploadReportPhoto(photoUri);
-    if (!photoUrl) return;
-    await supabase.from('order_catalog_photos').insert({ barcode, photo_uri: photoUrl });
+    if (!photoUrl) return false;
+    const { error } = await supabase
+      .from('order_catalog_photos')
+      .insert({ barcode, photo_uri: photoUrl });
+    return !error;
   } catch {
-    // best-effort
+    return false;
   }
 }
 

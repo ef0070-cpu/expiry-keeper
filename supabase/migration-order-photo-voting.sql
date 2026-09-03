@@ -13,6 +13,19 @@ create table if not exists public.order_catalog_photos (
 );
 create index if not exists order_catalog_photos_barcode_idx on public.order_catalog_photos(barcode);
 
+-- 이미 order_catalog에 채워져 있던 388개 기존 사진을 첫 후보로 백필한다.
+-- 이게 없으면 새로 등록되는 0표짜리 후보가 그 바코드의 유일한 후보가 되어
+-- 기존 좋은 사진을 즉시 대체해버린다 (이 기능이 막으려던 바로 그 문제).
+-- submitted_by는 대시보드에서 SQL을 직접 실행하는 컨텍스트라 auth.uid()가 null이라
+-- sentinel uuid로 채운다 (이 컬럼엔 FK가 없어 가능).
+insert into public.order_catalog_photos (barcode, photo_uri, submitted_by)
+select barcode, image_uri, '00000000-0000-0000-0000-000000000000'::uuid
+from public.order_catalog
+where image_uri is not null
+  and not exists (
+    select 1 from public.order_catalog_photos p where p.barcode = order_catalog.barcode
+  );
+
 alter table public.order_catalog_photos enable row level security;
 
 drop policy if exists "order_catalog_photos select" on public.order_catalog_photos;
@@ -24,10 +37,12 @@ create policy "order_catalog_photos insert" on public.order_catalog_photos
   for insert to authenticated with check (auth.uid() = submitted_by);
 
 -- 일반 update 정책은 없음: 후보 내용을 고칠 수 없다.
--- 저작권 삭제는 신고자 본인이 앱에서 즉시 지울 수 있어야 하므로 delete 정책만 추가한다.
-drop policy if exists "order_catalog_photos delete own submission" on public.order_catalog_photos;
-create policy "order_catalog_photos delete own submission" on public.order_catalog_photos
-  for delete to authenticated using (auth.uid() = submitted_by);
+-- 삭제(저작권 신고 등)는 제출자 본인 여부와 무관하게 인증된 사용자 누구나 즉시 처리할 수 있다 —
+-- 신고자가 원 제출자가 아닌 게 일반적이므로 submitted_by로 제한하면 삭제가 조용히 실패한다.
+-- 별도 백엔드 검증 함수가 없는 이 기능의 기존 트레이드오프와 동일한 성격이다.
+drop policy if exists "order_catalog_photos delete" on public.order_catalog_photos;
+create policy "order_catalog_photos delete" on public.order_catalog_photos
+  for delete to authenticated using (true);
 
 create table if not exists public.order_photo_votes (
   photo_id uuid not null references public.order_catalog_photos(id) on delete cascade,

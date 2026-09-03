@@ -55,8 +55,8 @@ async function recordSubmittedPhotoCandidate(barcode: string, photoUri: string):
 async function submitPhotoCandidateIfChanged(barcode: string, photoUri: string): Promise<void> {
   const map = await getSubmittedPhotoCandidates();
   if (map.get(barcode) === photoUri) return;
-  await submitPhotoCandidate(barcode, photoUri);
-  await recordSubmittedPhotoCandidate(barcode, photoUri);
+  const submitted = await submitPhotoCandidate(barcode, photoUri);
+  if (submitted) await recordSubmittedPhotoCandidate(barcode, photoUri);
 }
 
 /**

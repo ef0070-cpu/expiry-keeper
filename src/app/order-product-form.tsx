@@ -360,7 +360,7 @@ export default function OrderProductForm() {
               </Pressable>
             ) : null}
             <Text className="text-muted mt-1.5 text-xs">
-              이 사진은 같은 상품을 등록하는 다른 매장에도 함께 보여질 수 있어요
+              이 사진은 다른 사용자들의 투표를 통해 대표 사진으로 채택될 수 있어요
             </Text>
           </View>
         </View>
