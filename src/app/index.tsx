@@ -269,7 +269,8 @@ export default function Dashboard() {
           horizontal
           showsHorizontalScrollIndicator={false}
           className="mt-2.5"
-          contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
+          style={{ height: 40, flexGrow: 0 }}
+          contentContainerStyle={{ paddingHorizontal: 16, gap: 8, alignItems: 'center' }}
         >
           <Chip
             label="전체"
