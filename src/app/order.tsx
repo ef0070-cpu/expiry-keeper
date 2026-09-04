@@ -258,11 +258,12 @@ export default function Order() {
     return searchOrderProducts(assignedProducts, q).slice(0, 8);
   }, [products, fridgeSectionByProductId, quickSearchQuery]);
 
+  // 연달아 여러 상품을 추가할 수 있도록 추가해도 모달을 닫지 않는다 — 검색어만 비워서
+  // 바로 다음 상품을 검색할 수 있게 한다. 닫기는 모달의 X 버튼으로 직접 눌러야 한다.
   const onAddToFridge = useCallback(
     async (productId: string) => {
       if (!activeStoreId) return;
       setFridgeAssignments(await assignToFridgeSection(activeStoreId, productId, activeSection));
-      setShowAddToFridge(false);
       setFridgeSearchQuery('');
     },
     [activeStoreId, activeSection],
@@ -986,7 +987,23 @@ const AddToFridgeModal = memo(function AddToFridgeModal({
           className="w-full rounded-2xl bg-paper p-4"
           style={{ maxHeight: '75%' }}
         >
-          <Text className="text-ink mb-2 text-base font-bold">'{section}' 구역에 상품 추가</Text>
+          <View className="mb-2 flex-row items-center justify-between">
+            <Text className="text-ink flex-1 text-base font-bold" numberOfLines={1}>
+              '{section}' 구역에 상품 추가
+            </Text>
+            <Pressable
+              onPress={onClose}
+              hitSlop={8}
+              className="ml-2 h-7 w-7 items-center justify-center"
+              accessibilityRole="button"
+              accessibilityLabel="닫기"
+            >
+              <MaterialCommunityIcons name="close" size={20} color="#888888" />
+            </Pressable>
+          </View>
+          <Text className="text-muted mb-2 text-xs">
+            상품을 탭하면 바로 추가되고, 계속 다른 상품을 검색해 추가할 수 있어요.
+          </Text>
           <TextInput
             className="text-ink mb-2 rounded-xl border border-line bg-bg px-3 py-2 text-sm"
             placeholder="상품명 검색"
@@ -1013,9 +1030,6 @@ const AddToFridgeModal = memo(function AddToFridgeModal({
               <Text className="text-muted py-6 text-center text-sm">검색 결과가 없습니다</Text>
             }
           />
-          <Pressable onPress={onClose} className="mt-3 items-center py-2">
-            <Text className="text-muted text-sm">닫기</Text>
-          </Pressable>
         </Pressable>
       </Pressable>
     </Modal>
