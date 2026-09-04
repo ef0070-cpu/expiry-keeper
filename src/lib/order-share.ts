@@ -9,10 +9,11 @@ export function formatOrderDate(date: Date): string {
 export function buildOrderShareText(
   cart: OrderCart,
   products: OrderProduct[],
-  branch: string,
+  branch: string | null,
   date: Date,
 ): string {
-  const lines = [`[아이스크림 발주_ ${branch}- ${formatOrderDate(date)}]`];
+  const header = branch ? `${formatOrderDate(date)} / ${branch}` : formatOrderDate(date);
+  const lines = [`[${header}]`];
   let total = 0;
   Object.entries(cart).forEach(([id, qty]) => {
     if (qty <= 0) return;

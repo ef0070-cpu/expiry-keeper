@@ -1,4 +1,5 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Directory, File, Paths } from 'expo-file-system';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
@@ -31,6 +32,22 @@ import { deletePhotoCandidate, reportOrderProductIssue } from '@/lib/order-repor
 import { clearSubmittedPhotoCandidate } from '@/lib/photo-candidates';
 import { uploadPhotoToBucket } from '@/lib/storage';
 import { OrderProduct, OrderStatus } from '@/lib/order-types';
+
+/** 카메라/앨범에서 고른 사진은 임시 캐시 경로(uri)를 가리켜서 앱 재시작이나 OS의 저장공간
+ * 정리로 사라질 수 있다 — 저장하기 전에 앱 전용 영구 디렉터리로 복사해 안정적인 uri로 바꾼다.
+ * 복사에 실패하면(드묾) 원본 uri라도 우선 쓴다. */
+function persistLocalPhoto(uri: string): string {
+  try {
+    const ext = uri.split('.').pop()?.split('?')[0]?.toLowerCase() || 'jpg';
+    const dir = new Directory(Paths.document, 'product-photos');
+    dir.create({ intermediates: true, idempotent: true });
+    const dest = new File(dir, `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`);
+    new File(uri).copy(dest);
+    return dest.uri;
+  } catch {
+    return uri;
+  }
+}
 
 function errorMessage(e: unknown): string {
   if (e instanceof Error) return e.message;
@@ -131,7 +148,7 @@ export default function OrderProductForm() {
       result = await ImagePicker.launchImageLibraryAsync(options);
     }
     if (!result.canceled && result.assets[0]) {
-      onPicked(result.assets[0].uri);
+      onPicked(persistLocalPhoto(result.assets[0].uri));
     }
   };
 

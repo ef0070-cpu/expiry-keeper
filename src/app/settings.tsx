@@ -3,10 +3,8 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { lookupBarcode } from '@/lib/barcode-lookup';
 import { ddayLabel } from '@/lib/dates';
 import { rescheduleAllExpiryAlerts } from '@/lib/notifications';
-import { listProducts, saveProduct } from '@/lib/repo';
 import {
   ALERT_OFFSETS,
   AppMode,
@@ -28,10 +26,6 @@ export default function Settings() {
   const { count, hour, minute } = useAlertSettings();
   const dateInputMethod = useDateInputMethod();
   const [deleting, setDeleting] = useState(false);
-  const [rescanning, setRescanning] = useState(false);
-  const [rescanProgress, setRescanProgress] = useState<{ done: number; total: number } | null>(
-    null,
-  );
   const insets = useSafeAreaInsets();
 
   const deleteAccount = () => {
@@ -54,52 +48,6 @@ export default function Settings() {
               return;
             }
             await supabase.auth.signOut();
-          },
-        },
-      ],
-    );
-  };
-
-  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-  const rescanImages = async () => {
-    const products = await listProducts();
-    const targets = products.filter(
-      (p) => p.barcode?.trim() && (!p.imageUri || p.imageUri.startsWith('http')),
-    );
-    if (targets.length === 0) {
-      Alert.alert('재검색할 상품 없음', '조건에 맞는 상품이 없습니다.');
-      return;
-    }
-    Alert.alert(
-      '사진 일괄 재검색',
-      `${targets.length}개 상품을 대상으로 새 로직으로 사진을 다시 찾습니다. 직접 등록한 사진은 바뀌지 않습니다. 진행할까요?`,
-      [
-        { text: '취소', style: 'cancel' },
-        {
-          text: '진행',
-          onPress: async () => {
-            setRescanning(true);
-            setRescanProgress({ done: 0, total: targets.length });
-            try {
-              let updated = 0;
-              for (let i = 0; i < targets.length; i++) {
-                const p = targets[i];
-                const info = await lookupBarcode(p.barcode!.trim());
-                if (info.imageUrl && info.imageUrl !== p.imageUri) {
-                  await saveProduct({ ...p, imageUri: info.imageUrl });
-                  updated++;
-                }
-                setRescanProgress({ done: i + 1, total: targets.length });
-                await sleep(250);
-              }
-              Alert.alert('완료', `${targets.length}개 중 ${updated}개 사진이 업데이트됐습니다.`);
-            } catch (e) {
-              Alert.alert('재검색 실패', e instanceof Error ? e.message : '알 수 없는 오류');
-            } finally {
-              setRescanning(false);
-              setRescanProgress(null);
-            }
           },
         },
       ],
@@ -227,17 +175,6 @@ export default function Settings() {
               label={mode === 'home' ? '가족 공유 (팀 설정)' : '팀 설정'}
               onPress={() => router.push('/team')}
             />
-            <View className="h-px bg-line" />
-            {rescanning ? (
-              <View className="flex-row items-center justify-center p-4">
-                <ActivityIndicator color="#CC2222" size="small" />
-                <Text className="text-muted ml-2 text-sm">
-                  사진 재검색 중... {rescanProgress ? `${rescanProgress.done}/${rescanProgress.total}` : ''}
-                </Text>
-              </View>
-            ) : (
-              <LinkRow icon="image-search-outline" label="사진 일괄 재검색" onPress={rescanImages} />
-            )}
           </>
         ) : null}
       </View>

@@ -36,6 +36,7 @@ export default function Scan() {
   const [looking, setLooking] = useState(false);
   const [manualEntryVisible, setManualEntryVisible] = useState(false);
   const [manualBarcode, setManualBarcode] = useState('');
+  const [torchOn, setTorchOn] = useState(false);
   const scannedRef = useRef(false);
   const insets = useSafeAreaInsets();
   const layoutRef = useRef({ width: 0, height: 0 });
@@ -64,10 +65,28 @@ export default function Scan() {
     return cx >= left && cx <= right && cy >= top && cy <= bottom;
   };
 
+  // GS1 표준 체크섬(EAN-13/EAN-8/UPC-A 공통 알고리즘). 카메라가 숫자를 잘못 읽어도
+  // 자릿수만 맞으면 그대로 통과되던 문제를 막는다 — 체크섬이 틀리면 오인식으로 보고
+  // 버린다(다음 프레임에서 다시 시도됨). UPC-E는 6/8자리 압축 포맷이라 체크섬 검증에
+  // 별도 확장 로직이 필요해 자릿수 검사만 유지한다.
+  const hasValidChecksum = (data: string) => {
+    const digits = data.split('').map(Number);
+    const check = digits[digits.length - 1];
+    const body = digits.slice(0, -1);
+    let sum = 0;
+    body.forEach((d, i) => {
+      const posFromRight = body.length - i; // 체크 디지트 바로 앞이 1
+      sum += d * (posFromRight % 2 === 1 ? 3 : 1);
+    });
+    return (10 - (sum % 10)) % 10 === check;
+  };
+
   const isValidBarcode = (type: string, data: string) => {
     if (!/^\d+$/.test(data)) return false;
     const lengths = VALID_LENGTHS[type];
-    return !lengths || lengths.includes(data.length);
+    if (lengths && !lengths.includes(data.length)) return false;
+    if (type === 'ean13' || type === 'ean8' || type === 'upc_a') return hasValidChecksum(data);
+    return true;
   };
 
   const onScanned = async ({ type, data, bounds }: BarcodeScanningResult) => {
@@ -184,12 +203,29 @@ export default function Scan() {
       <CameraView
         style={{ flex: 1 }}
         facing="back"
+        enableTorch={torchOn}
         onLayout={onLayout}
         barcodeScannerSettings={{
           barcodeTypes: [...PRODUCT_BARCODE_TYPES],
         }}
         onBarcodeScanned={onScanned}
       />
+
+      {/* 손전등 토글 — 어두운 냉동고/창고에서 인식이 잘 안 될 때 사용 */}
+      <View className="absolute left-4" style={{ top: Math.max(insets.top, 16) + 8 }}>
+        <Pressable
+          onPress={() => setTorchOn((v) => !v)}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={torchOn ? '손전등 끄기' : '손전등 켜기'}
+        >
+          <MaterialCommunityIcons
+            name={torchOn ? 'flashlight' : 'flashlight-off'}
+            size={24}
+            color="#FFFFFF"
+          />
+        </Pressable>
+      </View>
 
       {/* 직접 입력(바코드 숫자 수기 입력) 트리거 — 카메라 인식이 잘 안 될 때 사용 */}
       <View

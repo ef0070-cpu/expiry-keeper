@@ -189,7 +189,7 @@ export default function Dashboard() {
       <Stack.Screen
         options={{
           headerRight: () => (
-            <View className="flex-row items-center" style={{ gap: 10 }}>
+            <View className="flex-row items-center" style={{ gap: 8 }}>
               {mode === 'retail' ? (
                 <HeaderIcon
                   icon="calculator-variant-outline"
@@ -384,13 +384,13 @@ function HeaderIcon({
   return (
     <Pressable
       onPress={onPress}
-      hitSlop={6}
+      hitSlop={8}
       className="items-center"
       accessibilityRole="button"
       accessibilityLabel={label}
     >
-      <MaterialCommunityIcons name={icon} size={22} color={color} />
-      <Text className="mt-0.5 text-[9px] leading-none" style={{ color }}>
+      <MaterialCommunityIcons name={icon} size={27} color={color} />
+      <Text className="mt-0.5 text-[10px] leading-none" style={{ color }}>
         {label}
       </Text>
     </Pressable>

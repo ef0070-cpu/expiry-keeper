@@ -3,35 +3,34 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Alert, FlatList, Pressable, Share, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Chip from '@/components/Chip';
 import {
   clearOrderCart,
+  getActiveStoreId,
   getOrderCart,
   listOrderProducts,
+  listStores,
   setOrderCartQuantity,
   writeOrderCart,
 } from '@/lib/order-repo';
 import { buildOrderShareText } from '@/lib/order-share';
 import { OrderCart, OrderProduct } from '@/lib/order-types';
-import { listProductCategories } from '@/lib/repo';
 
 export default function OrderCartScreen() {
   const insets = useSafeAreaInsets();
   const [cart, setCart] = useState<OrderCart>({});
   const [products, setProducts] = useState<OrderProduct[]>([]);
-  const [branches, setBranches] = useState<string[]>([]);
-  const [selectedBranch, setSelectedBranch] = useState<string | null>(null);
+  const [storeName, setStoreName] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const [cartData, productList, branchList] = await Promise.all([
+    const [cartData, productList, activeStoreId, stores] = await Promise.all([
       getOrderCart(),
       listOrderProducts(),
-      listProductCategories(),
+      getActiveStoreId(),
+      listStores(),
     ]);
     setCart(cartData);
     setProducts(productList);
-    setBranches(branchList);
-    setSelectedBranch((prev) => prev ?? branchList[0] ?? null);
+    setStoreName(stores.find((s) => s.id === activeStoreId)?.name ?? null);
   }, []);
 
   useFocusEffect(
@@ -81,11 +80,7 @@ export default function OrderCartScreen() {
   };
 
   const share = async () => {
-    if (!selectedBranch) {
-      Alert.alert('매장 없음', '재고관리 화면에서 매장(카테고리)을 먼저 등록해 주세요.');
-      return;
-    }
-    const text = buildOrderShareText(cart, products, selectedBranch, new Date());
+    const text = buildOrderShareText(cart, products, storeName, new Date());
     try {
       const result = await Share.share({ message: text });
       // Android는 공유 대상 앱에서 실제로 전송을 완료했는지 알려주지 않는다(공유 시트를
@@ -116,26 +111,6 @@ export default function OrderCartScreen() {
           <MaterialCommunityIcons name="close" size={22} color="#1A1A1A" />
         </Pressable>
       </View>
-      <View className="border-b border-line bg-paper px-4 pb-3 pt-1">
-        <Text className="text-ink mb-2 text-sm font-bold">매장</Text>
-        {branches.length > 0 ? (
-          <View className="flex-row flex-wrap" style={{ gap: 8 }}>
-            {branches.map((b) => (
-              <Chip
-                key={b}
-                label={b}
-                active={selectedBranch === b}
-                onPress={() => setSelectedBranch(b)}
-              />
-            ))}
-          </View>
-        ) : (
-          <Text className="text-muted text-sm">
-            재고관리 화면에서 매장(카테고리)을 먼저 등록해 주세요.
-          </Text>
-        )}
-      </View>
-
       <FlatList
         data={items}
         keyExtractor={(item) => item.product.id}

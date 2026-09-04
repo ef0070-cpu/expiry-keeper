@@ -196,7 +196,14 @@ export async function setActiveStoreId(id: string | null): Promise<void> {
 // ---------- 냉장고 구역 (전체 공용, 편집 가능) ----------
 
 const FRIDGE_SECTIONS_KEY = 'fridgeSections:v1';
-const DEFAULT_FRIDGE_SECTIONS: FridgeSection[] = ['600바', '1400콘류', '1400샌드류', '홈류'];
+const DEFAULT_FRIDGE_SECTIONS: FridgeSection[] = [
+  '600바-1',
+  '600바-2',
+  '800바/1000바',
+  '콘류',
+  '샌드류',
+  '홈류/상자류',
+];
 
 export async function listFridgeSections(): Promise<FridgeSection[]> {
   const raw = await AsyncStorage.getItem(FRIDGE_SECTIONS_KEY);

@@ -3,7 +3,6 @@ import { Image } from 'expo-image';
 import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, FlatList, Modal, Pressable, Text, TextInput, View } from 'react-native';
-import DraggableFlatList, { RenderItemParams } from 'react-native-draggable-flatlist';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Chip from '@/components/Chip';
 import Thumbnail from '@/components/Thumbnail';
@@ -68,6 +67,7 @@ export default function Order() {
   const [showFridgeSectionModal, setShowFridgeSectionModal] = useState(false);
   const [showAddToFridge, setShowAddToFridge] = useState(false);
   const [movingProduct, setMovingProduct] = useState<OrderProduct | null>(null);
+  const [settingsProduct, setSettingsProduct] = useState<OrderProduct | null>(null);
   const [fridgeSearchQuery, setFridgeSearchQuery] = useState('');
   const [quickSearchQuery, setQuickSearchQuery] = useState('');
   const [query, setQuery] = useState('');
@@ -78,6 +78,7 @@ export default function Order() {
   const [seeding, setSeeding] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [suggestionsCollapsed, setSuggestionsCollapsed] = useState(false);
+  const [showQuickHelp, setShowQuickHelp] = useState(false);
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scanParams = useLocalSearchParams<{ scannedBarcode?: string; nonce?: string }>();
 
@@ -289,6 +290,19 @@ export default function Order() {
     setFridgeSections(await reorderFridgeSections(sections));
   }, []);
 
+  // 드래그가 좁은 화면에서 조작하기 어려워, 화살표로 인접한 두 상품의 순서를 바꾸는 방식으로 대체.
+  // direction은 좌우(±1)뿐 아니라 3열 그리드 기준 위/아래(±3) 이동에도 쓰인다.
+  const onMoveFridgeProduct = useCallback(
+    (index: number, direction: number) => {
+      const nextIndex = index + direction;
+      if (nextIndex < 0 || nextIndex >= fridgeProducts.length) return;
+      const next = [...fridgeProducts];
+      [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+      onReorderFridgeProducts(next);
+    },
+    [fridgeProducts, onReorderFridgeProducts],
+  );
+
   const totalCount = Object.values(cart).reduce((sum, qty) => sum + qty, 0);
 
   // 낙관적 업데이트: 로컬 state 기준으로 즉시 반영하고 저장은 fire-and-forget —
@@ -446,18 +460,17 @@ export default function Order() {
     [load, onChangeStatus],
   );
 
-  // '이 구역에서 빼기'는 타일의 휴지통 아이콘으로, '상태 변경'은 빠른발주에서 불필요해
-  // 제외했다(검색발주 쪽 onLongPressProduct에는 그대로 남아있음).
-  const onLongPressFridgeTile = useCallback((p: OrderProduct) => {
-    Alert.alert(p.name, '어떻게 처리할까요?', [
-      { text: '다른 구역으로 이동', onPress: () => setMovingProduct(p) },
-      {
-        text: '상품수정',
-        onPress: () => router.push({ pathname: '/order-product-form', params: { id: p.id } }),
-      },
-      { text: '취소', style: 'cancel' },
-    ]);
-  }, []);
+  const onEditSettingsProduct = useCallback(() => {
+    if (!settingsProduct) return;
+    router.push({ pathname: '/order-product-form', params: { id: settingsProduct.id } });
+    setSettingsProduct(null);
+  }, [settingsProduct]);
+
+  const onMoveSettingsProduct = useCallback(() => {
+    if (!settingsProduct) return;
+    setMovingProduct(settingsProduct);
+    setSettingsProduct(null);
+  }, [settingsProduct]);
 
   const onMoveFridgeTile = useCallback(
     async (section: FridgeSection) => {
@@ -540,15 +553,45 @@ export default function Order() {
           <MaterialCommunityIcons name="chevron-down" size={16} color="#888888" />
         </Pressable>
 
-        {mode === 'quick' && activeStoreId && activeSection ? (
-          <Pressable
-            onPress={() => setShowAddToFridge(true)}
-            className="h-9 w-9 items-center justify-center rounded-full border border-line bg-paper active:opacity-70"
-            accessibilityRole="button"
-            accessibilityLabel={`${activeSection} 구역에 상품 추가`}
-          >
-            <MaterialCommunityIcons name="plus" size={20} color="#1A1A1A" />
-          </Pressable>
+        {mode === 'quick' && activeStoreId ? (
+          <View className="flex-row items-center" style={{ gap: 8 }}>
+            {fridgeSections.length > 0 ? (
+              <Pressable
+                onPress={() => setShowQuickHelp(true)}
+                hitSlop={8}
+                className="h-9 w-9 items-center justify-center rounded-full border border-line bg-paper active:opacity-70"
+                accessibilityRole="button"
+                accessibilityLabel="빠른발주 사용법 보기"
+              >
+                <MaterialCommunityIcons name="help-circle-outline" size={20} color="#1A1A1A" />
+              </Pressable>
+            ) : null}
+            {activeSection ? (
+              <Pressable
+                onPress={() => setShowAddToFridge(true)}
+                className="flex-row items-center gap-1 rounded-full bg-primary px-3 py-1.5 active:opacity-80"
+                accessibilityRole="button"
+                accessibilityLabel={`${activeSection} 구역에 상품 진열하기`}
+              >
+                <MaterialCommunityIcons name="plus" size={18} color="#FFFFFF" />
+                <Text className="text-sm font-bold" style={{ color: '#FFFFFF' }}>
+                  상품 진열하기
+                </Text>
+              </Pressable>
+            ) : (
+              <Pressable
+                onPress={() => setShowFridgeSectionModal(true)}
+                className="flex-row items-center gap-1 rounded-full bg-primary px-3 py-1.5 active:opacity-80"
+                accessibilityRole="button"
+                accessibilityLabel="냉동고 구역 추가하기"
+              >
+                <MaterialCommunityIcons name="plus" size={18} color="#FFFFFF" />
+                <Text className="text-sm font-bold" style={{ color: '#FFFFFF' }}>
+                  구역 추가하기
+                </Text>
+              </Pressable>
+            )}
+          </View>
         ) : null}
       </View>
 
@@ -586,6 +629,12 @@ export default function Order() {
         </Pressable>
       </View>
 
+      <Text className="text-muted mx-4 mt-2 text-xs">
+        {mode === 'search'
+          ? '상품명으로 검색해서 담아요. 전체 상품 중에서 찾을 때 편해요.'
+          : '냉동고 진열 순서대로 탭해서 빠르게 담아요. 구역별로 정리해두면 실사할 때도 편해요.'}
+      </Text>
+
       {toastMessage ? (
         <View
           pointerEvents="none"
@@ -605,7 +654,7 @@ export default function Order() {
               <MaterialCommunityIcons name="magnify" size={20} color="#888888" />
               <TextInput
                 className="text-ink ml-2 flex-1 py-2.5 text-base"
-                placeholder="상품명, 브랜드, 바코드 검색"
+                placeholder="상품명을 입력하여 검색하세요"
                 placeholderTextColor="#BBBBBB"
                 value={query}
                 onChangeText={setQuery}
@@ -700,10 +749,6 @@ export default function Order() {
             ) : null}
           </View>
 
-          <Text className="text-muted mt-2 px-4 text-xs">
-            기본 제공되는 데이터입니다. 카테고리·사진·품명은 편하신 대로 자유롭게 수정하세요.
-          </Text>
-
           <FlatList
             key="search-list"
             data={filtered}
@@ -749,57 +794,6 @@ export default function Order() {
         </View>
       ) : (
         <>
-          <Text className="text-muted mx-4 mt-2 text-xs">
-            매장 냉동고에 따라 상품 구역을 설정하세요.
-          </Text>
-          <View className="mx-4 mt-2">
-            <View className="flex-row items-center rounded-xl border border-line bg-paper px-3">
-              <MaterialCommunityIcons name="magnify" size={18} color="#888888" />
-              <TextInput
-                className="text-ink ml-2 flex-1 py-2 text-sm"
-                placeholder="냉장고 진열 상품 중에서 찾기"
-                placeholderTextColor="#BBBBBB"
-                value={quickSearchQuery}
-                onChangeText={setQuickSearchQuery}
-              />
-            </View>
-            {quickSearchResults.length > 0 ? (
-              <View className="mt-1 overflow-hidden rounded-xl border border-line bg-paper">
-                {quickSearchResults.map((p) => (
-                  <Pressable
-                    key={p.id}
-                    onPress={() => {
-                      const section = fridgeSectionByProductId.get(p.id);
-                      if (section) setActiveSection(section);
-                      setQuickSearchQuery('');
-                    }}
-                    className="flex-row items-center justify-between border-b border-line px-3 py-2.5"
-                  >
-                    <Text className="text-ink flex-1 text-sm font-medium" numberOfLines={1}>
-                      {p.name}
-                    </Text>
-                    <Text className="text-muted ml-2 text-xs">
-                      🧊 {fridgeSectionByProductId.get(p.id)}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            ) : null}
-          </View>
-
-          <View className="mt-3 flex-row flex-wrap items-center gap-2 px-4">
-            {fridgeSections.map((s) => (
-              <Chip key={s} label={s} active={activeSection === s} onPress={() => setActiveSection(s)} />
-            ))}
-            <Pressable
-              onPress={() => setShowFridgeSectionModal(true)}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel="구역 관리"
-            >
-              <MaterialCommunityIcons name="pencil-outline" size={18} color="#888888" />
-            </Pressable>
-          </View>
           <FridgeSectionModal
             visible={showFridgeSectionModal}
             sections={fridgeSections}
@@ -809,54 +803,143 @@ export default function Order() {
             onReorder={onReorderFridgeSections}
             onClose={() => setShowFridgeSectionModal(false)}
           />
-          <DraggableFlatList
-            key="quick-grid"
-            data={fridgeProducts}
-            keyExtractor={(item) => item.id}
-            numColumns={3}
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={{ padding: 16, paddingBottom: 120 + insets.bottom }}
-            columnWrapperStyle={{ gap: 10 }}
-            onDragEnd={({ data }) => onReorderFridgeProducts(data)}
-            renderItem={({ item, drag, isActive }: RenderItemParams<OrderProduct>) => (
-              <FridgeTile
-                product={item}
-                qty={cart[item.id] ?? 0}
-                dragging={isActive}
-                onTap={() => changeQty(item.id, 1)}
-                onDecrement={() => changeQty(item.id, -1)}
-                onLongPress={() => onLongPressFridgeTile(item)}
-                onRemove={() => onRemoveFridgeTile(item)}
-                onDragStart={drag}
-              />
-            )}
-            ListEmptyComponent={
-              <Text className="text-muted mt-8 text-center text-sm">
-                이 구역에 등록된 상품이 없습니다. 위쪽 매장 선택 옆 + 버튼으로 추가해 보세요.
+          {fridgeSections.length === 0 ? (
+            <View className="mx-4 mt-6 items-center rounded-2xl border border-line bg-paper px-6 py-8">
+              <MaterialCommunityIcons name="fridge-outline" size={40} color="#CCCCCC" />
+              <Text className="text-ink mt-3 text-center text-base font-bold">
+                아직 냉동고 구역이 없어요
               </Text>
-            }
-          />
-          <AddToFridgeModal
-            visible={showAddToFridge}
-            section={activeSection}
-            allProducts={products}
-            assignedIds={new Set(fridgeAssignments.map((a) => a.productId))}
-            query={fridgeSearchQuery}
-            onChangeQuery={setFridgeSearchQuery}
-            onPick={onAddToFridge}
-            onClose={() => {
-              setShowAddToFridge(false);
-              setFridgeSearchQuery('');
-            }}
-          />
-          <MoveToSectionModal
-            visible={movingProduct !== null}
-            productName={movingProduct?.name ?? ''}
-            currentSection={movingProduct ? fridgeSectionByProductId.get(movingProduct.id) : undefined}
-            sections={fridgeSections}
-            onPick={onMoveFridgeTile}
-            onClose={() => setMovingProduct(null)}
-          />
+              <Text className="text-muted mt-2 text-center text-sm">
+                구역은 냉동고 진열 순서예요(예: 1400콘류, 바류).{'\n'}구역을 만들어두면 그 순서대로 빠르게
+                탭해서 발주할 수 있어요.
+              </Text>
+              <Pressable
+                onPress={() => setShowFridgeSectionModal(true)}
+                className="mt-4 rounded-xl bg-primary px-5 py-3 active:opacity-80"
+              >
+                <Text className="text-sm font-bold" style={{ color: '#FFFFFF' }}>
+                  + 구역 추가하기
+                </Text>
+              </Pressable>
+            </View>
+          ) : (
+            <>
+              <View className="mx-4 mt-2">
+                <View className="flex-row items-center rounded-xl border border-line bg-paper px-3">
+                  <MaterialCommunityIcons name="magnify" size={18} color="#888888" />
+                  <TextInput
+                    className="text-ink ml-2 flex-1 py-2 text-sm"
+                    placeholder="냉장고 진열 상품 중에서 찾기"
+                    placeholderTextColor="#BBBBBB"
+                    value={quickSearchQuery}
+                    onChangeText={setQuickSearchQuery}
+                  />
+                </View>
+                {quickSearchResults.length > 0 ? (
+                  <View className="mt-1 overflow-hidden rounded-xl border border-line bg-paper">
+                    {quickSearchResults.map((p) => (
+                      <Pressable
+                        key={p.id}
+                        onPress={() => {
+                          const section = fridgeSectionByProductId.get(p.id);
+                          if (section) setActiveSection(section);
+                          setQuickSearchQuery('');
+                        }}
+                        className="flex-row items-center justify-between border-b border-line px-3 py-2.5"
+                      >
+                        <Text className="text-ink flex-1 text-sm font-medium" numberOfLines={1}>
+                          {p.name}
+                        </Text>
+                        <Text className="text-muted ml-2 text-xs">
+                          🧊 {fridgeSectionByProductId.get(p.id)}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                ) : null}
+              </View>
+
+              <View className="mt-3 flex-row flex-wrap items-center gap-2 px-4">
+                {fridgeSections.map((s) => (
+                  <Chip key={s} label={s} active={activeSection === s} onPress={() => setActiveSection(s)} />
+                ))}
+                <Pressable
+                  onPress={() => setShowFridgeSectionModal(true)}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="구역 관리"
+                >
+                  <MaterialCommunityIcons name="pencil-outline" size={18} color="#888888" />
+                </Pressable>
+              </View>
+
+              <QuickOrderHelpModal visible={showQuickHelp} onClose={() => setShowQuickHelp(false)} />
+
+              <FlatList
+                key="quick-grid"
+                data={fridgeProducts}
+                keyExtractor={(item) => item.id}
+                numColumns={3}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={{ padding: 16, paddingBottom: 120 + insets.bottom }}
+                columnWrapperStyle={{ gap: 10 }}
+                renderItem={({ item, index }) => (
+                  <FridgeTile
+                    product={item}
+                    qty={cart[item.id] ?? 0}
+                    onTap={() => changeQty(item.id, 1)}
+                    onDecrement={() => changeQty(item.id, -1)}
+                    onOpenSettings={() => setSettingsProduct(item)}
+                    onRemove={() => onRemoveFridgeTile(item)}
+                    onMoveLeft={index % 3 > 0 ? () => onMoveFridgeProduct(index, -1) : undefined}
+                    onMoveRight={
+                      index % 3 < 2 && index + 1 < fridgeProducts.length
+                        ? () => onMoveFridgeProduct(index, 1)
+                        : undefined
+                    }
+                    onMoveUp={index - 3 >= 0 ? () => onMoveFridgeProduct(index, -3) : undefined}
+                    onMoveDown={
+                      index + 3 < fridgeProducts.length ? () => onMoveFridgeProduct(index, 3) : undefined
+                    }
+                  />
+                )}
+                ListEmptyComponent={
+                  <Text className="text-muted mt-8 text-center text-sm">
+                    이 구역에 등록된 상품이 없습니다. 위쪽 '상품 진열하기' 버튼으로 추가해 보세요.
+                  </Text>
+                }
+              />
+              <AddToFridgeModal
+                visible={showAddToFridge}
+                section={activeSection}
+                allProducts={products}
+                categories={categories}
+                assignedIds={new Set(fridgeAssignments.map((a) => a.productId))}
+                query={fridgeSearchQuery}
+                onChangeQuery={setFridgeSearchQuery}
+                onPick={onAddToFridge}
+                onClose={() => {
+                  setShowAddToFridge(false);
+                  setFridgeSearchQuery('');
+                }}
+              />
+              <MoveToSectionModal
+                visible={movingProduct !== null}
+                productName={movingProduct?.name ?? ''}
+                currentSection={movingProduct ? fridgeSectionByProductId.get(movingProduct.id) : undefined}
+                sections={fridgeSections}
+                onPick={onMoveFridgeTile}
+                onClose={() => setMovingProduct(null)}
+              />
+              <ProductSettingsModal
+                visible={settingsProduct !== null}
+                productName={settingsProduct?.name ?? ''}
+                onEdit={onEditSettingsProduct}
+                onMove={onMoveSettingsProduct}
+                onClose={() => setSettingsProduct(null)}
+              />
+            </>
+          )}
         </>
       )}
 
@@ -882,28 +965,40 @@ export default function Order() {
 const FridgeTile = memo(function FridgeTile({
   product,
   qty,
-  dragging,
   onTap,
   onDecrement,
-  onLongPress,
+  onOpenSettings,
   onRemove,
-  onDragStart,
+  onMoveLeft,
+  onMoveRight,
+  onMoveUp,
+  onMoveDown,
 }: {
   product: OrderProduct;
   qty: number;
-  dragging: boolean;
   onTap: () => void;
   onDecrement: () => void;
-  onLongPress: () => void;
+  onOpenSettings: () => void;
   onRemove: () => void;
-  onDragStart: () => void;
+  onMoveLeft?: () => void;
+  onMoveRight?: () => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
 }) {
+  const [showMovePad, setShowMovePad] = useState(false);
+
+  const move = (fn?: () => void) => () => {
+    fn?.();
+    setShowMovePad(false);
+  };
+
   return (
     <Pressable
       onPress={onTap}
-      onLongPress={onLongPress}
-      className="mb-3 flex-1 items-center rounded-xl border bg-paper p-2 active:opacity-70"
-      style={{ maxWidth: '31%', borderColor: dragging ? '#CC2222' : '#E5E5E5', opacity: dragging ? 0.8 : 1 }}
+      accessibilityRole="button"
+      accessibilityLabel={product.name}
+      className="mb-3 flex-1 items-center rounded-xl border border-line bg-paper p-2 active:opacity-70"
+      style={{ maxWidth: '31%' }}
     >
       <Pressable
         onPress={onRemove}
@@ -915,14 +1010,13 @@ const FridgeTile = memo(function FridgeTile({
         <MaterialCommunityIcons name="trash-can-outline" size={15} color="#BBBBBB" />
       </Pressable>
       <Pressable
-        onLongPress={onDragStart}
-        delayLongPress={150}
+        onPress={onOpenSettings}
         hitSlop={8}
         className="absolute left-1 top-1 z-10 h-6 w-6 items-center justify-center rounded-full bg-paper"
         accessibilityRole="button"
-        accessibilityLabel={`${product.name} 순서 옮기기(꾹 눌러서 드래그)`}
+        accessibilityLabel={`${product.name} 설정`}
       >
-        <MaterialCommunityIcons name="drag" size={15} color="#BBBBBB" />
+        <MaterialCommunityIcons name="cog-outline" size={15} color="#BBBBBB" />
       </Pressable>
       <Thumbnail uri={product.imageUri} size={64} radius={8} iconSize={22} />
       <Text className="text-ink mt-1.5 text-center text-xs font-bold" numberOfLines={2}>
@@ -947,7 +1041,179 @@ const FridgeTile = memo(function FridgeTile({
           </Text>
         </View>
       ) : null}
+      <Pressable
+        onPress={() => setShowMovePad(true)}
+        hitSlop={8}
+        className="mt-1.5 h-6 w-6 items-center justify-center rounded-full border border-line bg-bg"
+        accessibilityRole="button"
+        accessibilityLabel={`${product.name} 위치 이동`}
+      >
+        <MaterialCommunityIcons name="arrow-all" size={14} color="#1A1A1A" />
+      </Pressable>
+
+      {showMovePad ? (
+        <View
+          className="absolute inset-0 items-center justify-center rounded-xl border border-line bg-paper"
+          style={{ elevation: 8 }}
+        >
+          <Pressable
+            onPress={move(onMoveUp)}
+            disabled={!onMoveUp}
+            hitSlop={8}
+            className="h-7 w-7 items-center justify-center"
+            style={{ opacity: onMoveUp ? 1 : 0.25 }}
+            accessibilityRole="button"
+            accessibilityLabel={`${product.name} 위로 이동`}
+          >
+            <MaterialCommunityIcons name="chevron-up" size={20} color="#1A1A1A" />
+          </Pressable>
+          <View className="flex-row items-center" style={{ gap: 20 }}>
+            <Pressable
+              onPress={move(onMoveLeft)}
+              disabled={!onMoveLeft}
+              hitSlop={8}
+              className="h-7 w-7 items-center justify-center"
+              style={{ opacity: onMoveLeft ? 1 : 0.25 }}
+              accessibilityRole="button"
+              accessibilityLabel={`${product.name} 왼쪽으로 이동`}
+            >
+              <MaterialCommunityIcons name="chevron-left" size={20} color="#1A1A1A" />
+            </Pressable>
+            <Pressable
+              onPress={() => setShowMovePad(false)}
+              hitSlop={8}
+              className="h-7 w-7 items-center justify-center"
+              accessibilityRole="button"
+              accessibilityLabel="닫기"
+            >
+              <MaterialCommunityIcons name="close" size={14} color="#BBBBBB" />
+            </Pressable>
+            <Pressable
+              onPress={move(onMoveRight)}
+              disabled={!onMoveRight}
+              hitSlop={8}
+              className="h-7 w-7 items-center justify-center"
+              style={{ opacity: onMoveRight ? 1 : 0.25 }}
+              accessibilityRole="button"
+              accessibilityLabel={`${product.name} 오른쪽으로 이동`}
+            >
+              <MaterialCommunityIcons name="chevron-right" size={20} color="#1A1A1A" />
+            </Pressable>
+          </View>
+          <Pressable
+            onPress={move(onMoveDown)}
+            disabled={!onMoveDown}
+            hitSlop={8}
+            className="h-7 w-7 items-center justify-center"
+            style={{ opacity: onMoveDown ? 1 : 0.25 }}
+            accessibilityRole="button"
+            accessibilityLabel={`${product.name} 아래로 이동`}
+          >
+            <MaterialCommunityIcons name="chevron-down" size={20} color="#1A1A1A" />
+          </Pressable>
+        </View>
+      ) : null}
     </Pressable>
+  );
+});
+
+const QuickOrderHelpModal = memo(function QuickOrderHelpModal({
+  visible,
+  onClose,
+}: {
+  visible: boolean;
+  onClose: () => void;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable className="flex-1 items-center justify-center bg-ink/40 px-6" onPress={onClose}>
+        <Pressable onPress={(e) => e.stopPropagation()} className="w-full rounded-2xl bg-paper p-4">
+          <View className="mb-2 flex-row items-center justify-between">
+            <Text className="text-ink flex-1 text-base font-bold">🍦 빠른발주 사용법</Text>
+            <Pressable
+              onPress={onClose}
+              hitSlop={8}
+              className="ml-2 h-7 w-7 items-center justify-center"
+              accessibilityRole="button"
+              accessibilityLabel="닫기"
+            >
+              <MaterialCommunityIcons name="close" size={20} color="#888888" />
+            </Pressable>
+          </View>
+          <View className="gap-2.5">
+            <View className="flex-row items-center" style={{ gap: 10 }}>
+              <MaterialCommunityIcons name="gesture-tap" size={18} color="#1A1A1A" />
+              <Text className="text-ink flex-1 text-sm">타일을 탭하면 1개 담겨요</Text>
+            </View>
+            <View className="flex-row items-center" style={{ gap: 10 }}>
+              <MaterialCommunityIcons name="cog-outline" size={18} color="#1A1A1A" />
+              <Text className="text-ink flex-1 text-sm">상품 수정 · 다른 구역으로 이동</Text>
+            </View>
+            <View className="flex-row items-center" style={{ gap: 10 }}>
+              <MaterialCommunityIcons name="arrow-all" size={18} color="#1A1A1A" />
+              <Text className="text-ink flex-1 text-sm">진열 순서 바꾸기</Text>
+            </View>
+            <View className="flex-row items-center" style={{ gap: 10 }}>
+              <MaterialCommunityIcons name="trash-can-outline" size={18} color="#1A1A1A" />
+              <Text className="text-ink flex-1 text-sm">이 구역에서 빼기</Text>
+            </View>
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+});
+
+const ProductSettingsModal = memo(function ProductSettingsModal({
+  visible,
+  productName,
+  onEdit,
+  onMove,
+  onClose,
+}: {
+  visible: boolean;
+  productName: string;
+  onEdit: () => void;
+  onMove: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable className="flex-1 items-center justify-center bg-ink/40 px-6" onPress={onClose}>
+        <Pressable onPress={(e) => e.stopPropagation()} className="w-full rounded-2xl bg-paper p-4">
+          <View className="mb-2 flex-row items-center justify-between">
+            <Text className="text-ink flex-1 text-base font-bold" numberOfLines={1}>
+              {productName}
+            </Text>
+            <Pressable
+              onPress={onClose}
+              hitSlop={8}
+              className="ml-2 h-7 w-7 items-center justify-center"
+              accessibilityRole="button"
+              accessibilityLabel="닫기"
+            >
+              <MaterialCommunityIcons name="close" size={20} color="#888888" />
+            </Pressable>
+          </View>
+          <Pressable
+            onPress={onEdit}
+            className="flex-row items-center rounded-xl px-3 py-3 active:bg-bg"
+            style={{ gap: 10 }}
+          >
+            <MaterialCommunityIcons name="pencil-outline" size={18} color="#1A1A1A" />
+            <Text className="text-ink text-sm font-medium">상품 수정</Text>
+          </Pressable>
+          <Pressable
+            onPress={onMove}
+            className="flex-row items-center rounded-xl px-3 py-3 active:bg-bg"
+            style={{ gap: 10 }}
+          >
+            <MaterialCommunityIcons name="swap-horizontal" size={18} color="#1A1A1A" />
+            <Text className="text-ink text-sm font-medium">다른 구역으로 이동</Text>
+          </Pressable>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 });
 
@@ -1001,6 +1267,7 @@ const AddToFridgeModal = memo(function AddToFridgeModal({
   visible,
   section,
   allProducts,
+  categories,
   assignedIds,
   query,
   onChangeQuery,
@@ -1010,16 +1277,22 @@ const AddToFridgeModal = memo(function AddToFridgeModal({
   visible: boolean;
   section: FridgeSection;
   allProducts: OrderProduct[];
+  categories: string[];
   assignedIds: Set<string>;
   query: string;
   onChangeQuery: (q: string) => void;
   onPick: (productId: string) => void;
   onClose: () => void;
 }) {
+  const [selectedCategory, setSelectedCategory] = useState('전체');
+
   const results = useMemo(() => {
-    const base = query.trim() ? searchOrderProducts(allProducts, query) : allProducts;
+    const byCategory = allProducts.filter(
+      (p) => selectedCategory === '전체' || p.category === selectedCategory,
+    );
+    const base = query.trim() ? searchOrderProducts(byCategory, query) : byCategory;
     return base.filter((p) => !assignedIds.has(p.id)).slice(0, 30);
-  }, [allProducts, assignedIds, query]);
+  }, [allProducts, assignedIds, query, selectedCategory]);
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -1031,7 +1304,7 @@ const AddToFridgeModal = memo(function AddToFridgeModal({
         >
           <View className="mb-2 flex-row items-center justify-between">
             <Text className="text-ink flex-1 text-base font-bold" numberOfLines={1}>
-              '{section}' 구역에 상품 추가
+              '{section}' 구역에 상품 진열하기
             </Text>
             <Pressable
               onPress={onClose}
@@ -1053,6 +1326,12 @@ const AddToFridgeModal = memo(function AddToFridgeModal({
             value={query}
             onChangeText={onChangeQuery}
           />
+          <View className="mb-2 flex-row flex-wrap" style={{ gap: 6 }}>
+            <Chip label="전체" active={selectedCategory === '전체'} onPress={() => setSelectedCategory('전체')} />
+            {categories.map((c) => (
+              <Chip key={c} label={c} active={selectedCategory === c} onPress={() => setSelectedCategory(c)} />
+            ))}
+          </View>
           <FlatList
             data={results}
             keyExtractor={(item) => item.id}
@@ -1252,6 +1531,14 @@ const FridgeSectionModal = memo(function FridgeSectionModal({
     setEditingName(null);
   };
 
+  const moveSection = (index: number, direction: -1 | 1) => {
+    const nextIndex = index + direction;
+    if (nextIndex < 0 || nextIndex >= sections.length) return;
+    const next = [...sections];
+    [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+    onReorder(next);
+  };
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable className="flex-1 items-center justify-center bg-ink/40 px-6" onPress={onClose}>
@@ -1261,14 +1548,13 @@ const FridgeSectionModal = memo(function FridgeSectionModal({
           style={{ maxHeight: '70%' }}
         >
           <Text className="text-ink mb-2 text-base font-bold">구역 관리</Text>
-          <Text className="text-muted mb-2 text-xs">왼쪽 손잡이를 꾹 눌러 끌면 순서를 바꿀 수 있어요</Text>
+          <Text className="text-muted mb-2 text-xs">화살표로 순서를 바꿀 수 있어요</Text>
 
-          <DraggableFlatList
+          <FlatList
             data={sections}
             keyExtractor={(s) => s}
             style={{ maxHeight: 320 }}
-            onDragEnd={({ data }) => onReorder(data)}
-            renderItem={({ item: s, drag, isActive }: RenderItemParams<string>) =>
+            renderItem={({ item: s, index }) =>
               editingName === s ? (
                 <View className="flex-row items-center gap-2 px-3 py-2">
                   <TextInput
@@ -1286,14 +1572,32 @@ const FridgeSectionModal = memo(function FridgeSectionModal({
                   </Pressable>
                 </View>
               ) : (
-                <View
-                  className="flex-row items-center justify-between rounded-xl px-1 py-1"
-                  style={{ backgroundColor: isActive ? '#F5F5F5' : 'transparent' }}
-                >
-                  <Pressable onLongPress={drag} delayLongPress={150} hitSlop={8} className="px-2 py-2">
-                    <MaterialCommunityIcons name="drag" size={18} color="#BBBBBB" />
-                  </Pressable>
-                  <Text className="text-ink flex-1 px-1 py-2 text-sm font-medium" numberOfLines={1}>
+                <View className="flex-row items-center justify-between rounded-xl px-1 py-1">
+                  <View className="flex-row items-center" style={{ gap: 4 }}>
+                    <Pressable
+                      onPress={() => moveSection(index, -1)}
+                      disabled={index === 0}
+                      hitSlop={8}
+                      className="h-7 w-7 items-center justify-center rounded-full border border-line bg-bg"
+                      style={{ opacity: index === 0 ? 0.25 : 1 }}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${s} 위로 이동`}
+                    >
+                      <MaterialCommunityIcons name="chevron-up" size={16} color="#1A1A1A" />
+                    </Pressable>
+                    <Pressable
+                      onPress={() => moveSection(index, 1)}
+                      disabled={index === sections.length - 1}
+                      hitSlop={8}
+                      className="h-7 w-7 items-center justify-center rounded-full border border-line bg-bg"
+                      style={{ opacity: index === sections.length - 1 ? 0.25 : 1 }}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${s} 아래로 이동`}
+                    >
+                      <MaterialCommunityIcons name="chevron-down" size={16} color="#1A1A1A" />
+                    </Pressable>
+                  </View>
+                  <Text className="text-ink flex-1 px-2 py-2 text-sm font-medium" numberOfLines={1}>
                     {s}
                   </Text>
                   <Pressable onPress={() => startRename(s)} hitSlop={8} className="ml-3">
