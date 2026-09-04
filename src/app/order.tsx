@@ -64,6 +64,7 @@ export default function Order() {
   const [activeSection, setActiveSection] = useState<FridgeSection>('');
   const [showFridgeSectionModal, setShowFridgeSectionModal] = useState(false);
   const [showAddToFridge, setShowAddToFridge] = useState(false);
+  const [movingProduct, setMovingProduct] = useState<OrderProduct | null>(null);
   const [fridgeSearchQuery, setFridgeSearchQuery] = useState('');
   const [quickSearchQuery, setQuickSearchQuery] = useState('');
   const [query, setQuery] = useState('');
@@ -424,7 +425,8 @@ export default function Order() {
     [load, onChangeStatus],
   );
 
-  // '이 구역에서 빼기'는 타일의 휴지통 아이콘으로 옮겨서, 여기는 수정/상태 변경 2개만 남긴다.
+  // '이 구역에서 빼기'는 타일의 휴지통 아이콘으로 옮겼다. 3개(수정/상태 변경/구역 이동)라
+  // Android 3버튼 한도에 맞춰 명시적 취소 버튼은 두지 않는다(뒤로가기·바깥 탭으로 닫힘).
   const onLongPressFridgeTile = useCallback(
     (p: OrderProduct) => {
       Alert.alert(p.name, '어떻게 처리할까요?', [
@@ -433,10 +435,19 @@ export default function Order() {
           onPress: () => router.push({ pathname: '/order-product-form', params: { id: p.id } }),
         },
         { text: '상태 변경', onPress: () => onChangeStatus(p) },
-        { text: '취소', style: 'cancel' },
+        { text: '다른 구역으로 이동', onPress: () => setMovingProduct(p) },
       ]);
     },
     [onChangeStatus],
+  );
+
+  const onMoveFridgeTile = useCallback(
+    async (section: FridgeSection) => {
+      if (!activeStoreId || !movingProduct) return;
+      setFridgeAssignments(await assignToFridgeSection(activeStoreId, movingProduct.id, section));
+      setMovingProduct(null);
+    },
+    [activeStoreId, movingProduct],
   );
 
   const onRemoveFridgeTile = useCallback(
@@ -706,7 +717,10 @@ export default function Order() {
         </View>
       ) : (
         <>
-          <View className="mx-4 mt-1">
+          <Text className="text-muted mx-4 mt-2 text-xs">
+            매장 냉동고에 따라 상품 구역을 설정하세요.
+          </Text>
+          <View className="mx-4 mt-2">
             <View className="flex-row items-center rounded-xl border border-line bg-paper px-3">
               <MaterialCommunityIcons name="magnify" size={18} color="#888888" />
               <TextInput
@@ -809,6 +823,14 @@ export default function Order() {
               setFridgeSearchQuery('');
             }}
           />
+          <MoveToSectionModal
+            visible={movingProduct !== null}
+            productName={movingProduct?.name ?? ''}
+            currentSection={movingProduct ? fridgeSectionByProductId.get(movingProduct.id) : undefined}
+            sections={fridgeSections}
+            onPick={onMoveFridgeTile}
+            onClose={() => setMovingProduct(null)}
+          />
         </>
       )}
 
@@ -867,18 +889,18 @@ const FridgeTile = memo(function FridgeTile({
         {product.name}
       </Text>
       {qty > 0 ? (
-        <View className="mt-1 flex-row items-center gap-1.5">
+        <View className="mt-1.5 flex-row items-center gap-2">
           <Pressable
             onPress={onDecrement}
-            hitSlop={6}
-            className="h-6 w-6 items-center justify-center rounded-full bg-bg"
+            hitSlop={10}
+            className="h-8 w-8 items-center justify-center rounded-full border border-line bg-bg active:opacity-70"
             accessibilityRole="button"
             accessibilityLabel={`${product.name} 수량 감소`}
           >
-            <MaterialCommunityIcons name="minus" size={13} color="#1A1A1A" />
+            <MaterialCommunityIcons name="minus" size={17} color="#1A1A1A" />
           </Pressable>
           <Text
-            className="text-ink w-4 text-center text-xs font-bold"
+            className="text-ink w-5 text-center text-sm font-bold"
             style={{ fontVariant: ['tabular-nums'] }}
           >
             {qty}
@@ -886,6 +908,52 @@ const FridgeTile = memo(function FridgeTile({
         </View>
       ) : null}
     </Pressable>
+  );
+});
+
+const MoveToSectionModal = memo(function MoveToSectionModal({
+  visible,
+  productName,
+  currentSection,
+  sections,
+  onPick,
+  onClose,
+}: {
+  visible: boolean;
+  productName: string;
+  currentSection?: FridgeSection;
+  sections: FridgeSection[];
+  onPick: (section: FridgeSection) => void;
+  onClose: () => void;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable className="flex-1 items-center justify-center bg-ink/40 px-6" onPress={onClose}>
+        <Pressable
+          onPress={(e) => e.stopPropagation()}
+          className="w-full rounded-2xl bg-paper p-4"
+          style={{ maxHeight: '70%' }}
+        >
+          <Text className="text-ink mb-2 text-base font-bold" numberOfLines={1}>
+            '{productName}' 어느 구역으로 옮길까요?
+          </Text>
+          {sections
+            .filter((s) => s !== currentSection)
+            .map((s) => (
+              <Pressable
+                key={s}
+                onPress={() => onPick(s)}
+                className="rounded-xl px-3 py-3 active:bg-bg"
+              >
+                <Text className="text-ink text-sm font-medium">{s}</Text>
+              </Pressable>
+            ))}
+          <Pressable onPress={onClose} className="mt-3 items-center py-2">
+            <Text className="text-muted text-sm">닫기</Text>
+          </Pressable>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 });
 
