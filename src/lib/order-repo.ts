@@ -193,9 +193,67 @@ export async function setActiveStoreId(id: string | null): Promise<void> {
   else await AsyncStorage.removeItem(ACTIVE_STORE_KEY);
 }
 
-// ---------- 냉장고 구역 배정 (매장별) ----------
+// ---------- 냉장고 구역 (전체 공용, 편집 가능) ----------
 
-export const FRIDGE_SECTIONS: FridgeSection[] = ['600바', '100바콘류', '1000바', '샌드류'];
+const FRIDGE_SECTIONS_KEY = 'fridgeSections:v1';
+const DEFAULT_FRIDGE_SECTIONS: FridgeSection[] = ['600바', '1400콘류', '1400샌드류', '홈류'];
+
+export async function listFridgeSections(): Promise<FridgeSection[]> {
+  const raw = await AsyncStorage.getItem(FRIDGE_SECTIONS_KEY);
+  return raw ? (JSON.parse(raw) as FridgeSection[]) : DEFAULT_FRIDGE_SECTIONS;
+}
+
+async function writeFridgeSections(sections: FridgeSection[]): Promise<void> {
+  await AsyncStorage.setItem(FRIDGE_SECTIONS_KEY, JSON.stringify(sections));
+}
+
+export async function addFridgeSection(name: string): Promise<FridgeSection[]> {
+  const sections = await listFridgeSections();
+  if (sections.includes(name)) return sections;
+  const next = [...sections, name];
+  await writeFridgeSections(next);
+  return next;
+}
+
+/** 구역 이름을 바꾸고, 이미 그 구역에 배정된 상품들(모든 매장)의 배정 기록도 새 이름으로
+ * 맞춰준다 — 안 그러면 이름을 바꾸는 순간 기존에 배정해둔 상품들이 전부 사라진 것처럼 보인다. */
+export async function renameFridgeSection(from: string, to: string): Promise<FridgeSection[]> {
+  const sections = await listFridgeSections();
+  const next = sections.map((s) => (s === from ? to : s));
+  await writeFridgeSections(next);
+  const stores = await listStores();
+  for (const store of stores) {
+    const assignments = await listFridgeAssignments(store.id);
+    if (assignments.some((a) => a.section === from)) {
+      await writeFridgeAssignments(
+        store.id,
+        assignments.map((a) => (a.section === from ? { ...a, section: to } : a)),
+      );
+    }
+  }
+  return next;
+}
+
+/** 구역을 삭제하고, 모든 매장에서 그 구역에 배정돼 있던 상품들의 배정 기록도 함께 지운다
+ * (배정 기록만 지워질 뿐 상품 자체나 장바구니는 그대로 남는다). */
+export async function deleteFridgeSection(name: string): Promise<FridgeSection[]> {
+  const sections = await listFridgeSections();
+  const next = sections.filter((s) => s !== name);
+  await writeFridgeSections(next);
+  const stores = await listStores();
+  for (const store of stores) {
+    const assignments = await listFridgeAssignments(store.id);
+    if (assignments.some((a) => a.section === name)) {
+      await writeFridgeAssignments(
+        store.id,
+        assignments.filter((a) => a.section !== name),
+      );
+    }
+  }
+  return next;
+}
+
+// ---------- 냉장고 구역 배정 (매장별) ----------
 
 function fridgeAssignmentsKey(storeId: string): string {
   return `fridgeAssignments:${storeId}`;

@@ -7,23 +7,26 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Chip from '@/components/Chip';
 import Thumbnail from '@/components/Thumbnail';
 import {
+  addFridgeSection,
   addOrderCategory,
   addStore,
   assignToFridgeSection,
   CatalogUpdateBadge,
   clearCatalogUpdateBadge,
+  deleteFridgeSection,
   deleteOrderCategory,
   deleteOrderProduct,
   deleteStore,
-  FRIDGE_SECTIONS,
   getActiveStoreId,
   getCatalogUpdateBadges,
   getOrderCart,
   listFridgeAssignments,
+  listFridgeSections,
   listOrderCategories,
   listOrderProducts,
   listStores,
   removeFromFridgeSection,
+  renameFridgeSection,
   renameOrderCategory,
   renameStore,
   saveOrderProduct,
@@ -57,7 +60,9 @@ export default function Order() {
   const [showStoreModal, setShowStoreModal] = useState(false);
   const [mode, setMode] = useState<'search' | 'quick'>('search');
   const [fridgeAssignments, setFridgeAssignments] = useState<FridgeAssignment[]>([]);
-  const [activeSection, setActiveSection] = useState<FridgeSection>(FRIDGE_SECTIONS[0]);
+  const [fridgeSections, setFridgeSections] = useState<FridgeSection[]>([]);
+  const [activeSection, setActiveSection] = useState<FridgeSection>('');
+  const [showFridgeSectionModal, setShowFridgeSectionModal] = useState(false);
   const [showAddToFridge, setShowAddToFridge] = useState(false);
   const [fridgeSearchQuery, setFridgeSearchQuery] = useState('');
   const [quickSearchQuery, setQuickSearchQuery] = useState('');
@@ -73,13 +78,14 @@ export default function Order() {
   const scanParams = useLocalSearchParams<{ scannedBarcode?: string; nonce?: string }>();
 
   const loadCatalog = useCallback(async () => {
-    const [productList, categoryList, cartData, badges, storeList, activeId] = await Promise.all([
+    const [productList, categoryList, cartData, badges, storeList, activeId, sections] = await Promise.all([
       listOrderProducts(),
       listOrderCategories(),
       getOrderCart(),
       getCatalogUpdateBadges(),
       listStores(),
       getActiveStoreId(),
+      listFridgeSections(),
     ]);
     setProducts(productList);
     setCategories(categoryList);
@@ -88,6 +94,9 @@ export default function Order() {
     setStores(storeList);
     setActiveStoreIdState(activeId);
     setFridgeAssignments(activeId ? await listFridgeAssignments(activeId) : []);
+    setFridgeSections(sections);
+    // 현재 선택된 구역이 삭제/이름변경 등으로 더는 목록에 없으면 첫 구역으로 되돌린다.
+    setActiveSection((prev) => (sections.includes(prev) ? prev : (sections[0] ?? '')));
   }, []);
 
   const switchStore = useCallback(
@@ -131,6 +140,41 @@ export default function Order() {
       ]);
     },
     [activeStoreId, loadCatalog],
+  );
+
+  const onAddFridgeSection = useCallback(async (name: string) => {
+    setFridgeSections(await addFridgeSection(name));
+  }, []);
+
+  const onRenameFridgeSection = useCallback(
+    async (from: string, to: string) => {
+      setFridgeSections(await renameFridgeSection(from, to));
+      // 현재 보고 있는 구역이 방금 바뀐 그 구역이면 표시도 새 이름으로 맞춘다.
+      setActiveSection((prev) => (prev === from ? to : prev));
+      if (activeStoreId) setFridgeAssignments(await listFridgeAssignments(activeStoreId));
+    },
+    [activeStoreId],
+  );
+
+  const onDeleteFridgeSection = useCallback(
+    (name: string) => {
+      Alert.alert(
+        '구역 삭제',
+        `'${name}' 구역을 삭제할까요? 모든 매장에서 이 구역에 배정된 상품 정보도 함께 사라집니다.`,
+        [
+          { text: '취소', style: 'cancel' },
+          {
+            text: '삭제',
+            style: 'destructive',
+            onPress: async () => {
+              setFridgeSections(await deleteFridgeSection(name));
+              if (activeStoreId) setFridgeAssignments(await listFridgeAssignments(activeStoreId));
+            },
+          },
+        ],
+      );
+    },
+    [activeStoreId],
   );
 
   const load = useCallback(async () => {
@@ -697,11 +741,27 @@ export default function Order() {
             ) : null}
           </View>
 
-          <View className="mt-3 flex-row flex-wrap gap-2 px-4">
-            {FRIDGE_SECTIONS.map((s) => (
+          <View className="mt-3 flex-row flex-wrap items-center gap-2 px-4">
+            {fridgeSections.map((s) => (
               <Chip key={s} label={s} active={activeSection === s} onPress={() => setActiveSection(s)} />
             ))}
+            <Pressable
+              onPress={() => setShowFridgeSectionModal(true)}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="구역 관리"
+            >
+              <MaterialCommunityIcons name="pencil-outline" size={18} color="#888888" />
+            </Pressable>
           </View>
+          <FridgeSectionModal
+            visible={showFridgeSectionModal}
+            sections={fridgeSections}
+            onAdd={onAddFridgeSection}
+            onRename={onRenameFridgeSection}
+            onDelete={onDeleteFridgeSection}
+            onClose={() => setShowFridgeSectionModal(false)}
+          />
           <FlatList
             key="quick-grid"
             data={fridgeProducts}
@@ -725,6 +785,7 @@ export default function Order() {
                 product={item}
                 qty={cart[item.id] ?? 0}
                 onTap={() => changeQty(item.id, 1)}
+                onDecrement={() => changeQty(item.id, -1)}
                 onLongPress={() => onLongPressFridgeTile(item)}
                 onRemove={() => onRemoveFridgeTile(item)}
               />
@@ -774,12 +835,14 @@ const FridgeTile = memo(function FridgeTile({
   product,
   qty,
   onTap,
+  onDecrement,
   onLongPress,
   onRemove,
 }: {
   product: OrderProduct;
   qty: number;
   onTap: () => void;
+  onDecrement: () => void;
   onLongPress: () => void;
   onRemove: () => void;
 }) {
@@ -804,8 +867,22 @@ const FridgeTile = memo(function FridgeTile({
         {product.name}
       </Text>
       {qty > 0 ? (
-        <View className="mt-1 rounded-full bg-primary px-2 py-0.5">
-          <Text className="text-paper text-xs font-bold">{qty}</Text>
+        <View className="mt-1 flex-row items-center gap-1.5">
+          <Pressable
+            onPress={onDecrement}
+            hitSlop={6}
+            className="h-6 w-6 items-center justify-center rounded-full bg-bg"
+            accessibilityRole="button"
+            accessibilityLabel={`${product.name} 수량 감소`}
+          >
+            <MaterialCommunityIcons name="minus" size={13} color="#1A1A1A" />
+          </Pressable>
+          <Text
+            className="text-ink w-4 text-center text-xs font-bold"
+            style={{ fontVariant: ['tabular-nums'] }}
+          >
+            {qty}
+          </Text>
         </View>
       ) : null}
     </Pressable>
@@ -1011,6 +1088,111 @@ const SuggestionRow = memo(function SuggestionRow({
         </Pressable>
       </View>
     </View>
+  );
+});
+
+const FridgeSectionModal = memo(function FridgeSectionModal({
+  visible,
+  sections,
+  onAdd,
+  onRename,
+  onDelete,
+  onClose,
+}: {
+  visible: boolean;
+  sections: string[];
+  onAdd: (name: string) => void;
+  onRename: (from: string, to: string) => void;
+  onDelete: (name: string) => void;
+  onClose: () => void;
+}) {
+  const [newName, setNewName] = useState('');
+  const [editingName, setEditingName] = useState<string | null>(null);
+  const [editingValue, setEditingValue] = useState('');
+
+  const submitAdd = () => {
+    const v = newName.trim();
+    if (!v) return;
+    onAdd(v);
+    setNewName('');
+  };
+
+  const startRename = (name: string) => {
+    setEditingName(name);
+    setEditingValue(name);
+  };
+
+  const submitRename = () => {
+    const v = editingValue.trim();
+    if (v && editingName && v !== editingName) onRename(editingName, v);
+    setEditingName(null);
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable className="flex-1 items-center justify-center bg-ink/40 px-6" onPress={onClose}>
+        <Pressable
+          onPress={(e) => e.stopPropagation()}
+          className="w-full rounded-2xl bg-paper p-4"
+          style={{ maxHeight: '70%' }}
+        >
+          <Text className="text-ink mb-2 text-base font-bold">구역 관리</Text>
+
+          {sections.map((s) =>
+            editingName === s ? (
+              <View key={s} className="flex-row items-center gap-2 px-3 py-2">
+                <TextInput
+                  className="text-ink flex-1 rounded-xl border border-line bg-bg px-3 py-2 text-sm"
+                  value={editingValue}
+                  onChangeText={setEditingValue}
+                  onSubmitEditing={submitRename}
+                  autoFocus
+                />
+                <Pressable onPress={submitRename} hitSlop={8}>
+                  <Text className="text-primary text-sm font-medium">저장</Text>
+                </Pressable>
+                <Pressable onPress={() => setEditingName(null)} hitSlop={8}>
+                  <Text className="text-muted text-sm">취소</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <View key={s} className="flex-row items-center justify-between rounded-xl px-3 py-3">
+                <Text className="text-ink flex-1 text-sm font-medium" numberOfLines={1}>
+                  {s}
+                </Text>
+                <Pressable onPress={() => startRename(s)} hitSlop={8} className="ml-3">
+                  <MaterialCommunityIcons name="pencil-outline" size={18} color="#888888" />
+                </Pressable>
+                <Pressable onPress={() => onDelete(s)} hitSlop={8} className="ml-3">
+                  <MaterialCommunityIcons name="trash-can-outline" size={18} color="#888888" />
+                </Pressable>
+              </View>
+            ),
+          )}
+
+          <View className="mt-3 flex-row gap-2">
+            <TextInput
+              className="text-ink flex-1 rounded-xl border border-line bg-bg px-3 py-2 text-sm"
+              placeholder="새 구역 이름 (예: 1400콘류)"
+              placeholderTextColor="#BBBBBB"
+              value={newName}
+              onChangeText={setNewName}
+              onSubmitEditing={submitAdd}
+            />
+            <Pressable
+              onPress={submitAdd}
+              className="items-center justify-center rounded-xl border border-line bg-bg px-4 active:opacity-70"
+            >
+              <Text className="text-ink text-sm font-medium">추가</Text>
+            </Pressable>
+          </View>
+
+          <Pressable onPress={onClose} className="mt-3 items-center py-2">
+            <Text className="text-muted text-sm">닫기</Text>
+          </Pressable>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 });
 

@@ -21,7 +21,8 @@ export interface Store {
   name: string;
 }
 
-export type FridgeSection = '600바' | '100바콘류' | '1000바' | '샌드류';
+/** 사용자가 자유롭게 추가/이름변경/삭제할 수 있는 전역(공용) 구역 이름. */
+export type FridgeSection = string;
 
 export interface FridgeAssignment {
   productId: string;
