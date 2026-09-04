@@ -429,11 +429,11 @@ export default function Order() {
   // 제외했다(검색발주 쪽 onLongPressProduct에는 그대로 남아있음).
   const onLongPressFridgeTile = useCallback((p: OrderProduct) => {
     Alert.alert(p.name, '어떻게 처리할까요?', [
+      { text: '다른 구역으로 이동', onPress: () => setMovingProduct(p) },
       {
         text: '상품수정',
         onPress: () => router.push({ pathname: '/order-product-form', params: { id: p.id } }),
       },
-      { text: '다른 구역으로 이동', onPress: () => setMovingProduct(p) },
       { text: '취소', style: 'cancel' },
     ]);
   }, []);
