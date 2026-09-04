@@ -214,7 +214,7 @@ export default function Settings() {
             <View className="h-px bg-line" />
             <LinkRow
               icon="calculator-variant-outline"
-              label="원가 계산기"
+              label="계산기"
               onPress={() => router.push('/margin-calculator')}
             />
           </>
