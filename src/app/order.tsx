@@ -380,9 +380,7 @@ export default function Order() {
     [load, onChangeStatus],
   );
 
-  // Android의 Alert.alert는 버튼을 최대 3개까지만 보여준다 — 그래서 이 메뉴도 검색발주 쪽
-  // onLongPressProduct와 같은 방식으로 '취소' 버튼 없이 3개(수정/상태 변경/구역에서 빼기)만
-  // 둔다. 뒤로가기·바깥 탭으로도 닫히니 기능적으로 취소는 여전히 가능하다.
+  // '이 구역에서 빼기'는 타일의 휴지통 아이콘으로 옮겨서, 여기는 수정/상태 변경 2개만 남긴다.
   const onLongPressFridgeTile = useCallback(
     (p: OrderProduct) => {
       Alert.alert(p.name, '어떻게 처리할까요?', [
@@ -391,8 +389,18 @@ export default function Order() {
           onPress: () => router.push({ pathname: '/order-product-form', params: { id: p.id } }),
         },
         { text: '상태 변경', onPress: () => onChangeStatus(p) },
+        { text: '취소', style: 'cancel' },
+      ]);
+    },
+    [onChangeStatus],
+  );
+
+  const onRemoveFridgeTile = useCallback(
+    (p: OrderProduct) => {
+      Alert.alert('구역에서 빼기', `'${p.name}'을(를) '${activeSection}' 구역에서 뺄까요?`, [
+        { text: '취소', style: 'cancel' },
         {
-          text: '이 구역에서 빼기',
+          text: '빼기',
           style: 'destructive',
           onPress: async () => {
             if (!activeStoreId) return;
@@ -401,7 +409,7 @@ export default function Order() {
         },
       ]);
     },
-    [activeStoreId, onChangeStatus],
+    [activeStoreId, activeSection],
   );
 
   const onSeedDefaults = async () => {
@@ -718,6 +726,7 @@ export default function Order() {
                 qty={cart[item.id] ?? 0}
                 onTap={() => changeQty(item.id, 1)}
                 onLongPress={() => onLongPressFridgeTile(item)}
+                onRemove={() => onRemoveFridgeTile(item)}
               />
             )}
             ListEmptyComponent={
@@ -766,11 +775,13 @@ const FridgeTile = memo(function FridgeTile({
   qty,
   onTap,
   onLongPress,
+  onRemove,
 }: {
   product: OrderProduct;
   qty: number;
   onTap: () => void;
   onLongPress: () => void;
+  onRemove: () => void;
 }) {
   return (
     <Pressable
@@ -779,6 +790,15 @@ const FridgeTile = memo(function FridgeTile({
       className="mb-3 flex-1 items-center rounded-xl border border-line bg-paper p-2 active:opacity-70"
       style={{ maxWidth: '31%' }}
     >
+      <Pressable
+        onPress={onRemove}
+        hitSlop={8}
+        className="absolute right-1 top-1 z-10 h-6 w-6 items-center justify-center rounded-full bg-paper"
+        accessibilityRole="button"
+        accessibilityLabel={`${product.name} 이 구역에서 빼기`}
+      >
+        <MaterialCommunityIcons name="trash-can-outline" size={15} color="#BBBBBB" />
+      </Pressable>
       <Thumbnail uri={product.imageUri} size={64} radius={8} iconSize={22} />
       <Text className="text-ink mt-1.5 text-center text-xs font-bold" numberOfLines={2}>
         {product.name}
