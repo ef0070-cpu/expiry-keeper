@@ -121,6 +121,8 @@ export default function MarginCalculator() {
 
   // --- 일반 계산기 상태 ---
   const [generalState, setGeneralState] = useState<GeneralCalcState>(initialGeneralCalcState);
+  // 최근 계산 결과 3건 — 화면을 나갔다 다시 들어오면 초기화되는 임시 캐시(AsyncStorage에 저장하지 않음).
+  const [generalHistory, setGeneralHistory] = useState<{ expression: string; result: string }[]>([]);
 
   const onGeneralKeyPress = (key: string) => {
     if (key === 'AC') {
@@ -136,7 +138,13 @@ export default function MarginCalculator() {
       return;
     }
     if (key === '=') {
-      setGeneralState((s) => generalCalculate(s));
+      const result = generalCalculate(generalState);
+      if (result !== generalState && result.expression) {
+        setGeneralHistory((h) =>
+          [{ expression: result.expression, result: formatDisplayValue(result.current) }, ...h].slice(0, 3),
+        );
+      }
+      setGeneralState(result);
       return;
     }
     if (key === '.') {
@@ -236,20 +244,33 @@ export default function MarginCalculator() {
           </>
         ) : (
           <>
-            <View className="p-4">
-              <View className="rounded-xl border border-line bg-paper px-4 py-4">
-                <Text className="text-muted mb-1 text-right text-sm" numberOfLines={1}>
+            <View className="flex-1 justify-end p-4">
+              {generalHistory.length > 0 ? (
+                <View className="mb-4">
+                  {generalHistory.map((h, i) => (
+                    <Text key={i} className="text-muted mb-1 text-right text-base" numberOfLines={1}>
+                      {h.expression} {h.result}
+                    </Text>
+                  ))}
+                </View>
+              ) : null}
+              <View className="rounded-xl border border-line bg-paper px-5 py-6">
+                <Text className="text-muted mb-2 text-right text-lg" numberOfLines={1}>
                   {generalState.expression}
                 </Text>
-                <Text className="text-ink text-right text-3xl font-bold" numberOfLines={1}>
+                <Text
+                  className="text-ink text-right font-bold"
+                  style={{ fontSize: 64 }}
+                  numberOfLines={1}
+                >
                   {formatDisplayValue(generalState.current)}
                 </Text>
               </View>
             </View>
 
-            <View className="gap-2 p-4" style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
+            <View className="gap-3 p-4" style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
               {GENERAL_KEYPAD_ROWS.map((row, i) => (
-                <View key={i} className="flex-row gap-2">
+                <View key={i} className="flex-row gap-3">
                   {row.map((key) => {
                     const isOperator = key in GENERAL_OPERATOR_KEYS;
                     const isEquals = key === '=';
@@ -270,8 +291,8 @@ export default function MarginCalculator() {
                         onPress={() => onGeneralKeyPress(key)}
                         accessibilityRole="button"
                         accessibilityLabel={accessibilityLabel}
-                        style={{ flex: isZero ? 2 : 1 }}
-                        className={`items-center justify-center rounded-xl border py-4 active:opacity-70 ${
+                        style={{ flex: isZero ? 2 : 1, minHeight: 72 }}
+                        className={`items-center justify-center rounded-xl border active:opacity-70 ${
                           isEquals
                             ? 'border-primary bg-primary'
                             : isOperator
@@ -280,9 +301,10 @@ export default function MarginCalculator() {
                         }`}
                       >
                         <Text
-                          className={`text-xl font-bold ${
+                          className={`font-bold ${
                             isEquals ? 'text-paper' : isOperator ? 'text-primary' : 'text-ink'
                           }`}
+                          style={{ fontSize: 30 }}
                         >
                           {key}
                         </Text>
