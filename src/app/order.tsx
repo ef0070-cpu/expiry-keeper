@@ -425,21 +425,18 @@ export default function Order() {
     [load, onChangeStatus],
   );
 
-  // '이 구역에서 빼기'는 타일의 휴지통 아이콘으로 옮겼다. 3개(수정/상태 변경/구역 이동)라
-  // Android 3버튼 한도에 맞춰 명시적 취소 버튼은 두지 않는다(뒤로가기·바깥 탭으로 닫힘).
-  const onLongPressFridgeTile = useCallback(
-    (p: OrderProduct) => {
-      Alert.alert(p.name, '어떻게 처리할까요?', [
-        {
-          text: '수정',
-          onPress: () => router.push({ pathname: '/order-product-form', params: { id: p.id } }),
-        },
-        { text: '상태 변경', onPress: () => onChangeStatus(p) },
-        { text: '다른 구역으로 이동', onPress: () => setMovingProduct(p) },
-      ]);
-    },
-    [onChangeStatus],
-  );
+  // '이 구역에서 빼기'는 타일의 휴지통 아이콘으로, '상태 변경'은 빠른발주에서 불필요해
+  // 제외했다(검색발주 쪽 onLongPressProduct에는 그대로 남아있음).
+  const onLongPressFridgeTile = useCallback((p: OrderProduct) => {
+    Alert.alert(p.name, '어떻게 처리할까요?', [
+      {
+        text: '상품수정',
+        onPress: () => router.push({ pathname: '/order-product-form', params: { id: p.id } }),
+      },
+      { text: '다른 구역으로 이동', onPress: () => setMovingProduct(p) },
+      { text: '취소', style: 'cancel' },
+    ]);
+  }, []);
 
   const onMoveFridgeTile = useCallback(
     async (section: FridgeSection) => {
