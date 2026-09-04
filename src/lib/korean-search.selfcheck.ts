@@ -22,4 +22,9 @@ console.assert(matchesSearch('거꾸로 수박바', '수박바'), '상품명 뒷
 console.assert(matchesSearch('거꾸로 수박바', 'ㄱㄲㄹㅅㅂㅂ'), '상품명에 공백 있어도 공백 없는 초성 검색어가 매칭돼야 함');
 console.assert(!matchesSearch('구구바 스트로베리', 'ㄱㅅㅌ'), '초성도 공백 무시 재시도가 단어 경계 보호를 깨면 안 됨 (회귀 방지)');
 
+console.assert(matchesSearch('메로나', 'ㅁㄹ나'), '초성+완성형 혼합 검색어(ㅁㄹ나)가 메로나와 매칭돼야 함');
+console.assert(matchesSearch('메로나', 'ㅁ로나'), '초성+완성형 혼합 검색어(ㅁ로나)가 메로나와 매칭돼야 함');
+console.assert(!matchesSearch('메로나', 'ㅁㄹ가'), '혼합 검색어의 완성형 글자가 다르면 매칭되면 안 됨');
+console.assert(!matchesSearch('아이스메로나', 'ㅁㄹ나'), '혼합 검색어도 target 중간에서 우연히 일치하면 안 됨');
+
 console.log('korean-search selfcheck OK');

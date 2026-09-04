@@ -26,12 +26,14 @@ export function mergeCatalogIntoProducts(
   catalogRows: OrderCatalogRow[],
   removedBarcodes: Set<string>,
   makeId: () => string = defaultId,
-): { items: OrderProduct[]; changed: boolean } {
+): { items: OrderProduct[]; changed: boolean; newBarcodes: string[]; updatedBarcodes: string[] } {
   const next = items.map((p) => ({ ...p }));
   const byBarcode = new Map(
     next.filter((p): p is OrderProduct & { barcode: string } => !!p.barcode).map((p) => [p.barcode, p]),
   );
   let changed = false;
+  const newBarcodes: string[] = [];
+  const updatedBarcodes: string[] = [];
 
   for (const row of catalogRows) {
     const local = byBarcode.get(row.barcode);
@@ -52,6 +54,7 @@ export function mergeCatalogIntoProducts(
         local.category = nextCategory;
         local.imageUri = row.image_uri;
         changed = true;
+        updatedBarcodes.push(row.barcode);
       }
     } else if (!removedBarcodes.has(row.barcode)) {
       next.push({
@@ -65,8 +68,9 @@ export function mergeCatalogIntoProducts(
         status: 'active',
       });
       changed = true;
+      newBarcodes.push(row.barcode);
     }
   }
 
-  return { items: next, changed };
+  return { items: next, changed, newBarcodes, updatedBarcodes };
 }

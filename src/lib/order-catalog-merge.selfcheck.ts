@@ -14,7 +14,7 @@ const base: OrderProduct = {
 
 // 1) 바코드 매칭되면 공용 필드가 Supabase 값으로 덮어써진다
 {
-  const { items, changed } = mergeCatalogIntoProducts(
+  const { items, changed, newBarcodes, updatedBarcodes } = mergeCatalogIntoProducts(
     [base],
     [{ barcode: '111', name: '새이름', brand: '새브랜드', price: 2000, category: '콘', image_uri: 'http://x/1.jpg' }],
     new Set(),
@@ -23,6 +23,11 @@ const base: OrderProduct = {
   console.assert(items[0].name === '새이름', '이름이 Supabase 값으로 덮어써져야 함');
   console.assert(items[0].price === 2000, '가격이 Supabase 값으로 덮어써져야 함');
   console.assert(items[0].imageUri === 'http://x/1.jpg', '사진이 Supabase 값으로 덮어써져야 함');
+  console.assert(
+    updatedBarcodes.length === 1 && updatedBarcodes[0] === '111',
+    '필드가 바뀐 기존 상품은 updatedBarcodes에 담겨야 함',
+  );
+  console.assert(newBarcodes.length === 0, '기존 상품 수정은 newBarcodes에 담기면 안 됨');
 }
 
 // 2) 완전히 동일하면 changed=false
@@ -37,7 +42,7 @@ const base: OrderProduct = {
 
 // 3) 로컬에 없는 바코드는 신규 상품으로 추가된다
 {
-  const { items, changed } = mergeCatalogIntoProducts(
+  const { items, changed, newBarcodes, updatedBarcodes } = mergeCatalogIntoProducts(
     [base],
     [{ barcode: '222', name: '신상품', brand: '브랜드', price: 500, category: '바', image_uri: null }],
     new Set(),
@@ -46,6 +51,11 @@ const base: OrderProduct = {
   console.assert(changed, '신규 추가는 changed=true여야 함');
   console.assert(items.length === 2, '상품이 하나 추가돼야 함');
   console.assert(items[1].id === 'new-1' && items[1].barcode === '222', '신규 상품 필드가 카탈로그 값과 일치해야 함');
+  console.assert(
+    newBarcodes.length === 1 && newBarcodes[0] === '222',
+    '새로 추가된 상품은 newBarcodes에 담겨야 함',
+  );
+  console.assert(updatedBarcodes.length === 0, '신규 추가는 updatedBarcodes에 담기면 안 됨');
 }
 
 // 4) removedBarcodes에 있으면 재생성하지 않는다
