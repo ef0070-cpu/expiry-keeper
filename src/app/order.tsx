@@ -675,6 +675,7 @@ export default function Order() {
             key="search-list"
             data={filtered}
             keyExtractor={(item) => item.id}
+            keyboardShouldPersistTaps="handled"
             contentContainerStyle={{ paddingTop: 12, paddingBottom: 120 + insets.bottom }}
             renderItem={({ item }) => (
               <CatalogRow
@@ -779,6 +780,7 @@ export default function Order() {
             data={fridgeProducts}
             keyExtractor={(item) => item.id}
             numColumns={3}
+            keyboardShouldPersistTaps="handled"
             contentContainerStyle={{ padding: 16, paddingBottom: 120 + insets.bottom }}
             columnWrapperStyle={{ gap: 10 }}
             ListHeaderComponent={
@@ -1015,6 +1017,7 @@ const AddToFridgeModal = memo(function AddToFridgeModal({
             data={results}
             keyExtractor={(item) => item.id}
             style={{ maxHeight: 360 }}
+            keyboardShouldPersistTaps="handled"
             renderItem={({ item }) => (
               <Pressable
                 onPress={() => onPick(item.id)}
