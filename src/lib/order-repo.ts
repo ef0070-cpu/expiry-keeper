@@ -215,6 +215,12 @@ export async function addFridgeSection(name: string): Promise<FridgeSection[]> {
   return next;
 }
 
+/** 구역 탭이 보이는 순서를 사용자가 드래그로 정한 순서로 저장한다. */
+export async function reorderFridgeSections(orderedSections: FridgeSection[]): Promise<FridgeSection[]> {
+  await writeFridgeSections(orderedSections);
+  return orderedSections;
+}
+
 /** 구역 이름을 바꾸고, 이미 그 구역에 배정된 상품들(모든 매장)의 배정 기록도 새 이름으로
  * 맞춰준다 — 안 그러면 이름을 바꾸는 순간 기존에 배정해둔 상품들이 전부 사라진 것처럼 보인다. */
 export async function renameFridgeSection(from: string, to: string): Promise<FridgeSection[]> {
@@ -287,6 +293,21 @@ export async function removeFromFridgeSection(
 ): Promise<FridgeAssignment[]> {
   const list = await listFridgeAssignments(storeId);
   const next = list.filter((a) => a.productId !== productId);
+  await writeFridgeAssignments(storeId, next);
+  return next;
+}
+
+/** 한 구역 안에서 상품이 보이는 순서를 사용자가 드래그로 정한 순서로 저장한다. 다른 구역의
+ * 배정은 그대로 두고, 이 구역 몫만 orderedProductIds 순서로 다시 쓴다. */
+export async function reorderFridgeAssignments(
+  storeId: string,
+  section: FridgeSection,
+  orderedProductIds: string[],
+): Promise<FridgeAssignment[]> {
+  const list = await listFridgeAssignments(storeId);
+  const others = list.filter((a) => a.section !== section);
+  const reordered = orderedProductIds.map((productId) => ({ productId, section }));
+  const next = [...others, ...reordered];
   await writeFridgeAssignments(storeId, next);
   return next;
 }

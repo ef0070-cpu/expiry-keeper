@@ -3,6 +3,7 @@ import { Image } from 'expo-image';
 import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, FlatList, Modal, Pressable, Text, TextInput, View } from 'react-native';
+import DraggableFlatList, { RenderItemParams } from 'react-native-draggable-flatlist';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Chip from '@/components/Chip';
 import Thumbnail from '@/components/Thumbnail';
@@ -29,6 +30,8 @@ import {
   renameFridgeSection,
   renameOrderCategory,
   renameStore,
+  reorderFridgeAssignments,
+  reorderFridgeSections,
   saveOrderProduct,
   seedDefaultOrderProducts,
   setActiveStoreId,
@@ -236,11 +239,14 @@ export default function Order() {
 
   // 빠른발주: 현재 구역에 배정되고 상태가 시판중인 상품만 그리드에 보여준다(단종/일시중지는
   // 자동 숨김 — 다시 active로 바꾸면 배정 정보가 남아 있어 별도 조작 없이 재노출됨).
+  // fridgeAssignments 배열의 저장 순서를 그대로 표시 순서로 쓴다 — 드래그로 정렬한 순서가
+  // 실제로 보이려면 products 배열 순서가 아니라 이 배열 순서를 따라야 한다.
   const fridgeProducts = useMemo(() => {
-    const idsInSection = new Set(
-      fridgeAssignments.filter((a) => a.section === activeSection).map((a) => a.productId),
-    );
-    return products.filter((p) => idsInSection.has(p.id) && (p.status ?? 'active') === 'active');
+    const productById = new Map(products.map((p) => [p.id, p]));
+    return fridgeAssignments
+      .filter((a) => a.section === activeSection)
+      .map((a) => productById.get(a.productId))
+      .filter((p): p is OrderProduct => !!p && (p.status ?? 'active') === 'active');
   }, [products, fridgeAssignments, activeSection]);
 
   const fridgeSectionByProductId = useMemo(
@@ -268,6 +274,20 @@ export default function Order() {
     },
     [activeStoreId, activeSection],
   );
+
+  const onReorderFridgeProducts = useCallback(
+    async (orderedProducts: OrderProduct[]) => {
+      if (!activeStoreId) return;
+      setFridgeAssignments(
+        await reorderFridgeAssignments(activeStoreId, activeSection, orderedProducts.map((p) => p.id)),
+      );
+    },
+    [activeStoreId, activeSection],
+  );
+
+  const onReorderFridgeSections = useCallback(async (sections: FridgeSection[]) => {
+    setFridgeSections(await reorderFridgeSections(sections));
+  }, []);
 
   const totalCount = Object.values(cart).reduce((sum, qty) => sum + qty, 0);
 
@@ -506,18 +526,31 @@ export default function Order() {
         }}
       />
 
-      <Pressable
-        onPress={() => setShowStoreModal(true)}
-        className="mx-4 mt-3 flex-row items-center self-start rounded-full border border-line bg-paper px-3 py-1.5 active:opacity-70"
-        accessibilityRole="button"
-        accessibilityLabel="매장 선택"
-      >
-        <MaterialCommunityIcons name="storefront-outline" size={16} color="#1A1A1A" />
-        <Text className="text-ink ml-1.5 text-sm font-medium">
-          {stores.find((s) => s.id === activeStoreId)?.name ?? '매장 선택 안 함'}
-        </Text>
-        <MaterialCommunityIcons name="chevron-down" size={16} color="#888888" />
-      </Pressable>
+      <View className="mx-4 mt-3 flex-row items-center justify-between">
+        <Pressable
+          onPress={() => setShowStoreModal(true)}
+          className="flex-row items-center self-start rounded-full border border-line bg-paper px-3 py-1.5 active:opacity-70"
+          accessibilityRole="button"
+          accessibilityLabel="매장 선택"
+        >
+          <MaterialCommunityIcons name="storefront-outline" size={16} color="#1A1A1A" />
+          <Text className="text-ink ml-1.5 text-sm font-medium">
+            {stores.find((s) => s.id === activeStoreId)?.name ?? '매장 선택 안 함'}
+          </Text>
+          <MaterialCommunityIcons name="chevron-down" size={16} color="#888888" />
+        </Pressable>
+
+        {mode === 'quick' && activeStoreId && activeSection ? (
+          <Pressable
+            onPress={() => setShowAddToFridge(true)}
+            className="h-9 w-9 items-center justify-center rounded-full border border-line bg-paper active:opacity-70"
+            accessibilityRole="button"
+            accessibilityLabel={`${activeSection} 구역에 상품 추가`}
+          >
+            <MaterialCommunityIcons name="plus" size={20} color="#1A1A1A" />
+          </Pressable>
+        ) : null}
+      </View>
 
       <StoreSwitcherModal
         visible={showStoreModal}
@@ -773,9 +806,10 @@ export default function Order() {
             onAdd={onAddFridgeSection}
             onRename={onRenameFridgeSection}
             onDelete={onDeleteFridgeSection}
+            onReorder={onReorderFridgeSections}
             onClose={() => setShowFridgeSectionModal(false)}
           />
-          <FlatList
+          <DraggableFlatList
             key="quick-grid"
             data={fridgeProducts}
             keyExtractor={(item) => item.id}
@@ -783,30 +817,22 @@ export default function Order() {
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={{ padding: 16, paddingBottom: 120 + insets.bottom }}
             columnWrapperStyle={{ gap: 10 }}
-            ListHeaderComponent={
-              <Pressable
-                onPress={() => setShowAddToFridge(true)}
-                className="mb-3 flex-row items-center justify-center rounded-xl border border-dashed border-line py-3"
-              >
-                <MaterialCommunityIcons name="plus" size={18} color="#888888" />
-                <Text className="text-muted ml-1.5 text-sm font-medium">
-                  '{activeSection}' 구역에 상품 추가
-                </Text>
-              </Pressable>
-            }
-            renderItem={({ item }) => (
+            onDragEnd={({ data }) => onReorderFridgeProducts(data)}
+            renderItem={({ item, drag, isActive }: RenderItemParams<OrderProduct>) => (
               <FridgeTile
                 product={item}
                 qty={cart[item.id] ?? 0}
+                dragging={isActive}
                 onTap={() => changeQty(item.id, 1)}
                 onDecrement={() => changeQty(item.id, -1)}
                 onLongPress={() => onLongPressFridgeTile(item)}
                 onRemove={() => onRemoveFridgeTile(item)}
+                onDragStart={drag}
               />
             )}
             ListEmptyComponent={
               <Text className="text-muted mt-8 text-center text-sm">
-                이 구역에 등록된 상품이 없습니다. 위 버튼으로 추가해 보세요.
+                이 구역에 등록된 상품이 없습니다. 위쪽 매장 선택 옆 + 버튼으로 추가해 보세요.
               </Text>
             }
           />
@@ -856,24 +882,28 @@ export default function Order() {
 const FridgeTile = memo(function FridgeTile({
   product,
   qty,
+  dragging,
   onTap,
   onDecrement,
   onLongPress,
   onRemove,
+  onDragStart,
 }: {
   product: OrderProduct;
   qty: number;
+  dragging: boolean;
   onTap: () => void;
   onDecrement: () => void;
   onLongPress: () => void;
   onRemove: () => void;
+  onDragStart: () => void;
 }) {
   return (
     <Pressable
       onPress={onTap}
       onLongPress={onLongPress}
-      className="mb-3 flex-1 items-center rounded-xl border border-line bg-paper p-2 active:opacity-70"
-      style={{ maxWidth: '31%' }}
+      className="mb-3 flex-1 items-center rounded-xl border bg-paper p-2 active:opacity-70"
+      style={{ maxWidth: '31%', borderColor: dragging ? '#CC2222' : '#E5E5E5', opacity: dragging ? 0.8 : 1 }}
     >
       <Pressable
         onPress={onRemove}
@@ -883,6 +913,16 @@ const FridgeTile = memo(function FridgeTile({
         accessibilityLabel={`${product.name} 이 구역에서 빼기`}
       >
         <MaterialCommunityIcons name="trash-can-outline" size={15} color="#BBBBBB" />
+      </Pressable>
+      <Pressable
+        onLongPress={onDragStart}
+        delayLongPress={150}
+        hitSlop={8}
+        className="absolute left-1 top-1 z-10 h-6 w-6 items-center justify-center rounded-full bg-paper"
+        accessibilityRole="button"
+        accessibilityLabel={`${product.name} 순서 옮기기(꾹 눌러서 드래그)`}
+      >
+        <MaterialCommunityIcons name="drag" size={15} color="#BBBBBB" />
       </Pressable>
       <Thumbnail uri={product.imageUri} size={64} radius={8} iconSize={22} />
       <Text className="text-ink mt-1.5 text-center text-xs font-bold" numberOfLines={2}>
@@ -1179,6 +1219,7 @@ const FridgeSectionModal = memo(function FridgeSectionModal({
   onAdd,
   onRename,
   onDelete,
+  onReorder,
   onClose,
 }: {
   visible: boolean;
@@ -1186,6 +1227,7 @@ const FridgeSectionModal = memo(function FridgeSectionModal({
   onAdd: (name: string) => void;
   onRename: (from: string, to: string) => void;
   onDelete: (name: string) => void;
+  onReorder: (sections: string[]) => void;
   onClose: () => void;
 }) {
   const [newName, setNewName] = useState('');
@@ -1219,38 +1261,51 @@ const FridgeSectionModal = memo(function FridgeSectionModal({
           style={{ maxHeight: '70%' }}
         >
           <Text className="text-ink mb-2 text-base font-bold">구역 관리</Text>
+          <Text className="text-muted mb-2 text-xs">왼쪽 손잡이를 꾹 눌러 끌면 순서를 바꿀 수 있어요</Text>
 
-          {sections.map((s) =>
-            editingName === s ? (
-              <View key={s} className="flex-row items-center gap-2 px-3 py-2">
-                <TextInput
-                  className="text-ink flex-1 rounded-xl border border-line bg-bg px-3 py-2 text-sm"
-                  value={editingValue}
-                  onChangeText={setEditingValue}
-                  onSubmitEditing={submitRename}
-                  autoFocus
-                />
-                <Pressable onPress={submitRename} hitSlop={8}>
-                  <Text className="text-primary text-sm font-medium">저장</Text>
-                </Pressable>
-                <Pressable onPress={() => setEditingName(null)} hitSlop={8}>
-                  <Text className="text-muted text-sm">취소</Text>
-                </Pressable>
-              </View>
-            ) : (
-              <View key={s} className="flex-row items-center justify-between rounded-xl px-3 py-3">
-                <Text className="text-ink flex-1 text-sm font-medium" numberOfLines={1}>
-                  {s}
-                </Text>
-                <Pressable onPress={() => startRename(s)} hitSlop={8} className="ml-3">
-                  <MaterialCommunityIcons name="pencil-outline" size={18} color="#888888" />
-                </Pressable>
-                <Pressable onPress={() => onDelete(s)} hitSlop={8} className="ml-3">
-                  <MaterialCommunityIcons name="trash-can-outline" size={18} color="#888888" />
-                </Pressable>
-              </View>
-            ),
-          )}
+          <DraggableFlatList
+            data={sections}
+            keyExtractor={(s) => s}
+            style={{ maxHeight: 320 }}
+            onDragEnd={({ data }) => onReorder(data)}
+            renderItem={({ item: s, drag, isActive }: RenderItemParams<string>) =>
+              editingName === s ? (
+                <View className="flex-row items-center gap-2 px-3 py-2">
+                  <TextInput
+                    className="text-ink flex-1 rounded-xl border border-line bg-bg px-3 py-2 text-sm"
+                    value={editingValue}
+                    onChangeText={setEditingValue}
+                    onSubmitEditing={submitRename}
+                    autoFocus
+                  />
+                  <Pressable onPress={submitRename} hitSlop={8}>
+                    <Text className="text-primary text-sm font-medium">저장</Text>
+                  </Pressable>
+                  <Pressable onPress={() => setEditingName(null)} hitSlop={8}>
+                    <Text className="text-muted text-sm">취소</Text>
+                  </Pressable>
+                </View>
+              ) : (
+                <View
+                  className="flex-row items-center justify-between rounded-xl px-1 py-1"
+                  style={{ backgroundColor: isActive ? '#F5F5F5' : 'transparent' }}
+                >
+                  <Pressable onLongPress={drag} delayLongPress={150} hitSlop={8} className="px-2 py-2">
+                    <MaterialCommunityIcons name="drag" size={18} color="#BBBBBB" />
+                  </Pressable>
+                  <Text className="text-ink flex-1 px-1 py-2 text-sm font-medium" numberOfLines={1}>
+                    {s}
+                  </Text>
+                  <Pressable onPress={() => startRename(s)} hitSlop={8} className="ml-3">
+                    <MaterialCommunityIcons name="pencil-outline" size={18} color="#888888" />
+                  </Pressable>
+                  <Pressable onPress={() => onDelete(s)} hitSlop={8} className="ml-3">
+                    <MaterialCommunityIcons name="trash-can-outline" size={18} color="#888888" />
+                  </Pressable>
+                </View>
+              )
+            }
+          />
 
           <View className="mt-3 flex-row gap-2">
             <TextInput
