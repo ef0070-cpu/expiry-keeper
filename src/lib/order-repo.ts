@@ -2,10 +2,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { upsertBarcodeCatalog } from './barcode-catalog';
 import { mergeCatalogIntoProducts, type OrderCatalogRow } from './order-catalog-merge';
 import { submitNewOrderProduct } from './order-report';
-import { submitPhotoCandidateIfChanged } from './photo-candidates';
+import { getSubmittedPhotoCandidates, submitPhotoCandidateIfChanged } from './photo-candidates';
 import { newId } from './repo';
 import { supabase } from './supabase';
-import { OrderCart, OrderProduct } from './order-types';
+import { FridgeAssignment, FridgeSection, OrderCart, OrderProduct, Store } from './order-types';
 import { DEFAULT_ORDER_PRODUCTS } from './order-seed-data';
 
 export { newId };
@@ -15,6 +15,11 @@ const CATEGORIES_KEY = 'orderCategories:v1';
 const CART_KEY = 'orderCart:v1';
 const REMOVED_BARCODES_KEY = 'removedOrderBarcodes:v1';
 const CATEGORY_OVERRIDE_KEY = 'orderCategoryOverrides:v1';
+const CATALOG_UPDATE_BADGE_KEY = 'orderCatalogUpdateBadges:v1';
+const STORES_KEY = 'stores:v1';
+const ACTIVE_STORE_KEY = 'activeStoreId:v1';
+
+export type CatalogUpdateBadge = 'new' | 'updated';
 
 const DEFAULT_CATEGORIES = ['바', '콘', '튜브', '샌드/기타', '홈/컵'];
 
@@ -58,7 +63,11 @@ export async function saveOrderProduct(p: OrderProduct): Promise<OrderProduct> {
   if (isNew) {
     submitNewOrderProduct(p).catch(() => {});
   } else if (p.barcode && p.imageUri) {
-    submitPhotoCandidateIfChanged(p.barcode, p.imageUri).catch(() => {});
+    // 로컬 오버라이드 기록까지는 기다린다(빠른 로컬 저장) — 그래야 저장 직후 목록으로 돌아가
+    // syncOrderCatalog가 실행돼도 방금 고른 사진이 도로 덮어써지지 않는다. 네트워크 후보 제출
+    // 자체는 이 함수 내부에서 best-effort로 처리되어 여기서 더 기다리지 않는다. 이 로컬 기록이
+    // 실패해도(예: AsyncStorage 오류) 이미 저장된 상품 자체는 살아있으니 저장 실패로 취급하지 않는다.
+    await submitPhotoCandidateIfChanged(p.barcode, p.imageUri).catch(() => {});
   }
   // 카테고리 수정은 공용 카탈로그 승인 절차를 안 거치므로, 다음 syncOrderCatalog가
   // 공용 값으로 도로 덮어쓰지 않도록 이 바코드의 로컬 지정값을 기억해둔다.
@@ -138,15 +147,108 @@ export async function deleteOrderCategory(name: string): Promise<void> {
   await writeOrderCategories(items.filter((c) => c !== name));
 }
 
+// ---------- 매장 ----------
+
+export async function listStores(): Promise<Store[]> {
+  const raw = await AsyncStorage.getItem(STORES_KEY);
+  return raw ? (JSON.parse(raw) as Store[]) : [];
+}
+
+async function writeStores(stores: Store[]): Promise<void> {
+  await AsyncStorage.setItem(STORES_KEY, JSON.stringify(stores));
+}
+
+export async function addStore(name: string): Promise<Store[]> {
+  const stores = await listStores();
+  const next = [...stores, { id: newId(), name }];
+  await writeStores(next);
+  return next;
+}
+
+export async function renameStore(id: string, name: string): Promise<Store[]> {
+  const stores = await listStores();
+  const next = stores.map((s) => (s.id === id ? { ...s, name } : s));
+  await writeStores(next);
+  return next;
+}
+
+/** 매장을 삭제하고 그 매장의 장바구니도 함께 지운다. 삭제한 매장이 선택돼 있었으면 선택을 해제한다
+ * (해제되면 매장 미선택 상태의 전역 장바구니를 쓰게 된다). */
+export async function deleteStore(id: string): Promise<Store[]> {
+  const stores = await listStores();
+  const next = stores.filter((s) => s.id !== id);
+  await writeStores(next);
+  await AsyncStorage.removeItem(`orderCart:${id}`);
+  await AsyncStorage.removeItem(fridgeAssignmentsKey(id));
+  if ((await getActiveStoreId()) === id) await setActiveStoreId(null);
+  return next;
+}
+
+export async function getActiveStoreId(): Promise<string | null> {
+  return AsyncStorage.getItem(ACTIVE_STORE_KEY);
+}
+
+export async function setActiveStoreId(id: string | null): Promise<void> {
+  if (id) await AsyncStorage.setItem(ACTIVE_STORE_KEY, id);
+  else await AsyncStorage.removeItem(ACTIVE_STORE_KEY);
+}
+
+// ---------- 냉장고 구역 배정 (매장별) ----------
+
+export const FRIDGE_SECTIONS: FridgeSection[] = ['600바', '100바콘류', '1000바', '샌드류'];
+
+function fridgeAssignmentsKey(storeId: string): string {
+  return `fridgeAssignments:${storeId}`;
+}
+
+export async function listFridgeAssignments(storeId: string): Promise<FridgeAssignment[]> {
+  const raw = await AsyncStorage.getItem(fridgeAssignmentsKey(storeId));
+  return raw ? (JSON.parse(raw) as FridgeAssignment[]) : [];
+}
+
+async function writeFridgeAssignments(storeId: string, list: FridgeAssignment[]): Promise<void> {
+  await AsyncStorage.setItem(fridgeAssignmentsKey(storeId), JSON.stringify(list));
+}
+
+/** 상품을 이 매장의 특정 구역에 배정한다. 이미 다른 구역에 있었으면 그 구역에서 빼고 새 구역으로
+ * 옮긴다(한 상품은 매장당 한 구역에만 있을 수 있음). */
+export async function assignToFridgeSection(
+  storeId: string,
+  productId: string,
+  section: FridgeSection,
+): Promise<FridgeAssignment[]> {
+  const list = await listFridgeAssignments(storeId);
+  const next = [...list.filter((a) => a.productId !== productId), { productId, section }];
+  await writeFridgeAssignments(storeId, next);
+  return next;
+}
+
+export async function removeFromFridgeSection(
+  storeId: string,
+  productId: string,
+): Promise<FridgeAssignment[]> {
+  const list = await listFridgeAssignments(storeId);
+  const next = list.filter((a) => a.productId !== productId);
+  await writeFridgeAssignments(storeId, next);
+  return next;
+}
+
 // ---------- 장바구니 ----------
+// 매장을 선택 중이면 매장별로 분리된 장바구니(`orderCart:{storeId}`)를, 선택 안 했으면 기존
+// 전역 카트(`orderCart:v1`)를 그대로 쓴다 — 매장을 안 쓰는 사용자는 동작이 그대로 유지된다.
+
+async function resolveCartKey(): Promise<string> {
+  const storeId = await getActiveStoreId();
+  return storeId ? `orderCart:${storeId}` : CART_KEY;
+}
 
 export async function getOrderCart(): Promise<OrderCart> {
-  const raw = await AsyncStorage.getItem(CART_KEY);
+  const raw = await AsyncStorage.getItem(await resolveCartKey());
   return raw ? (JSON.parse(raw) as OrderCart) : {};
 }
 
 export async function writeOrderCart(cart: OrderCart): Promise<void> {
-  await AsyncStorage.setItem(CART_KEY, JSON.stringify(cart));
+  await AsyncStorage.setItem(await resolveCartKey(), JSON.stringify(cart));
 }
 
 /** 수량을 절대값으로 설정한다 (0 이하면 항목 제거). 갱신된 전체 카트를 반환한다. */
@@ -186,19 +288,53 @@ export async function syncOrderCatalog(): Promise<void> {
       .select('barcode, name, brand, price, category, image_uri');
     if (error || !data) return;
 
-    const [items, removedBarcodes, categoryOverrides] = await Promise.all([
+    const [items, removedBarcodes, categoryOverrides, photoOverrides] = await Promise.all([
       listOrderProducts(),
       getRemovedBarcodes(),
       getCategoryOverrides(),
+      getSubmittedPhotoCandidates(),
     ]);
-    const rows = (data as OrderCatalogRow[]).map((row) =>
-      categoryOverrides.has(row.barcode)
+    const rows = (data as OrderCatalogRow[]).map((row) => {
+      const withCategory = categoryOverrides.has(row.barcode)
         ? { ...row, category: categoryOverrides.get(row.barcode)! }
-        : row,
+        : row;
+      // 이 기기에서 직접 고른 사진은 투표로 대표사진이 되기 전까지 공용 값이 덮어쓰지 않게 한다
+      // (카테고리 오버라이드와 같은 이유).
+      return photoOverrides.has(row.barcode)
+        ? { ...withCategory, image_uri: photoOverrides.get(row.barcode)! }
+        : withCategory;
+    });
+    const { items: merged, changed, newBarcodes, updatedBarcodes } = mergeCatalogIntoProducts(
+      items,
+      rows,
+      removedBarcodes,
     );
-    const { items: merged, changed } = mergeCatalogIntoProducts(items, rows, removedBarcodes);
     if (changed) await writeOrderProducts(merged);
+    if (newBarcodes.length || updatedBarcodes.length) {
+      const badges = await getCatalogUpdateBadges();
+      for (const b of newBarcodes) badges.set(b, 'new');
+      for (const b of updatedBarcodes) badges.set(b, 'updated');
+      await writeCatalogUpdateBadges(badges);
+    }
   } catch {
     // best-effort: 오프라인 등 실패 시 기존 로컬 상태 유지
   }
+}
+
+/** 공용 카탈로그 동기화로 새로 추가되거나(new) 필드가 바뀐(updated) 상품의 바코드 목록.
+ * 발주 목록 화면이 이걸로 "신규"/"수정" 뱃지를 표시하고 최상단에 올린다. 사용자가 해당 상품을
+ * 열어보면 clearCatalogUpdateBadge로 지운다 — 안 그러면 계속 최상단에 남는다. */
+export async function getCatalogUpdateBadges(): Promise<Map<string, CatalogUpdateBadge>> {
+  const raw = await AsyncStorage.getItem(CATALOG_UPDATE_BADGE_KEY);
+  return new Map(Object.entries(raw ? (JSON.parse(raw) as Record<string, CatalogUpdateBadge>) : {}));
+}
+
+async function writeCatalogUpdateBadges(badges: Map<string, CatalogUpdateBadge>): Promise<void> {
+  await AsyncStorage.setItem(CATALOG_UPDATE_BADGE_KEY, JSON.stringify(Object.fromEntries(badges)));
+}
+
+export async function clearCatalogUpdateBadge(barcode: string): Promise<void> {
+  const badges = await getCatalogUpdateBadges();
+  if (!badges.delete(barcode)) return;
+  await writeCatalogUpdateBadges(badges);
 }

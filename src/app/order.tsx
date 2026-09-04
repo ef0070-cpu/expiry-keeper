@@ -2,25 +2,38 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, FlatList, Pressable, Text, TextInput, View } from 'react-native';
+import { Alert, FlatList, Modal, Pressable, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Chip from '@/components/Chip';
 import Thumbnail from '@/components/Thumbnail';
 import {
   addOrderCategory,
+  addStore,
+  assignToFridgeSection,
+  CatalogUpdateBadge,
+  clearCatalogUpdateBadge,
   deleteOrderCategory,
   deleteOrderProduct,
+  deleteStore,
+  FRIDGE_SECTIONS,
+  getActiveStoreId,
+  getCatalogUpdateBadges,
   getOrderCart,
+  listFridgeAssignments,
   listOrderCategories,
   listOrderProducts,
+  listStores,
+  removeFromFridgeSection,
   renameOrderCategory,
+  renameStore,
   saveOrderProduct,
   seedDefaultOrderProducts,
+  setActiveStoreId,
   syncOrderCatalog,
   writeOrderCart,
 } from '@/lib/order-repo';
-import { OrderCart, OrderProduct, OrderStatus } from '@/lib/order-types';
-import { matchesSearch } from '@/lib/korean-search';
+import { FridgeAssignment, FridgeSection, OrderCart, OrderProduct, OrderStatus, Store } from '@/lib/order-types';
+import { searchOrderProducts } from '@/lib/order-search';
 
 const STATUS_META: Record<OrderStatus, { label: string; color: string }> = {
   active: { label: '시판중', color: '#2E7D32' },
@@ -28,11 +41,26 @@ const STATUS_META: Record<OrderStatus, { label: string; color: string }> = {
   paused: { label: '생산중단', color: '#F9A825' },
 };
 
+const UPDATE_BADGE_META: Record<CatalogUpdateBadge, { label: string; color: string }> = {
+  new: { label: '신규', color: '#2962FF' },
+  updated: { label: '수정', color: '#F9A825' },
+};
+
 export default function Order() {
   const insets = useSafeAreaInsets();
   const [products, setProducts] = useState<OrderProduct[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [cart, setCart] = useState<OrderCart>({});
+  const [updateBadges, setUpdateBadges] = useState<Map<string, CatalogUpdateBadge>>(new Map());
+  const [stores, setStores] = useState<Store[]>([]);
+  const [activeStoreId, setActiveStoreIdState] = useState<string | null>(null);
+  const [showStoreModal, setShowStoreModal] = useState(false);
+  const [mode, setMode] = useState<'search' | 'quick'>('search');
+  const [fridgeAssignments, setFridgeAssignments] = useState<FridgeAssignment[]>([]);
+  const [activeSection, setActiveSection] = useState<FridgeSection>(FRIDGE_SECTIONS[0]);
+  const [showAddToFridge, setShowAddToFridge] = useState(false);
+  const [fridgeSearchQuery, setFridgeSearchQuery] = useState('');
+  const [quickSearchQuery, setQuickSearchQuery] = useState('');
   const [query, setQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('전체');
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
@@ -45,15 +73,65 @@ export default function Order() {
   const scanParams = useLocalSearchParams<{ scannedBarcode?: string; nonce?: string }>();
 
   const loadCatalog = useCallback(async () => {
-    const [productList, categoryList, cartData] = await Promise.all([
+    const [productList, categoryList, cartData, badges, storeList, activeId] = await Promise.all([
       listOrderProducts(),
       listOrderCategories(),
       getOrderCart(),
+      getCatalogUpdateBadges(),
+      listStores(),
+      getActiveStoreId(),
     ]);
     setProducts(productList);
     setCategories(categoryList);
     setCart(cartData);
+    setUpdateBadges(badges);
+    setStores(storeList);
+    setActiveStoreIdState(activeId);
+    setFridgeAssignments(activeId ? await listFridgeAssignments(activeId) : []);
   }, []);
+
+  const switchStore = useCallback(
+    async (id: string | null) => {
+      await setActiveStoreId(id);
+      setActiveStoreIdState(id);
+      setShowStoreModal(false);
+      await loadCatalog();
+    },
+    [loadCatalog],
+  );
+
+  const onAddStore = useCallback(
+    async (name: string) => {
+      const next = await addStore(name);
+      setStores(next);
+      const created = next[next.length - 1];
+      if (created) await switchStore(created.id);
+    },
+    [switchStore],
+  );
+
+  const onRenameStore = useCallback(async (id: string, name: string) => {
+    setStores(await renameStore(id, name));
+  }, []);
+
+  const onDeleteStore = useCallback(
+    (id: string, name: string) => {
+      Alert.alert('매장 삭제', `'${name}' 매장을 삭제할까요? 이 매장의 장바구니도 함께 삭제됩니다.`, [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '삭제',
+          style: 'destructive',
+          onPress: async () => {
+            const wasActive = activeStoreId === id;
+            const next = await deleteStore(id);
+            setStores(next);
+            if (wasActive) await loadCatalog();
+          },
+        },
+      ]);
+    },
+    [activeStoreId, loadCatalog],
+  );
 
   const load = useCallback(async () => {
     await syncOrderCatalog();
@@ -85,42 +163,65 @@ export default function Order() {
   // 재필터링하면 저사양 기기에서 입력이 밀릴 수 있어, React가 재계산을 뒤로 미루게 한다.
   const deferredQuery = useDeferredValue(query);
 
+  // 공용 카탈로그 동기화로 새로 생기거나(신규) 정보가 바뀐(수정) 상품을 최상단에 모아 보여준다.
+  const hasBadge = useCallback(
+    (p: OrderProduct) => (p.barcode ? updateBadges.has(p.barcode) : false),
+    [updateBadges],
+  );
+
   const filtered = useMemo(() => {
-    return products.filter((p) => {
-      if (selectedCategory !== '전체' && p.category !== selectedCategory) return false;
-      if (!deferredQuery.trim()) return true;
-      return (
-        matchesSearch(p.name, deferredQuery) ||
-        matchesSearch(p.brand, deferredQuery) ||
-        (p.barcode ?? '').includes(deferredQuery.trim())
-      );
-    });
-  }, [products, deferredQuery, selectedCategory]);
+    const byCategory = products.filter(
+      (p) => selectedCategory === '전체' || p.category === selectedCategory,
+    );
+    const badgeSorted = [...byCategory].sort((a, b) => Number(hasBadge(b)) - Number(hasBadge(a)));
+    const q = deferredQuery.trim();
+    if (!q) return badgeSorted;
+    // 검색 중엔 관련도(완전일치>시작일치>부분일치>초성/자모>오타허용)가 우선, 같은 등급 안에서는
+    // 신규/수정 뱃지가 있는 상품이 위로 온다(searchOrderProducts의 등급 정렬은 안정정렬).
+    return searchOrderProducts(badgeSorted, q);
+  }, [products, deferredQuery, selectedCategory, hasBadge]);
 
   // 카테고리 탭과 무관하게 전체 상품에서 찾는 자동완성 제안 — 검색창 바로 아래 드롭다운으로
   // 뜨는 용도라 5개로 제한한다 (스크롤 없는 빠른 담기 목적, 전체 목록은 아래에 그대로 있음).
-  // 우선순위: 상품명 완전일치 > 상품명 시작일치 > 그 외(브랜드/바코드 매칭, 이름 중간 포함 등).
-  // 이게 없으면 "수박바"를 검색했을 때 목록 순서상 먼저 나오는 "거꾸로 수박바" 같은
-  // 부분일치 상품이 완전일치 상품보다 위에 뜨는 문제가 생긴다.
-  const suggestionRank = (p: OrderProduct, q: string) => {
-    if (p.name === q) return 0;
-    if (p.name.startsWith(q)) return 1;
-    return 2;
-  };
-
   const suggestions = useMemo(() => {
     const q = deferredQuery.trim();
     if (!q) return [];
-    return products
-      .filter(
-        (p) =>
-          matchesSearch(p.name, deferredQuery) ||
-          matchesSearch(p.brand, deferredQuery) ||
-          (p.barcode ?? '').includes(q),
-      )
-      .sort((a, b) => suggestionRank(a, q) - suggestionRank(b, q))
-      .slice(0, 5);
+    return searchOrderProducts(products, q).slice(0, 5);
   }, [products, deferredQuery]);
+
+  // 빠른발주: 현재 구역에 배정되고 상태가 시판중인 상품만 그리드에 보여준다(단종/일시중지는
+  // 자동 숨김 — 다시 active로 바꾸면 배정 정보가 남아 있어 별도 조작 없이 재노출됨).
+  const fridgeProducts = useMemo(() => {
+    const idsInSection = new Set(
+      fridgeAssignments.filter((a) => a.section === activeSection).map((a) => a.productId),
+    );
+    return products.filter((p) => idsInSection.has(p.id) && (p.status ?? 'active') === 'active');
+  }, [products, fridgeAssignments, activeSection]);
+
+  const fridgeSectionByProductId = useMemo(
+    () => new Map(fridgeAssignments.map((a) => [a.productId, a.section])),
+    [fridgeAssignments],
+  );
+
+  // 빠른발주 전용 검색: 388종 전체가 아니라 이 매장에 진열(배정)된 상품만 대상으로 한다.
+  const quickSearchResults = useMemo(() => {
+    const q = quickSearchQuery.trim();
+    if (!q) return [];
+    const assignedProducts = products.filter(
+      (p) => fridgeSectionByProductId.has(p.id) && (p.status ?? 'active') === 'active',
+    );
+    return searchOrderProducts(assignedProducts, q).slice(0, 8);
+  }, [products, fridgeSectionByProductId, quickSearchQuery]);
+
+  const onAddToFridge = useCallback(
+    async (productId: string) => {
+      if (!activeStoreId) return;
+      setFridgeAssignments(await assignToFridgeSection(activeStoreId, productId, activeSection));
+      setShowAddToFridge(false);
+      setFridgeSearchQuery('');
+    },
+    [activeStoreId, activeSection],
+  );
 
   const totalCount = Object.values(cart).reduce((sum, qty) => sum + qty, 0);
 
@@ -214,9 +315,17 @@ export default function Order() {
     ]);
   };
 
-  const handleOpenProduct = useCallback((id: string) => {
+  const handleOpenProduct = useCallback((id: string, barcode: string | null) => {
+    if (barcode && updateBadges.has(barcode)) {
+      setUpdateBadges((prev) => {
+        const next = new Map(prev);
+        next.delete(barcode);
+        return next;
+      });
+      clearCatalogUpdateBadge(barcode).catch(() => {});
+    }
     router.push({ pathname: '/order-product-form', params: { id } });
-  }, []);
+  }, [updateBadges]);
 
   // Android의 Alert.alert는 버튼을 최대 3개까지만 보여준다(4개째부터 잘림) — 그래서
   // 이 메뉴는 '취소' 버튼 없이 3개(수정/상태 변경/삭제)만 둔다. 뒤로가기·바깥 탭으로도
@@ -271,6 +380,24 @@ export default function Order() {
     [load, onChangeStatus],
   );
 
+  const onLongPressFridgeTile = useCallback(
+    (p: OrderProduct) => {
+      Alert.alert(p.name, '어떻게 처리할까요?', [
+        { text: '상태 변경', onPress: () => onChangeStatus(p) },
+        {
+          text: '이 구역에서 빼기',
+          style: 'destructive',
+          onPress: async () => {
+            if (!activeStoreId) return;
+            setFridgeAssignments(await removeFromFridgeSection(activeStoreId, p.id));
+          },
+        },
+        { text: '취소', style: 'cancel' },
+      ]);
+    },
+    [activeStoreId, onChangeStatus],
+  );
+
   const onSeedDefaults = async () => {
     setSeeding(true);
     try {
@@ -312,58 +439,51 @@ export default function Order() {
         }}
       />
 
-      <View className="relative mx-4 mt-3" style={{ zIndex: 10 }}>
-        <View className="flex-row items-center rounded-xl border border-line bg-paper px-3">
-          <MaterialCommunityIcons name="magnify" size={20} color="#888888" />
-          <TextInput
-            className="text-ink ml-2 flex-1 py-2.5 text-base"
-            placeholder="상품명, 브랜드, 바코드 검색"
-            placeholderTextColor="#BBBBBB"
-            value={query}
-            onChangeText={setQuery}
-          />
-          {query ? (
-            <Pressable
-              onPress={() => setQuery('')}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel="검색어 지우기"
-            >
-              <MaterialCommunityIcons name="close-circle" size={18} color="#BBBBBB" />
-            </Pressable>
-          ) : null}
-          {suggestions.length > 0 ? (
-            <Pressable
-              onPress={() => setSuggestionsCollapsed((v) => !v)}
-              hitSlop={8}
-              className="ml-2"
-              accessibilityRole="button"
-              accessibilityLabel={suggestionsCollapsed ? '추천 목록 펼치기' : '추천 목록 접기'}
-            >
-              <MaterialCommunityIcons
-                name={suggestionsCollapsed ? 'chevron-down' : 'chevron-up'}
-                size={20}
-                color="#888888"
-              />
-            </Pressable>
-          ) : null}
-        </View>
-        {suggestions.length > 0 && !suggestionsCollapsed ? (
-          <View
-            className="absolute left-0 right-0 top-full mt-1 overflow-hidden rounded-xl border border-line bg-paper"
-            style={{ elevation: 6 }}
-          >
-            {suggestions.map((p) => (
-              <SuggestionRow
-                key={p.id}
-                product={p}
-                qty={cart[p.id] ?? 0}
-                onChangeQty={changeQty}
-                onQuickAdd={quickAdd}
-              />
-            ))}
-          </View>
-        ) : null}
+      <Pressable
+        onPress={() => setShowStoreModal(true)}
+        className="mx-4 mt-3 flex-row items-center self-start rounded-full border border-line bg-paper px-3 py-1.5 active:opacity-70"
+        accessibilityRole="button"
+        accessibilityLabel="매장 선택"
+      >
+        <MaterialCommunityIcons name="storefront-outline" size={16} color="#1A1A1A" />
+        <Text className="text-ink ml-1.5 text-sm font-medium">
+          {stores.find((s) => s.id === activeStoreId)?.name ?? '매장 선택 안 함'}
+        </Text>
+        <MaterialCommunityIcons name="chevron-down" size={16} color="#888888" />
+      </Pressable>
+
+      <StoreSwitcherModal
+        visible={showStoreModal}
+        stores={stores}
+        activeStoreId={activeStoreId}
+        onSelect={switchStore}
+        onAdd={onAddStore}
+        onRename={onRenameStore}
+        onDelete={onDeleteStore}
+        onClose={() => setShowStoreModal(false)}
+      />
+
+      <View className="mx-4 mt-3 flex-row gap-2">
+        <Pressable
+          onPress={() => setMode('search')}
+          className={`flex-1 items-center rounded-xl border py-2.5 ${
+            mode === 'search' ? 'border-primary' : 'border-line'
+          }`}
+        >
+          <Text className={`text-sm font-bold ${mode === 'search' ? 'text-primary' : 'text-ink'}`}>
+            검색발주
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={() => setMode('quick')}
+          className={`flex-1 items-center rounded-xl border py-2.5 ${
+            mode === 'quick' ? 'border-primary' : 'border-line'
+          }`}
+        >
+          <Text className={`text-sm font-bold ${mode === 'quick' ? 'text-primary' : 'text-ink'}`}>
+            빠른발주
+          </Text>
+        </Pressable>
       </View>
 
       {toastMessage ? (
@@ -378,84 +498,243 @@ export default function Order() {
         </View>
       ) : null}
 
-      <View className="mt-2.5 px-4" style={{ gap: 8 }}>
-        <View className="flex-row flex-wrap" style={{ gap: 8 }}>
-          <Chip
-            label="전체"
-            active={selectedCategory === '전체'}
-            onPress={() => setSelectedCategory('전체')}
-          />
-          {categories.map((c) => (
-            <Chip
-              key={c}
-              label={c}
-              active={selectedCategory === c}
-              onPress={() => setSelectedCategory(c)}
-              onLongPress={() => onLongPressCategory(c)}
-            />
-          ))}
-          <Chip label="+" active={false} onPress={() => setShowCategoryInput(true)} />
-        </View>
-        {showCategoryInput || editingCategory ? (
-          <View className="flex-row gap-2">
-            <TextInput
-              className="text-ink flex-1 rounded-xl border border-line bg-paper px-3 py-2 text-sm"
-              placeholder="새 카테고리 입력 (예: 컵)"
-              placeholderTextColor="#BBBBBB"
-              value={categoryInput}
-              onChangeText={setCategoryInput}
-              autoFocus
-            />
-            <Pressable
-              onPress={submitCategory}
-              className="items-center justify-center rounded-xl border border-line bg-paper px-4 active:opacity-70"
-            >
-              <Text className="text-ink text-sm font-medium">
-                {editingCategory ? '수정' : '추가'}
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={editingCategory ? cancelCategoryEdit : closeCategoryInput}
-              className="items-center justify-center px-2"
-            >
-              <Text className="text-muted text-sm">취소</Text>
-            </Pressable>
+      {mode === 'search' ? (
+        <>
+          <View className="relative mx-4 mt-3" style={{ zIndex: 10 }}>
+            <View className="flex-row items-center rounded-xl border border-line bg-paper px-3">
+              <MaterialCommunityIcons name="magnify" size={20} color="#888888" />
+              <TextInput
+                className="text-ink ml-2 flex-1 py-2.5 text-base"
+                placeholder="상품명, 브랜드, 바코드 검색"
+                placeholderTextColor="#BBBBBB"
+                value={query}
+                onChangeText={setQuery}
+              />
+              {query ? (
+                <Pressable
+                  onPress={() => setQuery('')}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="검색어 지우기"
+                >
+                  <MaterialCommunityIcons name="close-circle" size={18} color="#BBBBBB" />
+                </Pressable>
+              ) : null}
+              {suggestions.length > 0 ? (
+                <Pressable
+                  onPress={() => setSuggestionsCollapsed((v) => !v)}
+                  hitSlop={8}
+                  className="ml-2"
+                  accessibilityRole="button"
+                  accessibilityLabel={suggestionsCollapsed ? '추천 목록 펼치기' : '추천 목록 접기'}
+                >
+                  <MaterialCommunityIcons
+                    name={suggestionsCollapsed ? 'chevron-down' : 'chevron-up'}
+                    size={20}
+                    color="#888888"
+                  />
+                </Pressable>
+              ) : null}
+            </View>
+            {suggestions.length > 0 && !suggestionsCollapsed ? (
+              <View
+                className="absolute left-0 right-0 top-full mt-1 overflow-hidden rounded-xl border border-line bg-paper"
+                style={{ elevation: 6 }}
+              >
+                {suggestions.map((p) => (
+                  <SuggestionRow
+                    key={p.id}
+                    product={p}
+                    qty={cart[p.id] ?? 0}
+                    onChangeQty={changeQty}
+                    onQuickAdd={quickAdd}
+                  />
+                ))}
+              </View>
+            ) : null}
           </View>
-        ) : null}
-      </View>
 
-      <FlatList
-        data={filtered}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={{ paddingTop: 12, paddingBottom: 120 + insets.bottom }}
-        renderItem={({ item }) => (
-          <CatalogRow
-            product={item}
-            qty={cart[item.id] ?? 0}
-            onChangeQty={changeQty}
-            onPress={handleOpenProduct}
-            onLongPress={onLongPressProduct}
-          />
-        )}
-        ListEmptyComponent={
-          <View className="mt-24 items-center">
-            <MaterialCommunityIcons name="cart-outline" size={48} color="#CCCCCC" />
-            <Text className="text-muted mt-4 text-base">등록된 발주 상품이 없습니다</Text>
-            <Text className="text-muted mt-1 text-sm">
-              오른쪽 위 + 버튼을 눌러 상품을 등록해 보세요
-            </Text>
-            <Pressable
-              onPress={onSeedDefaults}
-              disabled={seeding}
-              className="mt-4 rounded-xl border border-line bg-paper px-4 py-2.5 active:opacity-70"
-            >
-              <Text className="text-ink text-sm font-medium">
-                {seeding ? '불러오는 중...' : '기본 상품 불러오기 (아이스크림 388종)'}
-              </Text>
-            </Pressable>
+          <View className="mt-2.5 px-4" style={{ gap: 8 }}>
+            <View className="flex-row flex-wrap" style={{ gap: 8 }}>
+              <Chip
+                label="전체"
+                active={selectedCategory === '전체'}
+                onPress={() => setSelectedCategory('전체')}
+              />
+              {categories.map((c) => (
+                <Chip
+                  key={c}
+                  label={c}
+                  active={selectedCategory === c}
+                  onPress={() => setSelectedCategory(c)}
+                  onLongPress={() => onLongPressCategory(c)}
+                />
+              ))}
+              <Chip label="+" active={false} onPress={() => setShowCategoryInput(true)} />
+            </View>
+            {showCategoryInput || editingCategory ? (
+              <View className="flex-row gap-2">
+                <TextInput
+                  className="text-ink flex-1 rounded-xl border border-line bg-paper px-3 py-2 text-sm"
+                  placeholder="새 카테고리 입력 (예: 컵)"
+                  placeholderTextColor="#BBBBBB"
+                  value={categoryInput}
+                  onChangeText={setCategoryInput}
+                  autoFocus
+                />
+                <Pressable
+                  onPress={submitCategory}
+                  className="items-center justify-center rounded-xl border border-line bg-paper px-4 active:opacity-70"
+                >
+                  <Text className="text-ink text-sm font-medium">
+                    {editingCategory ? '수정' : '추가'}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={editingCategory ? cancelCategoryEdit : closeCategoryInput}
+                  className="items-center justify-center px-2"
+                >
+                  <Text className="text-muted text-sm">취소</Text>
+                </Pressable>
+              </View>
+            ) : null}
           </View>
-        }
-      />
+
+          <Text className="text-muted mt-2 px-4 text-xs">
+            기본 제공되는 데이터입니다. 카테고리·사진·품명은 편하신 대로 자유롭게 수정하세요.
+          </Text>
+
+          <FlatList
+            key="search-list"
+            data={filtered}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={{ paddingTop: 12, paddingBottom: 120 + insets.bottom }}
+            renderItem={({ item }) => (
+              <CatalogRow
+                product={item}
+                qty={cart[item.id] ?? 0}
+                badge={item.barcode ? updateBadges.get(item.barcode) : undefined}
+                onChangeQty={changeQty}
+                onPress={handleOpenProduct}
+                onLongPress={onLongPressProduct}
+              />
+            )}
+            ListEmptyComponent={
+              <View className="mt-24 items-center">
+                <MaterialCommunityIcons name="cart-outline" size={48} color="#CCCCCC" />
+                <Text className="text-muted mt-4 text-base">등록된 발주 상품이 없습니다</Text>
+                <Text className="text-muted mt-1 text-sm">
+                  오른쪽 위 + 버튼을 눌러 상품을 등록해 보세요
+                </Text>
+                <Pressable
+                  onPress={onSeedDefaults}
+                  disabled={seeding}
+                  className="mt-4 rounded-xl border border-line bg-paper px-4 py-2.5 active:opacity-70"
+                >
+                  <Text className="text-ink text-sm font-medium">
+                    {seeding ? '불러오는 중...' : '기본 상품 불러오기 (아이스크림 388종)'}
+                  </Text>
+                </Pressable>
+              </View>
+            }
+          />
+        </>
+      ) : !activeStoreId ? (
+        <View className="mt-16 items-center px-6">
+          <MaterialCommunityIcons name="storefront-outline" size={40} color="#CCCCCC" />
+          <Text className="text-muted mt-3 text-center text-sm">
+            빠른발주는 매장별 진열 정보가 필요해요.{'\n'}위에서 매장을 먼저 선택하거나 추가해 주세요.
+          </Text>
+        </View>
+      ) : (
+        <>
+          <View className="mx-4 mt-1">
+            <View className="flex-row items-center rounded-xl border border-line bg-paper px-3">
+              <MaterialCommunityIcons name="magnify" size={18} color="#888888" />
+              <TextInput
+                className="text-ink ml-2 flex-1 py-2 text-sm"
+                placeholder="냉장고 진열 상품 중에서 찾기"
+                placeholderTextColor="#BBBBBB"
+                value={quickSearchQuery}
+                onChangeText={setQuickSearchQuery}
+              />
+            </View>
+            {quickSearchResults.length > 0 ? (
+              <View className="mt-1 overflow-hidden rounded-xl border border-line bg-paper">
+                {quickSearchResults.map((p) => (
+                  <Pressable
+                    key={p.id}
+                    onPress={() => {
+                      const section = fridgeSectionByProductId.get(p.id);
+                      if (section) setActiveSection(section);
+                      setQuickSearchQuery('');
+                    }}
+                    className="flex-row items-center justify-between border-b border-line px-3 py-2.5"
+                  >
+                    <Text className="text-ink flex-1 text-sm font-medium" numberOfLines={1}>
+                      {p.name}
+                    </Text>
+                    <Text className="text-muted ml-2 text-xs">
+                      🧊 {fridgeSectionByProductId.get(p.id)}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
+          </View>
+
+          <View className="mt-3 flex-row flex-wrap gap-2 px-4">
+            {FRIDGE_SECTIONS.map((s) => (
+              <Chip key={s} label={s} active={activeSection === s} onPress={() => setActiveSection(s)} />
+            ))}
+          </View>
+          <FlatList
+            key="quick-grid"
+            data={fridgeProducts}
+            keyExtractor={(item) => item.id}
+            numColumns={3}
+            contentContainerStyle={{ padding: 16, paddingBottom: 120 + insets.bottom }}
+            columnWrapperStyle={{ gap: 10 }}
+            ListHeaderComponent={
+              <Pressable
+                onPress={() => setShowAddToFridge(true)}
+                className="mb-3 flex-row items-center justify-center rounded-xl border border-dashed border-line py-3"
+              >
+                <MaterialCommunityIcons name="plus" size={18} color="#888888" />
+                <Text className="text-muted ml-1.5 text-sm font-medium">
+                  '{activeSection}' 구역에 상품 추가
+                </Text>
+              </Pressable>
+            }
+            renderItem={({ item }) => (
+              <FridgeTile
+                product={item}
+                qty={cart[item.id] ?? 0}
+                onTap={() => changeQty(item.id, 1)}
+                onLongPress={() => onLongPressFridgeTile(item)}
+              />
+            )}
+            ListEmptyComponent={
+              <Text className="text-muted mt-8 text-center text-sm">
+                이 구역에 등록된 상품이 없습니다. 위 버튼으로 추가해 보세요.
+              </Text>
+            }
+          />
+          <AddToFridgeModal
+            visible={showAddToFridge}
+            section={activeSection}
+            allProducts={products}
+            assignedIds={new Set(fridgeAssignments.map((a) => a.productId))}
+            query={fridgeSearchQuery}
+            onChangeQuery={setFridgeSearchQuery}
+            onPick={onAddToFridge}
+            onClose={() => {
+              setShowAddToFridge(false);
+              setFridgeSearchQuery('');
+            }}
+          />
+        </>
+      )}
 
       {totalCount > 0 ? (
         <View
@@ -476,29 +755,145 @@ export default function Order() {
   );
 }
 
+const FridgeTile = memo(function FridgeTile({
+  product,
+  qty,
+  onTap,
+  onLongPress,
+}: {
+  product: OrderProduct;
+  qty: number;
+  onTap: () => void;
+  onLongPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onTap}
+      onLongPress={onLongPress}
+      className="mb-3 flex-1 items-center rounded-xl border border-line bg-paper p-2 active:opacity-70"
+      style={{ maxWidth: '31%' }}
+    >
+      <Thumbnail uri={product.imageUri} size={64} radius={8} iconSize={22} />
+      <Text className="text-ink mt-1.5 text-center text-xs font-bold" numberOfLines={2}>
+        {product.name}
+      </Text>
+      {qty > 0 ? (
+        <View className="mt-1 rounded-full bg-primary px-2 py-0.5">
+          <Text className="text-paper text-xs font-bold">{qty}</Text>
+        </View>
+      ) : null}
+    </Pressable>
+  );
+});
+
+const AddToFridgeModal = memo(function AddToFridgeModal({
+  visible,
+  section,
+  allProducts,
+  assignedIds,
+  query,
+  onChangeQuery,
+  onPick,
+  onClose,
+}: {
+  visible: boolean;
+  section: FridgeSection;
+  allProducts: OrderProduct[];
+  assignedIds: Set<string>;
+  query: string;
+  onChangeQuery: (q: string) => void;
+  onPick: (productId: string) => void;
+  onClose: () => void;
+}) {
+  const results = useMemo(() => {
+    const base = query.trim() ? searchOrderProducts(allProducts, query) : allProducts;
+    return base.filter((p) => !assignedIds.has(p.id)).slice(0, 30);
+  }, [allProducts, assignedIds, query]);
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable className="flex-1 items-center justify-center bg-ink/40 px-6" onPress={onClose}>
+        <Pressable
+          onPress={(e) => e.stopPropagation()}
+          className="w-full rounded-2xl bg-paper p-4"
+          style={{ maxHeight: '75%' }}
+        >
+          <Text className="text-ink mb-2 text-base font-bold">'{section}' 구역에 상품 추가</Text>
+          <TextInput
+            className="text-ink mb-2 rounded-xl border border-line bg-bg px-3 py-2 text-sm"
+            placeholder="상품명 검색"
+            placeholderTextColor="#BBBBBB"
+            value={query}
+            onChangeText={onChangeQuery}
+          />
+          <FlatList
+            data={results}
+            keyExtractor={(item) => item.id}
+            style={{ maxHeight: 360 }}
+            renderItem={({ item }) => (
+              <Pressable
+                onPress={() => onPick(item.id)}
+                className="flex-row items-center border-b border-line py-2.5"
+              >
+                <Thumbnail uri={item.imageUri} size={36} radius={6} iconSize={16} />
+                <Text className="text-ink ml-2.5 flex-1 text-sm font-medium" numberOfLines={1}>
+                  {item.name}
+                </Text>
+              </Pressable>
+            )}
+            ListEmptyComponent={
+              <Text className="text-muted py-6 text-center text-sm">검색 결과가 없습니다</Text>
+            }
+          />
+          <Pressable onPress={onClose} className="mt-3 items-center py-2">
+            <Text className="text-muted text-sm">닫기</Text>
+          </Pressable>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+});
+
 const CatalogRow = memo(function CatalogRow({
   product,
   qty,
+  badge,
   onChangeQty,
   onPress,
   onLongPress,
 }: {
   product: OrderProduct;
   qty: number;
+  badge?: CatalogUpdateBadge;
   onChangeQty: (id: string, delta: number) => void;
-  onPress: (id: string) => void;
+  onPress: (id: string, barcode: string | null) => void;
   onLongPress: (product: OrderProduct) => void;
 }) {
   const statusMeta = STATUS_META[product.status ?? 'active'];
+  const badgeMeta = badge ? UPDATE_BADGE_META[badge] : null;
   return (
     <Pressable
-      onPress={() => onPress(product.id)}
+      onPress={() => onPress(product.id, product.barcode)}
       onLongPress={() => onLongPress(product)}
       className="mx-4 mb-2.5 flex-row items-center rounded-xl border border-line bg-paper p-3 active:opacity-70"
     >
       <Thumbnail uri={product.imageUri} size={56} radius={8} iconSize={22} />
       <View className="ml-3 flex-1">
-        <Text className="text-ink text-base font-bold">{product.name}</Text>
+        <View className="flex-row items-center gap-1.5">
+          {badgeMeta ? (
+            <View
+              className="rounded px-1.5 py-0.5"
+              style={{ backgroundColor: badgeMeta.color }}
+            >
+              <Text className="text-xs font-bold" style={{ color: '#FFFFFF' }}>
+                {badgeMeta.label}
+              </Text>
+            </View>
+          ) : null}
+          <Text className="text-ink text-base font-bold" numberOfLines={1}>
+            {product.name}
+          </Text>
+        </View>
         <Text className="text-muted mt-0.5 text-sm">
           {product.brand} · {product.price.toLocaleString()}원
         </Text>
@@ -590,5 +985,139 @@ const SuggestionRow = memo(function SuggestionRow({
         </Pressable>
       </View>
     </View>
+  );
+});
+
+const StoreSwitcherModal = memo(function StoreSwitcherModal({
+  visible,
+  stores,
+  activeStoreId,
+  onSelect,
+  onAdd,
+  onRename,
+  onDelete,
+  onClose,
+}: {
+  visible: boolean;
+  stores: Store[];
+  activeStoreId: string | null;
+  onSelect: (id: string | null) => void;
+  onAdd: (name: string) => void;
+  onRename: (id: string, name: string) => void;
+  onDelete: (id: string, name: string) => void;
+  onClose: () => void;
+}) {
+  const [newName, setNewName] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState('');
+
+  const submitAdd = () => {
+    const v = newName.trim();
+    if (!v) return;
+    onAdd(v);
+    setNewName('');
+  };
+
+  const startRename = (s: Store) => {
+    setEditingId(s.id);
+    setEditingName(s.name);
+  };
+
+  const submitRename = () => {
+    const v = editingName.trim();
+    if (v && editingId) onRename(editingId, v);
+    setEditingId(null);
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable
+        className="flex-1 items-center justify-center bg-ink/40 px-6"
+        onPress={onClose}
+      >
+        <Pressable
+          onPress={(e) => e.stopPropagation()}
+          className="w-full rounded-2xl bg-paper p-4"
+          style={{ maxHeight: '70%' }}
+        >
+          <Text className="text-ink mb-2 text-base font-bold">매장 선택</Text>
+
+          <Pressable
+            onPress={() => onSelect(null)}
+            className={`flex-row items-center justify-between rounded-xl px-3 py-3 ${
+              activeStoreId === null ? 'bg-bg' : ''
+            }`}
+          >
+            <Text className="text-ink text-sm font-medium">매장 선택 안 함 (공용 장바구니)</Text>
+            {activeStoreId === null ? (
+              <MaterialCommunityIcons name="check" size={18} color="#CC2222" />
+            ) : null}
+          </Pressable>
+
+          {stores.map((s) =>
+            editingId === s.id ? (
+              <View key={s.id} className="flex-row items-center gap-2 px-3 py-2">
+                <TextInput
+                  className="text-ink flex-1 rounded-xl border border-line bg-bg px-3 py-2 text-sm"
+                  value={editingName}
+                  onChangeText={setEditingName}
+                  onSubmitEditing={submitRename}
+                  autoFocus
+                />
+                <Pressable onPress={submitRename} hitSlop={8}>
+                  <Text className="text-primary text-sm font-medium">저장</Text>
+                </Pressable>
+                <Pressable onPress={() => setEditingId(null)} hitSlop={8}>
+                  <Text className="text-muted text-sm">취소</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <View
+                key={s.id}
+                className={`flex-row items-center justify-between rounded-xl px-3 py-3 ${
+                  activeStoreId === s.id ? 'bg-bg' : ''
+                }`}
+              >
+                <Pressable onPress={() => onSelect(s.id)} className="flex-1 flex-row items-center">
+                  <Text className="text-ink flex-1 text-sm font-medium" numberOfLines={1}>
+                    {s.name}
+                  </Text>
+                  {activeStoreId === s.id ? (
+                    <MaterialCommunityIcons name="check" size={18} color="#CC2222" />
+                  ) : null}
+                </Pressable>
+                <Pressable onPress={() => startRename(s)} hitSlop={8} className="ml-3">
+                  <MaterialCommunityIcons name="pencil-outline" size={18} color="#888888" />
+                </Pressable>
+                <Pressable onPress={() => onDelete(s.id, s.name)} hitSlop={8} className="ml-3">
+                  <MaterialCommunityIcons name="trash-can-outline" size={18} color="#888888" />
+                </Pressable>
+              </View>
+            ),
+          )}
+
+          <View className="mt-3 flex-row gap-2">
+            <TextInput
+              className="text-ink flex-1 rounded-xl border border-line bg-bg px-3 py-2 text-sm"
+              placeholder="새 매장 이름 (예: 1호 매장)"
+              placeholderTextColor="#BBBBBB"
+              value={newName}
+              onChangeText={setNewName}
+              onSubmitEditing={submitAdd}
+            />
+            <Pressable
+              onPress={submitAdd}
+              className="items-center justify-center rounded-xl border border-line bg-bg px-4 active:opacity-70"
+            >
+              <Text className="text-ink text-sm font-medium">추가</Text>
+            </Pressable>
+          </View>
+
+          <Pressable onPress={onClose} className="mt-3 items-center py-2">
+            <Text className="text-muted text-sm">닫기</Text>
+          </Pressable>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 });

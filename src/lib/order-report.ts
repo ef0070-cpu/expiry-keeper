@@ -95,17 +95,20 @@ export async function submitNewOrderProduct(product: OrderProduct): Promise<void
  * best-effort — 실패해도 로컬 저장 흐름을 막지 않는다. 성공 여부는 반환값으로 알려준다
  * (호출자가 "제출 완료"를 로컬에 기록할지 판단할 수 있도록).
  */
-export async function submitPhotoCandidate(barcode: string, photoUri: string): Promise<boolean> {
-  if (!supabase) return false;
+/** 반환값은 실제로 DB에 들어간 사진 URL(업로드 후 URL, 실패 시 null) — 호출자가 로컬에 남겨둔
+ * 원본 경로 대신 이 값으로 자기 기록을 맞출 수 있도록 한다(로컬 파일 경로와 실제 저장된 URL이
+ * 달라 나중에 삭제 매칭이 안 되는 문제 방지). */
+export async function submitPhotoCandidate(barcode: string, photoUri: string): Promise<string | null> {
+  if (!supabase) return null;
   try {
     const photoUrl = await uploadReportPhoto(photoUri);
-    if (!photoUrl) return false;
+    if (!photoUrl) return null;
     const { error } = await supabase
       .from('order_catalog_photos')
       .insert({ barcode, photo_uri: photoUrl });
-    return !error;
+    return error ? null : photoUrl;
   } catch {
-    return false;
+    return null;
   }
 }
 

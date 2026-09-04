@@ -28,6 +28,7 @@ import {
   saveOrderProduct,
 } from '@/lib/order-repo';
 import { deletePhotoCandidate, reportOrderProductIssue } from '@/lib/order-report';
+import { clearSubmittedPhotoCandidate } from '@/lib/photo-candidates';
 import { uploadPhotoToBucket } from '@/lib/storage';
 import { OrderProduct, OrderStatus } from '@/lib/order-types';
 
@@ -52,6 +53,7 @@ export default function OrderProductForm() {
   const [brand, setBrand] = useState('');
   const [price, setPrice] = useState('');
   const [barcode, setBarcode] = useState(params.barcode ?? '');
+  const [aliasesText, setAliasesText] = useState('');
   const [categories, setCategories] = useState<string[]>([]);
   const [category, setCategory] = useState('');
   const [newCategory, setNewCategory] = useState('');
@@ -82,6 +84,7 @@ export default function OrderProductForm() {
         setBrand(p.brand);
         setPrice(String(p.price));
         setBarcode(p.barcode ?? '');
+        setAliasesText((p.aliases ?? []).join(', '));
         setCategory(p.category);
         setStatus(p.status ?? 'active');
       });
@@ -176,6 +179,7 @@ export default function OrderProductForm() {
           setRemovingPhoto(true);
           try {
             await deletePhotoCandidate(trimmedBarcode, imageUri);
+            await clearSubmittedPhotoCandidate(trimmedBarcode);
             setImageUri(null);
             if (params.id) {
               await saveOrderProduct({
@@ -245,6 +249,10 @@ export default function OrderProductForm() {
     }
     setBusy(true);
     try {
+      const aliases = aliasesText
+        .split(',')
+        .map((a) => a.trim())
+        .filter(Boolean);
       const product: OrderProduct = {
         id: params.id ?? newId(),
         name: name.trim(),
@@ -254,6 +262,7 @@ export default function OrderProductForm() {
         barcode: barcode.trim() || null,
         imageUri,
         status,
+        ...(aliases.length > 0 ? { aliases } : {}),
       };
       await saveOrderProduct(product);
       router.back();
@@ -352,6 +361,11 @@ export default function OrderProductForm() {
         contentContainerStyle={{ padding: 16, paddingBottom: Math.max(insets.bottom, 16) + 32 }}
         keyboardShouldPersistTaps="handled"
       >
+        {isEdit ? (
+          <Text className="text-muted mb-3 text-xs">
+            기본 제공되는 데이터입니다. 카테고리·사진·품명은 편하신 대로 자유롭게 수정하세요.
+          </Text>
+        ) : null}
         <View className="flex-row">
           <Pressable
             onPress={pickImage}
@@ -459,6 +473,20 @@ export default function OrderProductForm() {
               onChangeText={setPrice}
             />
           </View>
+        </View>
+
+        <View className="mt-4">
+          <Label text="별칭 (검색용, 쉼표로 구분)" />
+          <TextInput
+            className="text-ink rounded-xl border border-line bg-paper px-3 py-2.5 text-base"
+            placeholder="예: 메론바, 메론아이스바"
+            placeholderTextColor="#BBBBBB"
+            value={aliasesText}
+            onChangeText={setAliasesText}
+          />
+          <Text className="text-muted mt-1.5 text-xs">
+            줄임말이나 사투리 등 다르게 부르는 이름을 등록하면 검색에서도 찾을 수 있어요
+          </Text>
         </View>
 
         <View className="mt-4">
