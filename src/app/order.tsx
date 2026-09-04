@@ -380,9 +380,16 @@ export default function Order() {
     [load, onChangeStatus],
   );
 
+  // Android의 Alert.alert는 버튼을 최대 3개까지만 보여준다 — 그래서 이 메뉴도 검색발주 쪽
+  // onLongPressProduct와 같은 방식으로 '취소' 버튼 없이 3개(수정/상태 변경/구역에서 빼기)만
+  // 둔다. 뒤로가기·바깥 탭으로도 닫히니 기능적으로 취소는 여전히 가능하다.
   const onLongPressFridgeTile = useCallback(
     (p: OrderProduct) => {
       Alert.alert(p.name, '어떻게 처리할까요?', [
+        {
+          text: '수정',
+          onPress: () => router.push({ pathname: '/order-product-form', params: { id: p.id } }),
+        },
         { text: '상태 변경', onPress: () => onChangeStatus(p) },
         {
           text: '이 구역에서 빼기',
@@ -392,7 +399,6 @@ export default function Order() {
             setFridgeAssignments(await removeFromFridgeSection(activeStoreId, p.id));
           },
         },
-        { text: '취소', style: 'cancel' },
       ]);
     },
     [activeStoreId, onChangeStatus],
