@@ -1,6 +1,8 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import { useState } from 'react';
+import * as Linking from 'expo-linking';
+import * as Notifications from 'expo-notifications';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ddayLabel } from '@/lib/dates';
@@ -26,7 +28,14 @@ export default function Settings() {
   const { count, hour, minute } = useAlertSettings();
   const dateInputMethod = useDateInputMethod();
   const [deleting, setDeleting] = useState(false);
+  const [notifDenied, setNotifDenied] = useState(false);
   const insets = useSafeAreaInsets();
+
+  useFocusEffect(
+    useCallback(() => {
+      Notifications.getPermissionsAsync().then((p) => setNotifDenied(!p.granted));
+    }, []),
+  );
 
   const deleteAccount = () => {
     Alert.alert(
@@ -102,6 +111,17 @@ export default function Settings() {
       </View>
 
       <SectionTitle text="알림" />
+      {notifDenied ? (
+        <Pressable
+          onPress={() => Linking.openSettings()}
+          className="mb-3 flex-row items-center rounded-xl border border-primary bg-paper p-3 active:opacity-70"
+        >
+          <MaterialCommunityIcons name="bell-off-outline" size={20} color="#CC2222" />
+          <Text className="text-primary ml-2 flex-1 text-sm font-bold">
+            알림 권한이 꺼져 있어 유통기한 알림이 오지 않아요. 눌러서 설정에서 켜주세요.
+          </Text>
+        </Pressable>
+      ) : null}
       <View className="rounded-xl border border-line bg-paper p-4">
         <View className="flex-row items-center justify-between">
           <View className="flex-1 pr-3">

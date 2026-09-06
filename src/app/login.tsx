@@ -18,6 +18,11 @@ import { supabase } from '@/lib/supabase';
 
 WebBrowser.maybeCompleteAuthSession();
 
+// 로그인 흐름 디버그 로그 — 인증 코드/콜백 URL이 섞여 있어 프로덕션에는 남기지 않는다.
+function dlog(...args: unknown[]) {
+  if (__DEV__) console.log(...args);
+}
+
 type Provider = 'google' | 'kakao';
 
 const PROVIDER_LABEL: Record<Provider, string> = {
@@ -43,7 +48,7 @@ export default function Login() {
   const completeLogin = async (callbackUrl: string, provider: Provider | null) => {
     if (!supabase || handledUrls.current.has(callbackUrl)) return;
     handledUrls.current.add(callbackUrl);
-    console.log('[login] completeLogin callbackUrl:', callbackUrl);
+    dlog('[login] completeLogin callbackUrl:', callbackUrl);
     try {
       const url = new URL(callbackUrl);
       const errorDescription = url.searchParams.get('error_description');
@@ -51,10 +56,10 @@ export default function Login() {
       const code = url.searchParams.get('code');
       if (!code) throw new Error('인증 코드를 받지 못했습니다.');
       const { error } = await supabase.auth.exchangeCodeForSession(code);
-      console.log('[login] exchangeCodeForSession error:', error);
+      dlog('[login] exchangeCodeForSession error:', error);
       if (error) throw error;
     } catch (e) {
-      console.log('[login] completeLogin failed:', e);
+      dlog('[login] completeLogin failed:', e);
       const label = provider ? PROVIDER_LABEL[provider] : '소셜';
       const message = e instanceof Error ? e.message : '로그인에 실패했습니다.';
       Alert.alert(`${label} 로그인 오류`, message + loginFailureHint(provider));
@@ -66,7 +71,7 @@ export default function Login() {
   // 외부 앱 전환 등으로 브라우저 세션이 먼저 닫혀도, 마지막 리다이렉트가
   // 딥링크로 도착하면 여기서 받아 로그인을 마무리한다.
   useEffect(() => {
-    console.log('[login] incomingUrl:', incomingUrl);
+    dlog('[login] incomingUrl:', incomingUrl);
     if (incomingUrl && incomingUrl.includes('code=')) {
       completeLogin(incomingUrl, null);
     } else if (incomingUrl && incomingUrl.includes('error_description=')) {
@@ -80,13 +85,13 @@ export default function Login() {
     try {
       // Expo Go에서는 exp://[PC IP]:8081/--/login 형태의 주소가 된다
       const redirectTo = Linking.createURL('login');
-      console.log('[login] redirectTo:', redirectTo);
+      dlog('[login] redirectTo:', redirectTo);
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: { redirectTo, skipBrowserRedirect: true },
       });
       if (error) throw error;
-      console.log('[login] auth url:', data.url);
+      dlog('[login] auth url:', data.url);
 
       // 카카오는 카카오톡이 설치된 기기에서 외부 브라우저(Custom Tabs)로 열면
       // 안드로이드가 카카오 로그인 주소를 App Link로 가로채 카카오톡 앱으로 전환시키고,
@@ -99,7 +104,7 @@ export default function Login() {
       }
 
       const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
-      console.log('[login] browser result:', JSON.stringify(result));
+      dlog('[login] browser result:', JSON.stringify(result));
       if (result.type === 'success') {
         await completeLogin(result.url, provider);
         return;
@@ -127,7 +132,7 @@ export default function Login() {
   };
 
   const handleWebViewNavigation = (url: string) => {
-    console.log('[login] webview nav:', url);
+    dlog('[login] webview nav:', url);
     if (webViewSession && url.startsWith(webViewSession.redirectTo)) {
       setWebViewSession(null);
       completeLogin(url, 'kakao');
@@ -136,7 +141,7 @@ export default function Login() {
     // 카카오 페이지 안의 "카카오톡으로 로그인" 등 커스텀 스킴 링크를 눌러도
     // 앱 전환이 일어나지 않도록 http(s)가 아닌 이동은 모두 막는다.
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      console.log('[login] webview blocked non-http scheme:', url);
+      dlog('[login] webview blocked non-http scheme:', url);
       return false;
     }
     return true;
@@ -202,9 +207,9 @@ export default function Login() {
             source={{ uri: webViewSession.url }}
             onShouldStartLoadWithRequest={(request) => handleWebViewNavigation(request.url)}
             onNavigationStateChange={(navState) => handleWebViewNavigation(navState.url)}
-            onLoadStart={(e) => console.log('[login] webview onLoadStart:', e.nativeEvent.url)}
-            onError={(e) => console.log('[login] webview onError:', JSON.stringify(e.nativeEvent))}
-            onHttpError={(e) => console.log('[login] webview onHttpError:', JSON.stringify(e.nativeEvent))}
+            onLoadStart={(e) => dlog('[login] webview onLoadStart:', e.nativeEvent.url)}
+            onError={(e) => dlog('[login] webview onError:', JSON.stringify(e.nativeEvent))}
+            onHttpError={(e) => dlog('[login] webview onHttpError:', JSON.stringify(e.nativeEvent))}
             startInLoadingState
             renderLoading={() => (
               <View className="absolute inset-0 items-center justify-center">

@@ -1,5 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { BarcodeScanningResult, CameraView, useCameraPermissions } from 'expo-camera';
+import * as Linking from 'expo-linking';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useRef, useState } from 'react';
 import {
@@ -179,6 +180,7 @@ export default function Scan() {
   if (!permission) return <View className="flex-1 bg-ink" />;
 
   if (!permission.granted) {
+    const blocked = !permission.canAskAgain;
     return (
       <View className="flex-1 items-center justify-center bg-paper px-8">
         <MaterialCommunityIcons name="camera-off-outline" size={48} color="#888888" />
@@ -186,13 +188,15 @@ export default function Scan() {
           카메라 권한이 필요합니다
         </Text>
         <Text className="text-muted mt-2 text-center text-sm">
-          바코드를 스캔하려면 카메라 접근을 허용해 주세요.
+          {blocked
+            ? '설정에서 카메라 접근을 허용해 주세요.'
+            : '바코드를 스캔하려면 카메라 접근을 허용해 주세요.'}
         </Text>
         <Pressable
-          onPress={requestPermission}
+          onPress={blocked ? () => Linking.openSettings() : requestPermission}
           className="mt-6 rounded-xl bg-primary px-8 py-3 active:opacity-80"
         >
-          <Text className="text-paper text-base font-bold">권한 허용</Text>
+          <Text className="text-paper text-base font-bold">{blocked ? '설정 열기' : '권한 허용'}</Text>
         </Pressable>
       </View>
     );
