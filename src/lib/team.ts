@@ -40,22 +40,29 @@ export async function listMembers(): Promise<TeamMember[]> {
   }));
 }
 
+/** create_team/join_team_by_code RPC가 실제로 반환하는 컬럼만 (owner_id 없음) */
+interface TeamCreateResultRow {
+  id: string;
+  name: string;
+  invite_code: string;
+}
+
 /** 팀 만들기 — 초대 코드가 담긴 팀 정보를 돌려준다 */
-export async function createTeam(name: string): Promise<Team> {
+export async function createTeam(name: string): Promise<Pick<Team, 'id' | 'name' | 'inviteCode'>> {
   if (!supabase) throw new Error('클라우드 모드가 아닙니다');
   const { data, error } = await supabase.rpc('create_team', { team_name: name });
   if (error) throw new Error(error.message);
-  const row = (Array.isArray(data) ? data[0] : data) as TeamRow;
-  return fromTeamRow(row);
+  const row = (Array.isArray(data) ? data[0] : data) as TeamCreateResultRow;
+  return { id: row.id, name: row.name, inviteCode: row.invite_code };
 }
 
 /** 초대 코드로 팀 참여 */
-export async function joinTeam(code: string): Promise<Team> {
+export async function joinTeam(code: string): Promise<Pick<Team, 'id' | 'name' | 'inviteCode'>> {
   if (!supabase) throw new Error('클라우드 모드가 아닙니다');
   const { data, error } = await supabase.rpc('join_team_by_code', { code });
   if (error) throw new Error(error.message);
-  const row = (Array.isArray(data) ? data[0] : data) as TeamRow;
-  return fromTeamRow(row);
+  const row = (Array.isArray(data) ? data[0] : data) as TeamCreateResultRow;
+  return { id: row.id, name: row.name, inviteCode: row.invite_code };
 }
 
 /** 팀 나가기 */

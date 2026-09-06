@@ -143,7 +143,7 @@ export default function TeamScreen() {
     );
   };
 
-  const onDisband = (team: Team) => {
+  const onDisband = () => {
     Alert.alert(
       '팀 해체',
       `이 팀에는 멤버가 ${members.length}명 있습니다.\n해체하면 모든 멤버가 팀에서 빠지고, 각자 등록한 상품은 개인 상품으로 돌아갑니다. 계속할까요?`,
@@ -254,6 +254,7 @@ export default function TeamScreen() {
               {isOwner && m.userId !== myId ? (
                 <Pressable
                   onPress={() => onKick(m)}
+                  disabled={busy}
                   hitSlop={8}
                   accessibilityRole="button"
                   accessibilityLabel={`${m.email ?? '이 멤버'} 강퇴`}
@@ -277,7 +278,7 @@ export default function TeamScreen() {
 
         {isOwner ? (
           <Pressable
-            onPress={() => onDisband(team)}
+            onPress={onDisband}
             disabled={busy}
             className="mt-3 items-center rounded-xl border border-line py-3.5 active:opacity-70"
           >
