@@ -187,6 +187,12 @@ export default function Settings() {
             />
           </>
         ) : null}
+        <View className="h-px bg-line" />
+        <LinkRow
+          icon="file-delimited-outline"
+          label="CSV로 가져오기"
+          onPress={() => router.push('/csv-import')}
+        />
         {isCloudMode ? (
           <>
             <View className="h-px bg-line" />
