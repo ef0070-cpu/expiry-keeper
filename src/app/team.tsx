@@ -15,8 +15,10 @@ import {
 import { isCloudMode, supabase } from '@/lib/supabase';
 import {
   createTeam,
+  disbandTeam,
   getMyTeam,
   joinTeam,
+  kickMember,
   leaveTeam,
   listMembers,
   moveMyProductsToTeam,
@@ -141,6 +143,44 @@ export default function TeamScreen() {
     );
   };
 
+  const onDisband = (team: Team) => {
+    Alert.alert(
+      '팀 해체',
+      `이 팀에는 멤버가 ${members.length}명 있습니다.\n해체하면 모든 멤버가 팀에서 빠지고, 각자 등록한 상품은 개인 상품으로 돌아갑니다. 계속할까요?`,
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '해체하기',
+          style: 'destructive',
+          onPress: () =>
+            run(async () => {
+              await disbandTeam();
+              await load();
+            }),
+        },
+      ],
+    );
+  };
+
+  const onKick = (member: TeamMember) => {
+    Alert.alert(
+      '멤버 강퇴',
+      `${member.email ?? '이 멤버'}님을 팀에서 내보낼까요?\n이 멤버가 등록한 상품은 개인 상품으로 돌아갑니다.`,
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '내보내기',
+          style: 'destructive',
+          onPress: () =>
+            run(async () => {
+              await kickMember(member.userId);
+              await load();
+            }),
+        },
+      ],
+    );
+  };
+
   // ── 로컬 모드: 안내만 표시 ──
   if (!isCloudMode) {
     return (
@@ -167,6 +207,7 @@ export default function TeamScreen() {
 
   // ── 팀 있음: 팀 정보 + 멤버 목록 ──
   if (team) {
+    const isOwner = team.ownerId === myId;
     return (
       <ScrollView className="flex-1 bg-bg" contentContainerStyle={{ padding: 16 }}>
         <View className="rounded-xl border border-line bg-paper p-4">
@@ -210,6 +251,17 @@ export default function TeamScreen() {
                 {m.email ?? '(이메일 없음)'}
               </Text>
               {m.userId === myId ? <Text className="text-muted text-xs">나</Text> : null}
+              {isOwner && m.userId !== myId ? (
+                <Pressable
+                  onPress={() => onKick(m)}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${m.email ?? '이 멤버'} 강퇴`}
+                  className="ml-2 p-1"
+                >
+                  <MaterialCommunityIcons name="account-remove-outline" size={20} color="#CC2222" />
+                </Pressable>
+              ) : null}
             </View>
           ))}
         </View>
@@ -223,13 +275,23 @@ export default function TeamScreen() {
           <Text className="text-ink ml-2 text-sm font-medium">내 개인 상품을 팀으로 옮기기</Text>
         </Pressable>
 
-        <Pressable
-          onPress={onLeave}
-          disabled={busy}
-          className="mt-3 items-center rounded-xl border border-line py-3.5 active:opacity-70"
-        >
-          <Text className="text-primary text-sm font-medium">팀 나가기</Text>
-        </Pressable>
+        {isOwner ? (
+          <Pressable
+            onPress={() => onDisband(team)}
+            disabled={busy}
+            className="mt-3 items-center rounded-xl border border-line py-3.5 active:opacity-70"
+          >
+            <Text className="text-primary text-sm font-medium">팀 해체</Text>
+          </Pressable>
+        ) : (
+          <Pressable
+            onPress={onLeave}
+            disabled={busy}
+            className="mt-3 items-center rounded-xl border border-line py-3.5 active:opacity-70"
+          >
+            <Text className="text-primary text-sm font-medium">팀 나가기</Text>
+          </Pressable>
+        )}
       </ScrollView>
     );
   }
