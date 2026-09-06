@@ -59,6 +59,7 @@ export default function RootLayout() {
           <Stack.Screen name="recipes" options={{ title: '레시피 추천' }} />
           <Stack.Screen name="recipe-video" options={{ title: '레시피 영상' }} />
           <Stack.Screen name="settings" options={{ title: '설정' }} />
+          <Stack.Screen name="csv-import" options={{ title: 'CSV로 가져오기' }} />
         </Stack.Protected>
         <Stack.Protected guard={authed && mode === 'retail'}>
           <Stack.Screen name="order" options={{ title: '발주 관리' }} />

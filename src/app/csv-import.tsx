@@ -19,7 +19,7 @@ type ImportState =
   | { step: 'idle' }
   | { step: 'parsed'; rows: ParsedProductRow[]; errors: { line: number; reason: string }[] }
   | { step: 'importing'; total: number; done: number }
-  | { step: 'done'; success: number; failed: number };
+  | { step: 'done'; success: number; failed: number; firstError?: string };
 
 export default function CsvImportScreen() {
   const insets = useSafeAreaInsets();
@@ -62,6 +62,7 @@ export default function CsvImportScreen() {
     setState({ step: 'importing', total: rows.length, done: 0 });
     let success = 0;
     let failed = 0;
+    let firstError: string | undefined;
     for (const row of rows) {
       try {
         const product: Product = {
@@ -81,12 +82,13 @@ export default function CsvImportScreen() {
         await saveProduct(product);
         await scheduleExpiryAlerts(product);
         success++;
-      } catch {
+      } catch (e) {
         failed++;
+        firstError ??= e instanceof Error ? e.message : String(e);
       }
       setState((prev) => (prev.step === 'importing' ? { ...prev, done: prev.done + 1 } : prev));
     }
-    setState({ step: 'done', success, failed });
+    setState({ step: 'done', success, failed, firstError });
   };
 
   const confirmImport = (rows: ParsedProductRow[]) => {
@@ -129,7 +131,7 @@ export default function CsvImportScreen() {
           </Text>
           {state.errors.slice(0, 5).map((err, i) => (
             <Text key={i} className="text-muted mt-2 text-xs">
-              {err.line}행: {err.reason}
+              {err.line === 0 ? err.reason : `${err.line}행: ${err.reason}`}
             </Text>
           ))}
           {state.errors.length > 5 ? (
@@ -143,7 +145,13 @@ export default function CsvImportScreen() {
               state.rows.length === 0 ? 'bg-line' : 'bg-primary active:opacity-80'
             }`}
           >
-            <Text className="text-paper text-base font-bold">{state.rows.length}개 가져오기</Text>
+            <Text
+              className={`text-base font-bold ${
+                state.rows.length === 0 ? 'text-muted' : 'text-paper'
+              }`}
+            >
+              {state.rows.length}개 가져오기
+            </Text>
           </Pressable>
         </View>
       ) : null}
@@ -162,6 +170,9 @@ export default function CsvImportScreen() {
           <Text className="text-ink text-base font-bold">
             {state.success}개 등록 완료{state.failed > 0 ? `, ${state.failed}개 저장 실패` : ''}
           </Text>
+          {state.failed > 0 && state.firstError ? (
+            <Text className="text-muted mt-2 text-xs">첫 실패 사유: {state.firstError}</Text>
+          ) : null}
           <Pressable
             onPress={() => router.back()}
             className="mt-4 items-center rounded-xl bg-primary p-4 active:opacity-80"
