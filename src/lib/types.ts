@@ -32,6 +32,7 @@ export interface Team {
   id: string;
   name: string;
   inviteCode: string;
+  ownerId: string;
 }
 
 export interface TeamMember {

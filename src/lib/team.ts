@@ -10,10 +10,11 @@ interface TeamRow {
   id: string;
   name: string;
   invite_code: string;
+  owner_id: string;
 }
 
 function fromTeamRow(r: TeamRow): Team {
-  return { id: r.id, name: r.name, inviteCode: r.invite_code };
+  return { id: r.id, name: r.name, inviteCode: r.invite_code, ownerId: r.owner_id };
 }
 
 /** 내가 속한 팀. 없으면 null */
@@ -74,4 +75,18 @@ export async function moveMyProductsToTeam(teamId: string): Promise<number> {
     .select('id');
   if (error) throw new Error(error.message);
   return data?.length ?? 0;
+}
+
+/** 팀 해체 (팀장 전용) */
+export async function disbandTeam(): Promise<void> {
+  if (!supabase) throw new Error('클라우드 모드가 아닙니다');
+  const { error } = await supabase.rpc('disband_team');
+  if (error) throw new Error(error.message);
+}
+
+/** 팀원 강퇴 (팀장 전용) */
+export async function kickMember(userId: string): Promise<void> {
+  if (!supabase) throw new Error('클라우드 모드가 아닙니다');
+  const { error } = await supabase.rpc('kick_member', { target_user_id: userId });
+  if (error) throw new Error(error.message);
 }
