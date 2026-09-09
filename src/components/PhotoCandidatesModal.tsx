@@ -75,28 +75,38 @@ export default function PhotoCandidatesModal({
                       onPress={() => vote(c.id, 1)}
                       disabled={votingId === c.id}
                       className="items-center"
+                      hitSlop={11}
                       accessibilityRole="button"
                       accessibilityLabel="좋아요"
                     >
-                      <MaterialCommunityIcons
-                        name={c.myVote === 1 ? 'thumb-up' : 'thumb-up-outline'}
-                        size={22}
-                        color={c.myVote === 1 ? '#2E7D32' : '#888888'}
-                      />
+                      {votingId === c.id ? (
+                        <ActivityIndicator size="small" color="#2E7D32" />
+                      ) : (
+                        <MaterialCommunityIcons
+                          name={c.myVote === 1 ? 'thumb-up' : 'thumb-up-outline'}
+                          size={22}
+                          color={c.myVote === 1 ? '#2E7D32' : '#888888'}
+                        />
+                      )}
                       <Text className="text-ink mt-0.5 text-xs">{c.likes}</Text>
                     </Pressable>
                     <Pressable
                       onPress={() => vote(c.id, -1)}
                       disabled={votingId === c.id}
                       className="items-center"
+                      hitSlop={11}
                       accessibilityRole="button"
                       accessibilityLabel="싫어요"
                     >
-                      <MaterialCommunityIcons
-                        name={c.myVote === -1 ? 'thumb-down' : 'thumb-down-outline'}
-                        size={22}
-                        color={c.myVote === -1 ? '#C62828' : '#888888'}
-                      />
+                      {votingId === c.id ? (
+                        <ActivityIndicator size="small" color="#C62828" />
+                      ) : (
+                        <MaterialCommunityIcons
+                          name={c.myVote === -1 ? 'thumb-down' : 'thumb-down-outline'}
+                          size={22}
+                          color={c.myVote === -1 ? '#C62828' : '#888888'}
+                        />
+                      )}
                       <Text className="text-ink mt-0.5 text-xs">{c.dislikes}</Text>
                     </Pressable>
                   </View>

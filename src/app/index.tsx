@@ -245,16 +245,16 @@ export default function Dashboard() {
         {query ? (
           <Pressable
             onPress={() => setQuery('')}
-            hitSlop={8}
+            hitSlop={13}
             accessibilityRole="button"
             accessibilityLabel="검색어 지우기"
           >
-            <MaterialCommunityIcons name="close-circle" size={18} color="#BBBBBB" />
+            <MaterialCommunityIcons name="close-circle" size={18} color="#888888" />
           </Pressable>
         ) : null}
         <Pressable
           onPress={() => router.push('/scan?mode=search')}
-          hitSlop={8}
+          hitSlop={12}
           className="ml-2"
           accessibilityRole="button"
           accessibilityLabel="바코드로 검색"

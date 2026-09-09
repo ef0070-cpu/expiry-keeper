@@ -219,7 +219,7 @@ export default function Scan() {
       <View className="absolute left-4" style={{ top: Math.max(insets.top, 16) + 8 }}>
         <Pressable
           onPress={() => setTorchOn((v) => !v)}
-          hitSlop={8}
+          hitSlop={10}
           accessibilityRole="button"
           accessibilityLabel={torchOn ? '손전등 끄기' : '손전등 켜기'}
         >
@@ -238,7 +238,7 @@ export default function Scan() {
       >
         <Pressable
           onPress={() => setManualEntryVisible(true)}
-          hitSlop={8}
+          hitSlop={14}
           accessibilityRole="button"
           accessibilityLabel="바코드 직접 입력"
         >

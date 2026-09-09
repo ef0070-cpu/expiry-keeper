@@ -104,7 +104,7 @@ export default function OrderCartScreen() {
         <Text className="text-ink text-lg font-bold">발주 내역</Text>
         <Pressable
           onPress={() => router.back()}
-          hitSlop={8}
+          hitSlop={11}
           accessibilityRole="button"
           accessibilityLabel="닫기"
         >
@@ -149,12 +149,12 @@ export default function OrderCartScreen() {
             </Pressable>
             <Pressable
               onPress={() => removeItem(item.product.id)}
-              hitSlop={8}
+              hitSlop={12}
               className="ml-2"
               accessibilityRole="button"
               accessibilityLabel="상품 삭제"
             >
-              <MaterialCommunityIcons name="close" size={20} color="#BBBBBB" />
+              <MaterialCommunityIcons name="close" size={20} color="#888888" />
             </Pressable>
           </View>
         )}

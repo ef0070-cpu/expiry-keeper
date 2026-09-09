@@ -244,6 +244,11 @@ export async function renameFridgeSection(from: string, to: string): Promise<Fri
       );
     }
   }
+  const dividers = await listFridgeSectionDividers();
+  if (from in dividers) {
+    const { [from]: fromDividers, ...restDividers } = dividers;
+    await writeFridgeSectionDividers({ ...restDividers, [to]: fromDividers });
+  }
   return next;
 }
 
@@ -263,6 +268,41 @@ export async function deleteFridgeSection(name: string): Promise<FridgeSection[]
       );
     }
   }
+  const dividers = await listFridgeSectionDividers();
+  if (name in dividers) {
+    const { [name]: _removedDividers, ...restDividers } = dividers;
+    await writeFridgeSectionDividers(restDividers);
+  }
+  return next;
+}
+
+// ---------- 구역별 가로 구분선 (매장 공용) ----------
+// 실제 냉동고의 상/하단 선반 구분(가로 철망)을 화면에도 표시하기 위한 순수 시각 요소.
+// 순서/열 개수와 달리 진열 순서에는 아무 영향을 주지 않는다. 그 줄(row)의 마지막 상품 id를
+// 저장해서, 어느 상품에서 토글하든 항상 줄 전체 아래에 온전한 구분선이 그려지게 한다.
+
+const FRIDGE_SECTION_DIVIDERS_KEY = 'fridgeSectionDividers:v1';
+
+export async function listFridgeSectionDividers(): Promise<Record<string, string[]>> {
+  const raw = await AsyncStorage.getItem(FRIDGE_SECTION_DIVIDERS_KEY);
+  return raw ? (JSON.parse(raw) as Record<string, string[]>) : {};
+}
+
+async function writeFridgeSectionDividers(map: Record<string, string[]>): Promise<void> {
+  await AsyncStorage.setItem(FRIDGE_SECTION_DIVIDERS_KEY, JSON.stringify(map));
+}
+
+export async function toggleFridgeSectionDivider(
+  section: string,
+  rowLastProductId: string,
+): Promise<Record<string, string[]>> {
+  const map = await listFridgeSectionDividers();
+  const current = map[section] ?? [];
+  const nextList = current.includes(rowLastProductId)
+    ? current.filter((id) => id !== rowLastProductId)
+    : [...current, rowLastProductId];
+  const next = { ...map, [section]: nextList };
+  await writeFridgeSectionDividers(next);
   return next;
 }
 
@@ -281,25 +321,34 @@ async function writeFridgeAssignments(storeId: string, list: FridgeAssignment[])
   await AsyncStorage.setItem(fridgeAssignmentsKey(storeId), JSON.stringify(list));
 }
 
-/** 상품을 이 매장의 특정 구역에 배정한다. 이미 다른 구역에 있었으면 그 구역에서 빼고 새 구역으로
- * 옮긴다(한 상품은 매장당 한 구역에만 있을 수 있음). */
+/** 상품을 이 매장의 특정 구역에 배정한다.
+ * mode 'move'(기본): 이미 다른 구역에 있었으면 그 구역에서 빼고 새 구역으로 옮긴다(한 상품이
+ * 한 구역에만 있는 기존 동작).
+ * mode 'duplicate': 다른 구역의 배정은 그대로 두고 이 구역에도 추가한다(실제 냉동고에 같은
+ * 상품을 두 군데 진열해둔 경우처럼, 한 상품이 여러 구역에 동시에 있을 수 있게 함). */
 export async function assignToFridgeSection(
+  storeId: string,
+  productId: string,
+  section: FridgeSection,
+  mode: 'move' | 'duplicate' = 'move',
+): Promise<FridgeAssignment[]> {
+  const list = await listFridgeAssignments(storeId);
+  const withoutThisSection = list.filter((a) => !(a.productId === productId && a.section === section));
+  const base = mode === 'move' ? withoutThisSection.filter((a) => a.productId !== productId) : withoutThisSection;
+  const next = [...base, { productId, section }];
+  await writeFridgeAssignments(storeId, next);
+  return next;
+}
+
+/** mode 'duplicate'로 한 상품이 여러 구역에 동시에 배정될 수 있어, 특정 구역에서만 빼려면
+ * section을 지정해야 한다 — 안 그러면 다른 구역의 배정까지 같이 사라진다. */
+export async function removeFromFridgeSection(
   storeId: string,
   productId: string,
   section: FridgeSection,
 ): Promise<FridgeAssignment[]> {
   const list = await listFridgeAssignments(storeId);
-  const next = [...list.filter((a) => a.productId !== productId), { productId, section }];
-  await writeFridgeAssignments(storeId, next);
-  return next;
-}
-
-export async function removeFromFridgeSection(
-  storeId: string,
-  productId: string,
-): Promise<FridgeAssignment[]> {
-  const list = await listFridgeAssignments(storeId);
-  const next = list.filter((a) => a.productId !== productId);
+  const next = list.filter((a) => !(a.productId === productId && a.section === section));
   await writeFridgeAssignments(storeId, next);
   return next;
 }

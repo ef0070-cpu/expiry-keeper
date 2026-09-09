@@ -38,11 +38,18 @@ export async function submitPhotoCandidateIfChanged(barcode: string, photoUri: s
   if (map.get(barcode) === photoUri) return;
   await recordSubmittedPhotoCandidate(barcode, photoUri);
   submitPhotoCandidate(barcode, photoUri)
-    .then((uploadedUrl) => {
+    .then(async (uploadedUrl) => {
       // 카메라/앨범으로 고른 로컬 파일 경로처럼 업로드 과정에서 URL이 바뀌는 경우, 실제로 DB에
       // 들어간 URL로 오버라이드를 맞춰둔다 — 안 그러면 나중에 "사진 제거"가 로컬 경로로 매칭을
       // 시도해 실제 DB 행을 못 찾는다.
       if (uploadedUrl && uploadedUrl !== photoUri) return recordSubmittedPhotoCandidate(barcode, uploadedUrl);
+      // 실패(uploadedUrl null)했는데 오버라이드를 이 값 그대로 두면, 목록 동기화 때 유효하지 않은
+      // 사진 참조가 계속 대표사진 자리를 차지해 목록에서 사진이 깨져 보인다. 그 사이 다른 사진으로
+      // 덮어쓰지 않았을 때만(map.get === photoUri) 정리해서, 서버의 실제 대표사진이 대신 보이게 한다.
+      if (!uploadedUrl) {
+        const current = await getSubmittedPhotoCandidates();
+        if (current.get(barcode) === photoUri) await clearSubmittedPhotoCandidate(barcode);
+      }
     })
     .catch(() => {});
 }
