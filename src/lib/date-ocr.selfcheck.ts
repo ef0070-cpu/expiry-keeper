@@ -34,5 +34,9 @@ console.assert(
   extractExpiryDateFromText('맛있는 초코과자 120g', 'ymd', REF) === null,
   '날짜 없는 텍스트에서 null 반환 실패',
 );
+console.assert(
+  extractExpiryDateFromText('2026.13.32', 'ymd', REF) === null,
+  'PAIR_RE 잘못된 부분매칭 버그: 잘못된 3묶음 입력이 spurious 2묶음 결과를 생산하지 않아야 함',
+);
 
 console.log('date-ocr selfcheck OK');

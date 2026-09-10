@@ -14,7 +14,7 @@ function lastDayOfMonth(year: number, month: number): number {
 }
 
 const TRIPLE_RE = /(\d{2,4})\s*[.\-/]\s*(\d{1,2})\s*[.\-/]\s*(\d{2,4})/g;
-const PAIR_RE = /(\d{2,4})\s*[.\-/]\s*(\d{1,2})(?!\s*[.\-/]\s*\d)/g;
+const PAIR_RE = /(\d{2,4})\s*[.\-/]\s*(\d{1,2})(?!\d)/g;
 
 /** 3묶음(년+월+일) 후보 하나를 dateOcrOrder 기준으로 해석한다. */
 function resolveTriple(a: string, b: string, c: string, order: DateOcrOrder): string | null {
