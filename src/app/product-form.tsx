@@ -16,15 +16,17 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { recognizeText } from '@infinitered/react-native-mlkit-text-recognition';
 import ImageCandidatesModal from '@/components/ImageCandidatesModal';
 import PhotoCandidatesModal from '@/components/PhotoCandidatesModal';
 import { hasImageSearchKeys, lookupBarcode, searchProductImageCandidates } from '@/lib/barcode-lookup';
+import { extractExpiryDateFromText } from '@/lib/date-ocr';
 import { deleteLocalPhotoIfOwned, persistLocalPhoto } from '@/lib/local-photo';
 import { uploadPhotoToBucket } from '@/lib/storage';
 import { autoFormatDate, formatDate, isValidDateStr } from '@/lib/dates';
 import { cancelExpiryAlerts, scheduleExpiryAlerts } from '@/lib/notifications';
 import { deleteProduct, getProduct, listProducts, newId, saveProduct } from '@/lib/repo';
-import { AppMode, useAppMode, useDateInputMethod } from '@/lib/settings';
+import { AppMode, useAppMode, useDateInputMethod, useDateOcrOrder } from '@/lib/settings';
 import { Product, ProductStatus } from '@/lib/types';
 
 export default function ProductForm() {
@@ -37,6 +39,7 @@ export default function ProductForm() {
   const isEdit = !!params.id;
   const mode = useAppMode();
   const dateInputMethod = useDateInputMethod();
+  const dateOcrOrder = useDateOcrOrder();
 
   const [name, setName] = useState(params.prefillName ?? '');
   const [imageUri, setImageUri] = useState<string | null>(params.prefillImage || null);
@@ -56,6 +59,7 @@ export default function ProductForm() {
   const [searching, setSearching] = useState(false);
   const [imageCandidates, setImageCandidates] = useState<string[] | null>(null);
   const [showPhotoCandidates, setShowPhotoCandidates] = useState(false);
+  const [ocrBusy, setOcrBusy] = useState(false);
 
   const [barcode, setBarcode] = useState<string | null>(params.barcode ?? null);
   // 수정 시 원래 등록됐던 모드를 유지 (현재 화면 모드로 덮어쓰지 않음)
@@ -132,6 +136,24 @@ export default function ProductForm() {
     ]);
   };
 
+  const ensureCameraPermission = async (): Promise<boolean> => {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (perm.granted) return true;
+    if (perm.canAskAgain) {
+      Alert.alert('권한 필요', '카메라 접근 권한을 허용해 주세요.');
+    } else {
+      Alert.alert(
+        '권한 필요',
+        '카메라 접근 권한이 거부되어 있어요. 설정에서 권한을 허용해 주세요.',
+        [
+          { text: '취소', style: 'cancel' },
+          { text: '설정 열기', onPress: () => Linking.openSettings() },
+        ],
+      );
+    }
+    return false;
+  };
+
   const launchPicker = async (source: 'camera' | 'library') => {
     const options: ImagePicker.ImagePickerOptions = {
       mediaTypes: ['images'],
@@ -141,22 +163,7 @@ export default function ProductForm() {
     };
     let result: ImagePicker.ImagePickerResult;
     if (source === 'camera') {
-      const perm = await ImagePicker.requestCameraPermissionsAsync();
-      if (!perm.granted) {
-        if (perm.canAskAgain) {
-          Alert.alert('권한 필요', '카메라 접근 권한을 허용해 주세요.');
-        } else {
-          Alert.alert(
-            '권한 필요',
-            '카메라 접근 권한이 거부되어 있어요. 설정에서 권한을 허용해 주세요.',
-            [
-              { text: '취소', style: 'cancel' },
-              { text: '설정 열기', onPress: () => Linking.openSettings() },
-            ],
-          );
-        }
-        return;
-      }
+      if (!(await ensureCameraPermission())) return;
       result = await ImagePicker.launchCameraAsync(options);
     } else {
       result = await ImagePicker.launchImageLibraryAsync(options);
@@ -164,6 +171,27 @@ export default function ProductForm() {
     if (!result.canceled && result.assets[0]) {
       deleteLocalPhotoIfOwned(imageUri);
       setImageUri(persistLocalPhoto(result.assets[0].uri));
+    }
+  };
+
+  const scanExpiryDatePhoto = async () => {
+    if (!(await ensureCameraPermission())) return;
+    const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 1 });
+    if (result.canceled || !result.assets[0]) return;
+
+    setOcrBusy(true);
+    try {
+      const { text } = await recognizeText(result.assets[0].uri);
+      const found = extractExpiryDateFromText(text, dateOcrOrder);
+      if (found) {
+        setExpiryDate(found);
+      } else {
+        Alert.alert('인식 실패', '유통기한을 찾지 못했어요. 직접 입력해 주세요.');
+      }
+    } catch {
+      Alert.alert('인식 실패', '사진 인식 중 문제가 발생했어요. 직접 입력해 주세요.');
+    } finally {
+      setOcrBusy(false);
     }
   };
 
@@ -350,7 +378,24 @@ export default function ProductForm() {
         {/* 유통기한 + 수량 (한 줄 배치) */}
         <View className="mt-4 flex-row gap-3">
           <View className="flex-1">
-            <Label text="유통기한 *" />
+            <View className="flex-row items-center justify-between">
+              <Label text="유통기한 *" />
+              <Pressable
+                onPress={scanExpiryDatePhoto}
+                disabled={ocrBusy}
+                className="flex-row items-center"
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="사진으로 유통기한 인식"
+              >
+                {ocrBusy ? (
+                  <ActivityIndicator size="small" color="#CC2222" />
+                ) : (
+                  <MaterialCommunityIcons name="text-recognition" size={15} color="#CC2222" />
+                )}
+                <Text className="text-primary ml-1 text-xs font-medium">사진으로 인식</Text>
+              </Pressable>
+            </View>
             {dateInputMethod === 'text' ? (
               <TextInput
                 className="text-ink rounded-xl border border-line bg-paper px-3 py-2.5 text-base"
