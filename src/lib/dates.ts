@@ -78,3 +78,13 @@ export function autoFormatDate(input: string): string {
   if (digits.length <= 6) return `${digits.slice(0, 4)}-${digits.slice(4)}`;
   return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6)}`;
 }
+
+/** dateStr에 개월 수를 더한다. 말일을 초과하면 그 달의 마지막 날로 클램프한다. */
+export function addMonths(dateStr: string, months: number): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const totalMonths = m - 1 + months;
+  const targetYear = y + Math.floor(totalMonths / 12);
+  const targetMonth = ((totalMonths % 12) + 12) % 12;
+  const lastDay = new Date(targetYear, targetMonth + 1, 0).getDate();
+  return formatDate(new Date(targetYear, targetMonth, Math.min(d, lastDay)));
+}
