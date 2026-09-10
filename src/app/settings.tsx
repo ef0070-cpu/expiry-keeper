@@ -12,14 +12,19 @@ import {
   AppMode,
   DATE_INPUT_METHOD_META,
   DATE_INPUT_METHODS,
+  DATE_OCR_ORDER_META,
+  DATE_OCR_ORDERS,
   DateInputMethod,
+  DateOcrOrder,
   MODE_LABELS,
   setAlertSettings,
   setAppMode,
   setDateInputMethod,
+  setDateOcrOrder,
   useAlertSettings,
   useAppMode,
   useDateInputMethod,
+  useDateOcrOrder,
 } from '@/lib/settings';
 import { isCloudMode, supabase } from '@/lib/supabase';
 
@@ -27,6 +32,7 @@ export default function Settings() {
   const mode = useAppMode();
   const { count, hour, minute } = useAlertSettings();
   const dateInputMethod = useDateInputMethod();
+  const dateOcrOrder = useDateOcrOrder();
   const [deleting, setDeleting] = useState(false);
   const [notifDenied, setNotifDenied] = useState(false);
   const insets = useSafeAreaInsets();
@@ -106,6 +112,19 @@ export default function Settings() {
           <View key={method}>
             {i > 0 ? <View className="h-px bg-line" /> : null}
             <DateMethodRow target={method} current={dateInputMethod} />
+          </View>
+        ))}
+      </View>
+
+      <SectionTitle text="사진 인식 날짜 순서" />
+      <Text className="text-muted mb-2 text-xs">
+        유통기한 사진 인식에서 순서가 애매할 때만 사용돼요.
+      </Text>
+      <View className="overflow-hidden rounded-xl border border-line bg-paper">
+        {DATE_OCR_ORDERS.map((order, i) => (
+          <View key={order}>
+            {i > 0 ? <View className="h-px bg-line" /> : null}
+            <DateOcrOrderRow target={order} current={dateOcrOrder} />
           </View>
         ))}
       </View>
@@ -317,6 +336,35 @@ function DateMethodRow({
   return (
     <Pressable
       onPress={() => setDateInputMethod(target)}
+      className="flex-row items-center p-4 active:opacity-70"
+    >
+      <View className="flex-1">
+        <Text className={`text-base font-bold ${active ? 'text-ink' : 'text-muted'}`}>
+          {label}
+        </Text>
+        <Text className="text-muted mt-0.5 text-xs">{description}</Text>
+      </View>
+      <MaterialCommunityIcons
+        name={active ? 'radiobox-marked' : 'radiobox-blank'}
+        size={22}
+        color={active ? '#CC2222' : '#CCCCCC'}
+      />
+    </Pressable>
+  );
+}
+
+function DateOcrOrderRow({
+  target,
+  current,
+}: {
+  target: DateOcrOrder;
+  current: DateOcrOrder;
+}) {
+  const active = current === target;
+  const { label, description } = DATE_OCR_ORDER_META[target];
+  return (
+    <Pressable
+      onPress={() => setDateOcrOrder(target)}
       className="flex-row items-center p-4 active:opacity-70"
     >
       <View className="flex-1">
