@@ -155,3 +155,50 @@ export function useDateInputMethod(): DateInputMethod {
   }, []);
   return method;
 }
+
+// ---------- 사진 인식 날짜 순서 ----------
+
+export type DateOcrOrder = 'ymd' | 'dmy' | 'mdy';
+
+export const DATE_OCR_ORDERS: readonly DateOcrOrder[] = ['ymd', 'dmy', 'mdy'];
+
+export const DATE_OCR_ORDER_META: Record<DateOcrOrder, { label: string; description: string }> = {
+  ymd: { label: '년/월/일 (기본)', description: '국내 제품 표준. 예: 26.09.10 → 2026-09-10' },
+  dmy: { label: '일/월/년', description: '유럽 등 해외 표준. 예: 10.09.26 → 2026-09-10' },
+  mdy: { label: '월/일/년', description: '미국 표준. 예: 09.10.26 → 2026-09-10' },
+};
+
+const DATE_OCR_ORDER_KEY = 'dateOcrOrder:v1';
+const DEFAULT_DATE_OCR_ORDER: DateOcrOrder = 'ymd';
+
+let dateOcrOrderCache: DateOcrOrder | undefined;
+const dateOcrOrderListeners = new Set<() => void>();
+
+async function loadDateOcrOrder(): Promise<void> {
+  if (dateOcrOrderCache !== undefined) return;
+  const raw = await AsyncStorage.getItem(DATE_OCR_ORDER_KEY);
+  dateOcrOrderCache = (DATE_OCR_ORDERS as string[]).includes(raw ?? '')
+    ? (raw as DateOcrOrder)
+    : DEFAULT_DATE_OCR_ORDER;
+}
+
+export async function setDateOcrOrder(order: DateOcrOrder): Promise<void> {
+  dateOcrOrderCache = order;
+  dateOcrOrderListeners.forEach((fn) => fn());
+  await AsyncStorage.setItem(DATE_OCR_ORDER_KEY, order);
+}
+
+/** 로딩 중에도 기본값(년/월/일)을 즉시 돌려준다. */
+export function useDateOcrOrder(): DateOcrOrder {
+  const [order, setOrder] = useState<DateOcrOrder>(dateOcrOrderCache ?? DEFAULT_DATE_OCR_ORDER);
+  useEffect(() => {
+    const update = () => setOrder(dateOcrOrderCache ?? DEFAULT_DATE_OCR_ORDER);
+    dateOcrOrderListeners.add(update);
+    if (dateOcrOrderCache === undefined) loadDateOcrOrder().then(update);
+    else update();
+    return () => {
+      dateOcrOrderListeners.delete(update);
+    };
+  }, []);
+  return order;
+}
