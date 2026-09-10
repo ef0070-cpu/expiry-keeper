@@ -20,8 +20,7 @@
 
 ## 범위
 
-- 신규 의존성: `@infinitered/react-native-mlkit-text-recognition` (Expo용 config plugin 포함된 ML Kit 텍스트 인식 래퍼)
-- `app.json`: 위 패키지의 config plugin 등록
+- 신규 의존성: `@infinitered/react-native-mlkit-text-recognition` + `@infinitered/react-native-mlkit-core`(필수 의존, Expo Modules API 기반 네이티브 모듈 — GitHub 소스로 확인함. config plugin 등록은 불필요, `app.json` 변경 없음)
 - 신규 로직 `src/lib/date-ocr.ts` (순수 함수, UI 없음)
 - `src/lib/dates.ts`: `addMonths` 함수 추가 (제조일+개월수 계산용)
 - `src/lib/settings.ts`: 날짜 순서 설정값(3가지) 추가
