@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -23,7 +24,7 @@ import { hasImageSearchKeys, lookupBarcode, searchProductImageCandidates } from 
 import { extractExpiryDateFromText } from '@/lib/date-ocr';
 import { deleteLocalPhotoIfOwned, persistLocalPhoto } from '@/lib/local-photo';
 import { uploadPhotoToBucket } from '@/lib/storage';
-import { autoFormatDate, formatDate, isValidDateStr } from '@/lib/dates';
+import { addMonths, autoFormatDate, formatDate, isValidDateStr } from '@/lib/dates';
 import { cancelExpiryAlerts, scheduleExpiryAlerts } from '@/lib/notifications';
 import { deleteProduct, getProduct, listProducts, newId, saveProduct } from '@/lib/repo';
 import { AppMode, useAppMode, useDateInputMethod, useDateOcrOrder } from '@/lib/settings';
@@ -60,6 +61,9 @@ export default function ProductForm() {
   const [imageCandidates, setImageCandidates] = useState<string[] | null>(null);
   const [showPhotoCandidates, setShowPhotoCandidates] = useState(false);
   const [ocrBusy, setOcrBusy] = useState(false);
+  const [manufactureCalcVisible, setManufactureCalcVisible] = useState(false);
+  const [manufactureDate, setManufactureDate] = useState('');
+  const [manufactureMonths, setManufactureMonths] = useState('6');
 
   const [barcode, setBarcode] = useState<string | null>(params.barcode ?? null);
   // 수정 시 원래 등록됐던 모드를 유지 (현재 화면 모드로 덮어쓰지 않음)
@@ -303,6 +307,65 @@ export default function ProductForm() {
         barcode={barcode ?? ''}
         onClose={() => setShowPhotoCandidates(false)}
       />
+      <Modal
+        visible={manufactureCalcVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setManufactureCalcVisible(false)}
+      >
+        <View className="flex-1 items-center justify-center bg-black/60 px-8">
+          <View className="w-full rounded-2xl bg-paper p-4">
+            <Text className="text-ink mb-3 text-base font-bold">제조일+기간으로 계산</Text>
+            <Label text="제조일자" />
+            <TextInput
+              className="text-ink rounded-xl border border-line bg-bg px-3 py-2.5 text-base"
+              placeholder="YYYY-MM-DD"
+              placeholderTextColor="#BBBBBB"
+              keyboardType="number-pad"
+              maxLength={10}
+              value={manufactureDate}
+              onChangeText={(t) => setManufactureDate(autoFormatDate(t))}
+            />
+            <View className="mt-3">
+              <Label text="개월 수" />
+              <TextInput
+                className="text-ink rounded-xl border border-line bg-bg px-3 py-2.5 text-base"
+                placeholder="6"
+                placeholderTextColor="#BBBBBB"
+                keyboardType="number-pad"
+                value={manufactureMonths}
+                onChangeText={setManufactureMonths}
+              />
+            </View>
+            <View className="mt-4 flex-row gap-2">
+              <Pressable
+                onPress={() => {
+                  setManufactureCalcVisible(false);
+                  setManufactureDate('');
+                  setManufactureMonths('6');
+                }}
+                className="flex-1 items-center rounded-xl border border-line bg-paper py-2.5 active:opacity-70"
+              >
+                <Text className="text-ink text-sm font-medium">취소</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  const months = Number(manufactureMonths);
+                  if (!isValidDateStr(manufactureDate) || !Number.isFinite(months) || months <= 0) {
+                    Alert.alert('입력 확인', '제조일자(YYYY-MM-DD)와 개월 수를 올바르게 입력해 주세요.');
+                    return;
+                  }
+                  setExpiryDate(addMonths(manufactureDate, months));
+                  setManufactureCalcVisible(false);
+                }}
+                className="flex-1 items-center rounded-xl bg-primary py-2.5 active:opacity-80"
+              >
+                <Text className="text-paper text-sm font-bold">계산</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
       <ScrollView
         className="flex-1 bg-bg"
         contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
@@ -437,6 +500,9 @@ export default function ProductForm() {
                 ) : null}
               </View>
             ) : null}
+            <Pressable onPress={() => setManufactureCalcVisible(true)} className="mt-1.5">
+              <Text className="text-muted text-xs underline">제조일+기간으로 계산</Text>
+            </Pressable>
           </View>
           <View>
             <Label text="수량" />
