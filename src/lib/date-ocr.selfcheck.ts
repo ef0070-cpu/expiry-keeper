@@ -38,5 +38,9 @@ console.assert(
   extractExpiryDateFromText('2026.13.32', 'ymd', REF) === null,
   'PAIR_RE 잘못된 부분매칭 버그: 잘못된 3묶음 입력이 spurious 2묶음 결과를 생산하지 않아야 함',
 );
+console.assert(
+  extractExpiryDateFromText('2026.9.1', 'ymd', REF) === '2026-09-01',
+  'TRIPLE_RE 한 자리 일(day) 놓치는 버그: 한 자리 숫자도 정확히 매칭되어야 함',
+);
 
 console.log('date-ocr selfcheck OK');
