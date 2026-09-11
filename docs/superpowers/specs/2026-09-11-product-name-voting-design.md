@@ -233,9 +233,9 @@ if (isNew) {
 }
 ```
 
-### `src/lib/order-report.ts` (수정)
+### `src/lib/order-report.ts` (수정 불필요)
 
-- `reportOrderProductIssue()`에서 `name` 필드 제거 — 더 이상 이름 오류를 관리자 승인 신고로 받지 않는다. brand/price/category/message/photo(저작권)만 남긴다.
+`order_product_reports.name`은 `not null` 컬럼이라 `reportOrderProductIssue()`가 계속 `product.name`을 채워 보내야 insert 자체가 성공한다. 코드 변경은 필요 없다 — Task 1의 `apply_approved_order_report` 트리거 교체만으로 그 값이 더 이상 `order_catalog.name`에 반영되지 않는다(전송은 되지만 트리거가 무시).
 
 ### UI (`src/components/NameCandidatesModal.tsx` 신규, `PhotoCandidatesModal.tsx` 구조 재사용)
 
