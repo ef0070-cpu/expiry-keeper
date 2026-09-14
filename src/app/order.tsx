@@ -1473,7 +1473,7 @@ const AddToFridgeModal = memo(function AddToFridgeModal({
                 accessibilityRole="button"
                 accessibilityLabel="검색어 지우기"
               >
-                <MaterialCommunityIcons name="close-circle" size={18} color="#888888" />
+                <MaterialCommunityIcons name="close-circle" size={24} color="#888888" />
               </Pressable>
             ) : null}
           </View>
