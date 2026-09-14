@@ -34,6 +34,11 @@ src/components/CandidatesModal.tsx  (신규)
 ```ts
 type Candidate = { id: string; likes: number; dislikes: number; myVote: 1 | -1 | null };
 
+// 후보 타입은 탭마다 라벨 필드 하나씩만 다르므로(photoUri/brand/name), 공용 Candidate에
+// 라벨 필드를 합치지 않는다 — 실제 구현에서는 TAB_CONFIG를 제네릭(TabConfig<C extends
+// Candidate>)으로 선언해 탭별 후보 타입을 각각 넘기거나, list() 어댑터가 반환하기 전에
+// 원본 필드(photoUri 등)를 유지한 채 렌더링 시점에만 타입을 좁혀 쓴다. 아래는 그 의도를
+// 보여주는 의사코드이고, 타입은 계획 단계에서 확정한다.
 const TAB_CONFIG: Record<'photo' | 'brand' | 'name', {
   title: string;
   list: (barcode: string) => Promise<Candidate[]>;
@@ -41,7 +46,7 @@ const TAB_CONFIG: Record<'photo' | 'brand' | 'name', {
   submit: ((barcode: string, value: string) => Promise<void>) | null; // null이면 제안 입력창 숨김
   placeholder?: string;
   emptyText: string;
-  renderLabel: (c: Candidate) => ReactNode; // 사진=썸네일 Image, 브랜드/상품명=Text
+  renderLabel: (c: any) => ReactNode; // 사진=썸네일 Image(c.photoUri), 브랜드=Text(c.brand), 상품명=Text(c.name)
 }> = {
   photo: {
     title: '사진',
@@ -79,8 +84,8 @@ const TAB_CONFIG: Record<'photo' | 'brand' | 'name', {
 
 **`order-product-form.tsx`**
 - `showPhotoCandidates`/`showBrandCandidates` 두 boolean state를 `candidatesTab: 'photo' | 'brand' | 'name' | null` 하나로 교체(`null` = 닫힘).
-- 기존 "사진 후보 보기/투표", "브랜드 후보 보기/투표" 링크는 위치 그대로 유지하고 각각 `setCandidatesTab('photo')` / `setCandidatesTab('brand')` 호출로만 바뀐다.
-- 상품명 입력창 아래에 "상품명 후보 보기/투표" 링크를 신규 추가 (`setCandidatesTab('name')`).
+- 기존 "사진 후보 보기/투표"(상품명 입력창 바로 아래에 이미 있음), "브랜드 후보 보기/투표"(브랜드 입력창 아래) 링크는 위치 그대로 유지하고 각각 `setCandidatesTab('photo')` / `setCandidatesTab('brand')` 호출로만 바뀐다.
+- "상품명 후보 보기/투표" 링크를 신규 추가한다 — 기존 사진 링크와 같은 자리(상품명 입력창 아래)에 나란히 놓는다 (`setCandidatesTab('name')`).
 - `<PhotoCandidatesModal>` + `<BrandCandidatesModal>` 두 인스턴스 → `<CandidatesModal visible={candidatesTab !== null} initialTab={candidatesTab ?? 'photo'} onClose={() => setCandidatesTab(null)} onPhotoApplied={setImageUri} />` 하나로 교체.
 
 **`product-form.tsx`**
