@@ -1020,7 +1020,13 @@ export default function Order() {
                 contentContainerStyle={{ alignItems: 'center', gap: 8, paddingHorizontal: 16 }}
               >
                 {fridgeSections.map((s) => (
-                  <Chip key={s} label={s} active={activeSection === s} onPress={() => setActiveSection(s)} />
+                  <Chip
+                    key={s}
+                    label={s}
+                    active={activeSection === s}
+                    onPress={() => setActiveSection(s)}
+                    onLongPress={() => setShowFridgeSectionModal(true)}
+                  />
                 ))}
                 <Pressable
                   onPress={() => setShowFridgeSectionModal(true)}
