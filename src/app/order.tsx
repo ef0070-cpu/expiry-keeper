@@ -1226,7 +1226,7 @@ const FridgeTile = memo(function FridgeTile({
       </Pressable>
 
       <Thumbnail uri={product.imageUri} size={64} radius={8} iconSize={22} />
-      <Text className="text-ink mt-1.5 text-center text-xs font-bold" numberOfLines={2}>
+      <Text className="text-ink mt-1.5 w-full text-center text-xs font-bold" numberOfLines={2}>
         {product.name}
       </Text>
 
