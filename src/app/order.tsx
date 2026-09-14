@@ -1028,14 +1028,6 @@ export default function Order() {
                     onLongPress={() => setShowFridgeSectionModal(true)}
                   />
                 ))}
-                <Pressable
-                  onPress={() => setShowFridgeSectionModal(true)}
-                  hitSlop={13}
-                  accessibilityRole="button"
-                  accessibilityLabel="구역 관리"
-                >
-                  <MaterialCommunityIcons name="pencil-outline" size={18} color="#888888" />
-                </Pressable>
               </ScrollView>
 
               <QuickOrderHelpModal visible={showQuickHelp} onClose={() => setShowQuickHelp(false)} />
