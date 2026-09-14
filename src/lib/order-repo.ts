@@ -21,6 +21,7 @@ const CART_KEY = 'orderCart:v1';
 const REMOVED_BARCODES_KEY = 'removedOrderBarcodes:v1';
 const CATEGORY_OVERRIDE_KEY = 'orderCategoryOverrides:v1';
 const PRICE_OVERRIDE_KEY = 'orderPriceOverrides:v1';
+const CATALOG_REFERENCE_PRICE_KEY = 'orderCatalogReferencePrice:v1';
 const CATALOG_UPDATE_BADGE_KEY = 'orderCatalogUpdateBadges:v1';
 const STORES_KEY = 'stores:v1';
 const ACTIVE_STORE_KEY = 'activeStoreId:v1';
@@ -123,6 +124,18 @@ async function recordPriceOverride(barcode: string, price: number): Promise<void
   const overrides = await getPriceOverrides();
   overrides.set(barcode, price);
   await AsyncStorage.setItem(PRICE_OVERRIDE_KEY, JSON.stringify(Object.fromEntries(overrides)));
+}
+
+/** 공용 카탈로그(order_catalog)에 등록된 참고 가격 — 매장마다 실제 가격이 다를 수 있어
+ * 내 가격에 자동 반영하지 않고, 화면에 "다른 매장 참고가"로만 보여주는 용도. */
+export async function getCatalogReferencePrice(barcode: string): Promise<number | null> {
+  const raw = await AsyncStorage.getItem(CATALOG_REFERENCE_PRICE_KEY);
+  const map = raw ? (JSON.parse(raw) as Record<string, number>) : {};
+  return map[barcode] ?? null;
+}
+
+async function writeCatalogReferencePrices(map: Record<string, number>): Promise<void> {
+  await AsyncStorage.setItem(CATALOG_REFERENCE_PRICE_KEY, JSON.stringify(map));
 }
 
 async function recordRemovedBarcode(barcode: string | null): Promise<void> {
@@ -500,6 +513,12 @@ export async function syncOrderCatalog(): Promise<void> {
       getPriceOverrides(),
       getSubmittedPhotoCandidates(),
     ]);
+    const referencePrices: Record<string, number> = {};
+    for (const row of data as OrderCatalogRow[]) {
+      if (row.price != null) referencePrices[row.barcode] = row.price;
+    }
+    writeCatalogReferencePrices(referencePrices).catch(() => {});
+
     const rows = (data as OrderCatalogRow[]).map((row) => {
       const withCategory = categoryOverrides.has(row.barcode)
         ? { ...row, category: categoryOverrides.get(row.barcode)! }
