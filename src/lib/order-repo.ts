@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { upsertBarcodeCatalog } from './barcode-catalog';
 import { mergeCatalogIntoProducts, type OrderCatalogRow } from './order-catalog-merge';
 import { reportOrderProductIssue, submitNewOrderProduct } from './order-report';
+import { submitBrandCandidateIfChanged } from './brand-candidates';
 import {
   getSubmittedPhotoCandidates,
   recordSubmittedPhotoCandidate,
@@ -19,7 +20,6 @@ const CATEGORIES_KEY = 'orderCategories:v1';
 const CART_KEY = 'orderCart:v1';
 const REMOVED_BARCODES_KEY = 'removedOrderBarcodes:v1';
 const CATEGORY_OVERRIDE_KEY = 'orderCategoryOverrides:v1';
-const BRAND_OVERRIDE_KEY = 'orderBrandOverrides:v1';
 const PRICE_OVERRIDE_KEY = 'orderPriceOverrides:v1';
 const CATALOG_UPDATE_BADGE_KEY = 'orderCatalogUpdateBadges:v1';
 const STORES_KEY = 'stores:v1';
@@ -82,14 +82,16 @@ export async function saveOrderProduct(p: OrderProduct): Promise<OrderProduct> {
   if (categoryChanged && p.barcode) {
     recordCategoryOverride(p.barcode, p.category).catch(() => {});
   }
-  // 가격/브랜드 수정도 카테고리와 같은 이유로 로컬 오버라이드를 남긴다. 추가로, 다른 사용자에게도
-  // 반영되려면 관리자 승인이 필요하므로(가격은 오탈자·낚시성 입력 위험이 있어 카테고리처럼 즉시
-  // 신뢰하지 않음) 신고 테이블(order_product_reports, kind 기본값 'fix')에 자동 제출한다 —
-  // 관리자가 대시보드에서 승인하면 트리거가 공용 카탈로그(order_catalog)에 반영해 모두에게 퍼진다.
-  if ((brandChanged || priceChanged) && p.barcode) {
-    if (brandChanged) recordBrandOverride(p.barcode, p.brand).catch(() => {});
-    if (priceChanged) recordPriceOverride(p.barcode, p.price).catch(() => {});
-    reportOrderProductIssue(p, '가격/브랜드 수정 (앱에서 자동 제출됨)').catch(() => {});
+  // 브랜드는 이제 투표로 대표값이 결정되므로, 로컬 오버라이드 대신 후보로 제출한다(다른 후보와
+  // 동률/신규일 때만 즉시 대표가 되고, 그 외엔 투표를 받아야 한다).
+  if (brandChanged && p.barcode) {
+    submitBrandCandidateIfChanged(p.barcode, p.brand).catch(() => {});
+  }
+  // 가격 수정은 매장마다 실제로 다를 수 있어(가맹점별 판매가 차이) 대표값으로 만들지 않는다.
+  // 로컬 오버라이드만 남겨 동기화가 내 가격을 덮어쓰지 못하게 하고, 참고용 신고만 접수한다.
+  if (priceChanged && p.barcode) {
+    recordPriceOverride(p.barcode, p.price).catch(() => {});
+    reportOrderProductIssue(p, '가격 수정 (앱에서 자동 제출됨)').catch(() => {});
   }
   return p;
 }
@@ -109,20 +111,6 @@ async function recordCategoryOverride(barcode: string, category: string): Promis
   const overrides = await getCategoryOverrides();
   overrides.set(barcode, category);
   await AsyncStorage.setItem(CATEGORY_OVERRIDE_KEY, JSON.stringify(Object.fromEntries(overrides)));
-}
-
-/** 바코드→사용자가 이 기기에서 직접 지정한 브랜드. syncOrderCatalog가 공용 값으로 덮어쓰지 않게 막는다
- * (카테고리 오버라이드와 같은 이유 — 관리자가 신고를 승인해 공용 카탈로그가 갱신되기 전까지는
- * 이 기기에서 방금 고친 값이 매번 되돌아가면 안 된다). */
-export async function getBrandOverrides(): Promise<Map<string, string>> {
-  const raw = await AsyncStorage.getItem(BRAND_OVERRIDE_KEY);
-  return new Map(Object.entries(raw ? (JSON.parse(raw) as Record<string, string>) : {}));
-}
-
-async function recordBrandOverride(barcode: string, brand: string): Promise<void> {
-  const overrides = await getBrandOverrides();
-  overrides.set(barcode, brand);
-  await AsyncStorage.setItem(BRAND_OVERRIDE_KEY, JSON.stringify(Object.fromEntries(overrides)));
 }
 
 /** 바코드→사용자가 이 기기에서 직접 지정한 가격. syncOrderCatalog가 공용 값으로 덮어쓰지 않게 막는다. */
@@ -505,27 +493,22 @@ export async function syncOrderCatalog(): Promise<void> {
       .select('barcode, name, brand, price, category, image_uri');
     if (error || !data) return;
 
-    const [items, removedBarcodes, categoryOverrides, brandOverrides, priceOverrides, photoOverrides] =
-      await Promise.all([
-        listOrderProducts(),
-        getRemovedBarcodes(),
-        getCategoryOverrides(),
-        getBrandOverrides(),
-        getPriceOverrides(),
-        getSubmittedPhotoCandidates(),
-      ]);
+    const [items, removedBarcodes, categoryOverrides, priceOverrides, photoOverrides] = await Promise.all([
+      listOrderProducts(),
+      getRemovedBarcodes(),
+      getCategoryOverrides(),
+      getPriceOverrides(),
+      getSubmittedPhotoCandidates(),
+    ]);
     const rows = (data as OrderCatalogRow[]).map((row) => {
       const withCategory = categoryOverrides.has(row.barcode)
         ? { ...row, category: categoryOverrides.get(row.barcode)! }
         : row;
-      const withBrand = brandOverrides.has(row.barcode)
-        ? { ...withCategory, brand: brandOverrides.get(row.barcode)! }
-        : withCategory;
       const withPrice = priceOverrides.has(row.barcode)
-        ? { ...withBrand, price: priceOverrides.get(row.barcode)! }
-        : withBrand;
+        ? { ...withCategory, price: priceOverrides.get(row.barcode)! }
+        : withCategory;
       // 이 기기에서 직접 고른 사진은 투표로 대표사진이 되기 전까지 공용 값이 덮어쓰지 않게 한다
-      // (카테고리 오버라이드와 같은 이유).
+      // (카테고리 오버라이드와 같은 이유). 브랜드는 이제 오버라이드 없이 공용 값(투표 결과)을 그대로 쓴다.
       return photoOverrides.has(row.barcode)
         ? { ...withPrice, image_uri: photoOverrides.get(row.barcode)! }
         : withPrice;
