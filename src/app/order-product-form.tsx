@@ -16,6 +16,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import BrandCandidatesModal from '@/components/BrandCandidatesModal';
 import Chip from '@/components/Chip';
 import PhotoCandidatesModal from '@/components/PhotoCandidatesModal';
 import { hasImageSearchKeys, lookupBarcode } from '@/lib/barcode-lookup';
@@ -23,6 +24,7 @@ import { deleteLocalPhotoIfOwned, persistLocalPhoto } from '@/lib/local-photo';
 import {
   addOrderCategory,
   deleteOrderProduct,
+  getCatalogReferencePrice,
   getOrderProduct,
   listOrderCategories,
   newId,
@@ -67,6 +69,8 @@ export default function OrderProductForm() {
   const [reporting, setReporting] = useState(false);
   const [showPhotoCandidates, setShowPhotoCandidates] = useState(false);
   const [removingPhoto, setRemovingPhoto] = useState(false);
+  const [showBrandCandidates, setShowBrandCandidates] = useState(false);
+  const [referencePrice, setReferencePrice] = useState<number | null>(null);
 
   useEffect(() => {
     listOrderCategories().then((list) => {
@@ -88,6 +92,15 @@ export default function OrderProductForm() {
       });
     }
   }, [params.id]);
+
+  useEffect(() => {
+    const trimmed = barcode.trim();
+    if (!trimmed) {
+      setReferencePrice(null);
+      return;
+    }
+    getCatalogReferencePrice(trimmed).then(setReferencePrice);
+  }, [barcode]);
 
   const pickPhoto = (
     title: string,
@@ -350,6 +363,11 @@ export default function OrderProductForm() {
         onClose={() => setShowPhotoCandidates(false)}
         onPhotoApplied={setImageUri}
       />
+      <BrandCandidatesModal
+        visible={showBrandCandidates}
+        barcode={barcode.trim()}
+        onClose={() => setShowBrandCandidates(false)}
+      />
       <ScrollView
         className="flex-1 bg-bg"
         contentContainerStyle={{ padding: 16, paddingBottom: Math.max(insets.bottom, 16) + 32 }}
@@ -447,6 +465,11 @@ export default function OrderProductForm() {
               value={brand}
               onChangeText={setBrand}
             />
+            {isEdit && barcode.trim() ? (
+              <Pressable onPress={() => setShowBrandCandidates(true)} className="mt-1.5">
+                <Text className="text-muted text-xs underline">브랜드 후보 보기 / 투표</Text>
+              </Pressable>
+            ) : null}
           </View>
           <View className="flex-1">
             <Label text="가격 (원)" />
@@ -458,6 +481,11 @@ export default function OrderProductForm() {
               value={price}
               onChangeText={setPrice}
             />
+            {referencePrice != null && String(referencePrice) !== price.trim() ? (
+              <Text className="text-muted mt-1.5 text-xs">
+                참고: 공용 카탈로그 가격 {referencePrice.toLocaleString()}원 (내 매장 가격과 다를 수 있어요)
+              </Text>
+            ) : null}
           </View>
         </View>
 
