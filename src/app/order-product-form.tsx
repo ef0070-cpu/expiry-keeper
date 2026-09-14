@@ -16,9 +16,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Chip from '@/components/Chip';
-import ImageCandidatesModal from '@/components/ImageCandidatesModal';
 import PhotoCandidatesModal from '@/components/PhotoCandidatesModal';
-import { hasImageSearchKeys, lookupBarcode, searchProductImageCandidates } from '@/lib/barcode-lookup';
+import { hasImageSearchKeys, lookupBarcode } from '@/lib/barcode-lookup';
 import { deleteLocalPhotoIfOwned, persistLocalPhoto } from '@/lib/local-photo';
 import {
   addOrderCategory,
@@ -30,7 +29,6 @@ import {
 } from '@/lib/order-repo';
 import { deletePhotoCandidate, reportOrderProductIssue } from '@/lib/order-report';
 import { clearSubmittedPhotoCandidate } from '@/lib/photo-candidates';
-import { uploadPhotoToBucket } from '@/lib/storage';
 import { OrderProduct, OrderStatus } from '@/lib/order-types';
 
 function errorMessage(e: unknown): string {
@@ -60,7 +58,6 @@ export default function OrderProductForm() {
   const [newCategory, setNewCategory] = useState('');
   const [status, setStatus] = useState<OrderStatus>('active');
   const [busy, setBusy] = useState(false);
-  const [searching, setSearching] = useState(false);
   const [checkingBarcode, setCheckingBarcode] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [reportMessage, setReportMessage] = useState('');
@@ -69,7 +66,6 @@ export default function OrderProductForm() {
   const [reporting, setReporting] = useState(false);
   const [showPhotoCandidates, setShowPhotoCandidates] = useState(false);
   const [removingPhoto, setRemovingPhoto] = useState(false);
-  const [imageCandidates, setImageCandidates] = useState<string[] | null>(null);
 
   useEffect(() => {
     listOrderCategories().then((list) => {
@@ -141,36 +137,6 @@ export default function OrderProductForm() {
     if (!result.canceled && result.assets[0]) {
       onPicked(persistLocalPhoto(result.assets[0].uri));
     }
-  };
-
-  const findImageOnWeb = async () => {
-    if (!name.trim()) {
-      Alert.alert('입력 확인', '먼저 상품명을 입력해 주세요.');
-      return;
-    }
-    if (!hasImageSearchKeys()) {
-      Alert.alert('로그인 필요', '이미지 검색을 사용하려면 로그인이 필요합니다.');
-      return;
-    }
-    setSearching(true);
-    // 바코드 매칭 이미지(있으면)를 1순위 후보로 넣고, 상품명(+브랜드) 검색 결과를 더해
-    // 사용자가 직접 고르게 한다 — 자동으로 하나를 확정 적용하지 않는다.
-    const candidates: string[] = [];
-    if (barcode.trim()) {
-      const info = await lookupBarcode(barcode.trim(), brand.trim() || undefined);
-      if (info.imageUrl) candidates.push(info.imageUrl);
-    }
-    const query = brand.trim() ? `${brand.trim()} ${name.trim()}` : name.trim();
-    const found = await searchProductImageCandidates(query);
-    for (const url of found) {
-      if (!candidates.includes(url)) candidates.push(url);
-    }
-    setSearching(false);
-    if (candidates.length === 0) {
-      Alert.alert('검색 결과 없음', '이미지를 찾지 못했습니다. 직접 촬영해 주세요.');
-      return;
-    }
-    setImageCandidates(candidates);
   };
 
   /** 잘못된 사진을 공용 후보에서 즉시 삭제한다(관리자 승인 불필요) — 삭제되면 모든 사용자 화면에서
@@ -346,20 +312,6 @@ export default function OrderProductForm() {
       className="flex-1"
     >
       <Stack.Screen options={{ title: isEdit ? '발주 상품 수정' : '발주 상품 등록' }} />
-      <ImageCandidatesModal
-        visible={imageCandidates !== null}
-        candidates={imageCandidates ?? []}
-        onSelect={async (url) => {
-          setImageCandidates(null);
-          // 검색결과 원본 링크는 핫링크 차단·임시 링크 등으로 나중에 깨질 수 있어, 고르는 순간
-          // 우리 Storage로 재업로드해 안정적인 URL로 바꾼다. 실패하면 원본 링크라도 우선 보여준다.
-          const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
-          const hosted = await uploadPhotoToBucket(url, 'order-report-images', path, true);
-          deleteLocalPhotoIfOwned(imageUri);
-          setImageUri(hosted ?? url);
-        }}
-        onClose={() => setImageCandidates(null)}
-      />
       <PhotoCandidatesModal
         visible={showPhotoCandidates}
         barcode={barcode.trim()}
@@ -407,18 +359,6 @@ export default function OrderProductForm() {
               onChangeText={setName}
             />
             <View className="mt-2 flex-row items-center gap-4">
-              <Pressable
-                onPress={findImageOnWeb}
-                disabled={searching}
-                className="flex-row items-center"
-              >
-                {searching ? (
-                  <ActivityIndicator size="small" color="#CC2222" />
-                ) : (
-                  <MaterialCommunityIcons name="image-search-outline" size={15} color="#CC2222" />
-                )}
-                <Text className="text-primary ml-1 text-xs font-medium">웹에서 이미지 찾기</Text>
-              </Pressable>
               {imageUri && barcode.trim() ? (
                 <Pressable onPress={removePhoto} disabled={removingPhoto}>
                   <Text className="text-muted text-xs underline">사진 제거</Text>
