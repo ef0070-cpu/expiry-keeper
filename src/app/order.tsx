@@ -1029,6 +1029,9 @@ export default function Order() {
                   />
                 ))}
               </ScrollView>
+              <Text className="text-muted mt-1 px-4 text-xs">
+                구역을 꾹 누르면 이름 변경·삭제·순서 변경을 할 수 있어요
+              </Text>
 
               <QuickOrderHelpModal visible={showQuickHelp} onClose={() => setShowQuickHelp(false)} />
 
@@ -1274,6 +1277,10 @@ const QuickOrderHelpModal = memo(function QuickOrderHelpModal({
             <View className="flex-row items-center" style={{ gap: 10 }}>
               <MaterialCommunityIcons name="trash-can-outline" size={18} color="#1A1A1A" />
               <Text className="text-ink flex-1 text-sm">이 구역에서 빼기</Text>
+            </View>
+            <View className="flex-row items-center" style={{ gap: 10 }}>
+              <MaterialCommunityIcons name="gesture-tap-hold" size={18} color="#1A1A1A" />
+              <Text className="text-ink flex-1 text-sm">구역 탭을 꾹 누르면 이름 변경 · 삭제 · 순서 변경</Text>
             </View>
           </View>
         </Pressable>
