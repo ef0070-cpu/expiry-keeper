@@ -8,9 +8,10 @@ create table if not exists public.product_brand_candidates (
   id uuid primary key default gen_random_uuid(),
   barcode text not null,
   brand text not null,
-  submitted_by uuid not null references auth.users(id),
+  submitted_by uuid not null default auth.uid() references auth.users(id),
   created_at timestamptz not null default now()
 );
+alter table public.product_brand_candidates alter column submitted_by set default auth.uid();
 create index if not exists product_brand_candidates_barcode_idx on public.product_brand_candidates(barcode);
 
 alter table public.product_brand_candidates enable row level security;
