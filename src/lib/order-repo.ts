@@ -2,7 +2,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { upsertBarcodeCatalog } from './barcode-catalog';
 import { mergeCatalogIntoProducts, type OrderCatalogRow } from './order-catalog-merge';
 import { reportOrderProductIssue, submitNewOrderProduct } from './order-report';
-import { getSubmittedPhotoCandidates, submitPhotoCandidateIfChanged } from './photo-candidates';
+import {
+  getSubmittedPhotoCandidates,
+  recordSubmittedPhotoCandidate,
+  submitPhotoCandidateIfChanged,
+} from './photo-candidates';
 import { newId } from './repo';
 import { supabase } from './supabase';
 import { FridgeAssignment, FridgeSection, OrderCart, OrderProduct, Store } from './order-types';
@@ -151,6 +155,22 @@ export async function deleteOrderProduct(id: string): Promise<void> {
     delete next[id];
     await writeOrderCart(next);
   }
+}
+
+/** 사진 후보에 좋아요를 눌러 그 사진을 내 상품 사진으로 즉시 반영한다. saveOrderProduct를
+ * 쓰지 않는 이유: saveOrderProduct는 imageUri가 바뀌면 submitPhotoCandidateIfChanged로 "새
+ * 후보 제출"까지 같이 하는데, 여기 photoUri는 이미 등록된 후보라 그러면 중복 후보 행이 생긴다.
+ * 로컬 표시만 바꾸고, 오버라이드만 남겨 다음 syncOrderCatalog가 이 선택을 덮어쓰지 않게 한다. */
+export async function applyOrderProductPhoto(barcode: string, photoUri: string): Promise<void> {
+  const items = await listOrderProducts();
+  let changed = false;
+  const next = items.map((p) => {
+    if (p.barcode !== barcode || p.imageUri === photoUri) return p;
+    changed = true;
+    return { ...p, imageUri: photoUri };
+  });
+  if (changed) await writeOrderProducts(next);
+  await recordSubmittedPhotoCandidate(barcode, photoUri);
 }
 
 // ---------- 제품유형 카테고리 ----------

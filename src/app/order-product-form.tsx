@@ -316,6 +316,7 @@ export default function OrderProductForm() {
         visible={showPhotoCandidates}
         barcode={barcode.trim()}
         onClose={() => setShowPhotoCandidates(false)}
+        onPhotoApplied={setImageUri}
       />
       <ScrollView
         className="flex-1 bg-bg"

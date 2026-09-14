@@ -2,6 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { applyOrderProductPhoto } from '@/lib/order-repo';
 import { listPhotoCandidates, voteOnPhoto, type PhotoCandidate } from '@/lib/order-report';
 
 function errorMessage(e: unknown): string {
@@ -17,10 +18,13 @@ export default function PhotoCandidatesModal({
   visible,
   barcode,
   onClose,
+  onPhotoApplied,
 }: {
   visible: boolean;
   barcode: string;
   onClose: () => void;
+  /** 좋아요를 눌러 그 사진이 내 상품 사진으로 즉시 반영됐을 때 알려준다(폼 화면의 미리보기 갱신용). */
+  onPhotoApplied?: (photoUri: string) => void;
 }) {
   const [candidates, setCandidates] = useState<PhotoCandidate[]>([]);
   const [loading, setLoading] = useState(false);
@@ -35,10 +39,17 @@ export default function PhotoCandidatesModal({
   }, [visible, barcode]);
 
   const vote = async (photoId: string, value: 1 | -1) => {
+    // 이미 좋아요 상태에서 다시 누르면 투표 취소(중립)이지 "선택"이 아니므로, 그때는 적용하지 않는다.
+    const target = candidates.find((c) => c.id === photoId);
+    const applyAsMyPhoto = value === 1 && target?.myVote !== 1;
     setVotingId(photoId);
     try {
       await voteOnPhoto(photoId, value);
       setCandidates(await listPhotoCandidates(barcode));
+      if (applyAsMyPhoto && target) {
+        await applyOrderProductPhoto(barcode, target.photoUri);
+        onPhotoApplied?.(target.photoUri);
+      }
     } catch (e) {
       Alert.alert('투표 실패', errorMessage(e));
     } finally {

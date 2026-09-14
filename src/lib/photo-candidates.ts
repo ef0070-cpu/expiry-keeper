@@ -10,7 +10,7 @@ export async function getSubmittedPhotoCandidates(): Promise<Map<string, string>
   return new Map(Object.entries(raw ? (JSON.parse(raw) as Record<string, string>) : {}));
 }
 
-async function recordSubmittedPhotoCandidate(barcode: string, photoUri: string): Promise<void> {
+export async function recordSubmittedPhotoCandidate(barcode: string, photoUri: string): Promise<void> {
   const map = await getSubmittedPhotoCandidates();
   map.set(barcode, photoUri);
   await AsyncStorage.setItem(SUBMITTED_PHOTO_KEY, JSON.stringify(Object.fromEntries(map)));
