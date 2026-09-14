@@ -1,6 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
+import * as Linking from 'expo-linking';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
@@ -112,6 +113,27 @@ export default function OrderProductForm() {
       setReportPhotoUri(uri);
     });
 
+  /** 권한이 거부돼 있으면(특히 "다시 묻지 않음"으로 완전히 거부된 상태) 카메라 앱이 그냥
+   * 조용히 안 열려서 사용자 눈엔 "눌러도 반응이 없다"로 보인다 — canAskAgain이 false면 OS가
+   * 재요청 다이얼로그 자체를 안 띄우므로, 설정 화면으로 안내해야 한다. */
+  const ensureCameraPermission = async (): Promise<boolean> => {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (perm.granted) return true;
+    if (perm.canAskAgain) {
+      Alert.alert('권한 필요', '카메라 접근 권한을 허용해 주세요.');
+    } else {
+      Alert.alert(
+        '권한 필요',
+        '카메라 접근 권한이 거부되어 있어요. 설정에서 권한을 허용해 주세요.',
+        [
+          { text: '취소', style: 'cancel' },
+          { text: '설정 열기', onPress: () => Linking.openSettings() },
+        ],
+      );
+    }
+    return false;
+  };
+
   const launchPicker = async (
     source: 'camera' | 'library',
     onPicked: (uri: string) => void,
@@ -125,11 +147,7 @@ export default function OrderProductForm() {
     };
     let result: ImagePicker.ImagePickerResult;
     if (source === 'camera') {
-      const perm = await ImagePicker.requestCameraPermissionsAsync();
-      if (!perm.granted) {
-        Alert.alert('권한 필요', '카메라 접근 권한을 허용해 주세요.');
-        return;
-      }
+      if (!(await ensureCameraPermission())) return;
       result = await ImagePicker.launchCameraAsync(options);
     } else {
       result = await ImagePicker.launchImageLibraryAsync(options);
