@@ -23,6 +23,7 @@ import {
   addStore,
   assignToFridgeSection,
   CatalogUpdateBadge,
+  clearAllCatalogUpdateBadges,
   clearCatalogUpdateBadge,
   deleteFridgeSection,
   deleteOrderCategory,
@@ -114,6 +115,9 @@ export default function Order() {
     setCategories(categoryList);
     setCart(cartData);
     setUpdateBadges(badges);
+    // 발주 화면을 한 번 띄운 것 자체를 "확인함"으로 본다 — 이번 렌더에는 그대로 보이고,
+    // 다음부터는 상품을 개별로 안 열어봐도 다시 안 뜬다.
+    if (badges.size > 0) clearAllCatalogUpdateBadges().catch(() => {});
     setStores(storeList);
     setActiveStoreIdState(activeId);
     setFridgeAssignments(activeId ? await listFridgeAssignments(activeId) : []);

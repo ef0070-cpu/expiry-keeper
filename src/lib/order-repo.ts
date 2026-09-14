@@ -505,8 +505,9 @@ export async function syncOrderCatalog(): Promise<void> {
 }
 
 /** 공용 카탈로그 동기화로 새로 추가되거나(new) 필드가 바뀐(updated) 상품의 바코드 목록.
- * 발주 목록 화면이 이걸로 "신규"/"수정" 뱃지를 표시하고 최상단에 올린다. 사용자가 해당 상품을
- * 열어보면 clearCatalogUpdateBadge로 지운다 — 안 그러면 계속 최상단에 남는다. */
+ * 발주 목록 화면이 이걸로 "신규"/"수정" 뱃지를 표시하고 최상단에 올린다. 상품을 하나하나 열어봐야
+ * 지워지면 사용자가 그렇게까지 안 하므로, 발주 화면을 한 번 띄운 것 자체를 "확인함"으로 보고
+ * clearAllCatalogUpdateBadges로 한꺼번에 지운다(이번 화면엔 그대로 보이고, 다음부터 안 뜬다). */
 export async function getCatalogUpdateBadges(): Promise<Map<string, CatalogUpdateBadge>> {
   const raw = await AsyncStorage.getItem(CATALOG_UPDATE_BADGE_KEY);
   return new Map(Object.entries(raw ? (JSON.parse(raw) as Record<string, CatalogUpdateBadge>) : {}));
@@ -520,4 +521,9 @@ export async function clearCatalogUpdateBadge(barcode: string): Promise<void> {
   const badges = await getCatalogUpdateBadges();
   if (!badges.delete(barcode)) return;
   await writeCatalogUpdateBadges(badges);
+}
+
+/** 발주 화면을 한 번 확인한 것으로 보고 신규/수정 뱃지를 전부 지운다(개별 상품 열람 불필요). */
+export async function clearAllCatalogUpdateBadges(): Promise<void> {
+  await AsyncStorage.removeItem(CATALOG_UPDATE_BADGE_KEY);
 }
