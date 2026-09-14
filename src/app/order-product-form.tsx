@@ -361,26 +361,37 @@ export default function OrderProductForm() {
           </Text>
         ) : null}
         <View className="flex-row">
-          <Pressable
-            onPress={pickImage}
-            className="items-center justify-center rounded-xl border border-line bg-paper active:opacity-70"
-            style={{ width: 96, height: 96 }}
-            accessibilityRole="button"
-            accessibilityLabel={imageUri ? '사진 변경' : '사진 추가'}
-          >
-            {imageUri ? (
-              <Image
-                source={{ uri: imageUri }}
-                style={{ width: 96, height: 96, borderRadius: 12 }}
-                contentFit="cover"
-              />
-            ) : (
-              <View className="items-center">
-                <MaterialCommunityIcons name="camera-plus-outline" size={26} color="#888888" />
-                <Text className="text-muted mt-1 text-xs">사진 추가</Text>
-              </View>
-            )}
-          </Pressable>
+          <View style={{ width: 96 }}>
+            <Pressable
+              onPress={pickImage}
+              className="items-center justify-center rounded-xl border border-line bg-paper active:opacity-70"
+              style={{ width: 96, height: 96 }}
+              accessibilityRole="button"
+              accessibilityLabel={imageUri ? '사진 변경' : '사진 추가'}
+            >
+              {imageUri ? (
+                <Image
+                  source={{ uri: imageUri }}
+                  style={{ width: 96, height: 96, borderRadius: 12 }}
+                  contentFit="cover"
+                />
+              ) : (
+                <View className="items-center">
+                  <MaterialCommunityIcons name="camera-plus-outline" size={26} color="#888888" />
+                  <Text className="text-muted mt-1 text-xs">사진 추가</Text>
+                </View>
+              )}
+            </Pressable>
+            {imageUri && barcode.trim() ? (
+              <Pressable
+                onPress={removePhoto}
+                disabled={removingPhoto}
+                className="mt-1.5 items-center"
+              >
+                <Text className="text-muted text-xs underline">사진 제거</Text>
+              </Pressable>
+            ) : null}
+          </View>
 
           <View className="ml-3 flex-1">
             <Text className="text-ink text-sm font-bold">상품명 *</Text>
@@ -391,13 +402,6 @@ export default function OrderProductForm() {
               value={name}
               onChangeText={setName}
             />
-            <View className="mt-2 flex-row items-center gap-4">
-              {imageUri && barcode.trim() ? (
-                <Pressable onPress={removePhoto} disabled={removingPhoto}>
-                  <Text className="text-muted text-xs underline">사진 제거</Text>
-                </Pressable>
-              ) : null}
-            </View>
             {isEdit && barcode.trim() ? (
               <Pressable onPress={() => setShowPhotoCandidates(true)} className="mt-1.5">
                 <Text className="text-muted text-xs underline">사진 후보 보기 / 투표</Text>
