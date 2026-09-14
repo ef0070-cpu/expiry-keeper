@@ -100,17 +100,14 @@ export default function Order() {
   const scanParams = useLocalSearchParams<{ scannedBarcode?: string; nonce?: string }>();
 
   const loadCatalog = useCallback(async () => {
-    const [productList, categoryList, cartData, badges, storeList, activeId, sections, sectionDividers] =
-      await Promise.all([
-        listOrderProducts(),
-        listOrderCategories(),
-        getOrderCart(),
-        getCatalogUpdateBadges(),
-        listStores(),
-        getActiveStoreId(),
-        listFridgeSections(),
-        listFridgeSectionDividers(),
-      ]);
+    const [productList, categoryList, cartData, badges, storeList, activeId] = await Promise.all([
+      listOrderProducts(),
+      listOrderCategories(),
+      getOrderCart(),
+      getCatalogUpdateBadges(),
+      listStores(),
+      getActiveStoreId(),
+    ]);
     setProducts(productList);
     setCategories(categoryList);
     setCart(cartData);
@@ -120,7 +117,19 @@ export default function Order() {
     if (badges.size > 0) clearAllCatalogUpdateBadges().catch(() => {});
     setStores(storeList);
     setActiveStoreIdState(activeId);
-    setFridgeAssignments(activeId ? await listFridgeAssignments(activeId) : []);
+    // 구역 목록/구분선은 매장별이라 매장이 선택 안 됐으면 비워둔다(빠른발주는 매장 선택을 요구함).
+    const [assignments, sections, sectionDividers]: [
+      FridgeAssignment[],
+      FridgeSection[],
+      Record<string, string[]>,
+    ] = activeId
+      ? await Promise.all([
+          listFridgeAssignments(activeId),
+          listFridgeSections(activeId),
+          listFridgeSectionDividers(activeId),
+        ])
+      : [[], [], {}];
+    setFridgeAssignments(assignments);
     setFridgeSections(sections);
     setFridgeSectionDividersState(sectionDividers);
     // 현재 선택된 구역이 삭제/이름변경 등으로 더는 목록에 없으면 첫 구역으로 되돌린다.
@@ -170,33 +179,39 @@ export default function Order() {
     [activeStoreId, loadCatalog],
   );
 
-  const onAddFridgeSection = useCallback(async (name: string) => {
-    setFridgeSections(await addFridgeSection(name));
-  }, []);
+  const onAddFridgeSection = useCallback(
+    async (name: string) => {
+      if (!activeStoreId) return;
+      setFridgeSections(await addFridgeSection(activeStoreId, name));
+    },
+    [activeStoreId],
+  );
 
   const onRenameFridgeSection = useCallback(
     async (from: string, to: string) => {
-      setFridgeSections(await renameFridgeSection(from, to));
+      if (!activeStoreId) return;
+      setFridgeSections(await renameFridgeSection(activeStoreId, from, to));
       // 현재 보고 있는 구역이 방금 바뀐 그 구역이면 표시도 새 이름으로 맞춘다.
       setActiveSection((prev) => (prev === from ? to : prev));
-      if (activeStoreId) setFridgeAssignments(await listFridgeAssignments(activeStoreId));
+      setFridgeAssignments(await listFridgeAssignments(activeStoreId));
     },
     [activeStoreId],
   );
 
   const onDeleteFridgeSection = useCallback(
     (name: string) => {
+      if (!activeStoreId) return;
       Alert.alert(
         '구역 삭제',
-        `'${name}' 구역을 삭제할까요? 모든 매장에서 이 구역에 배정된 상품 정보도 함께 사라집니다.`,
+        `'${name}' 구역을 삭제할까요? 이 매장에서 이 구역에 배정된 상품 정보도 함께 사라집니다.`,
         [
           { text: '취소', style: 'cancel' },
           {
             text: '삭제',
             style: 'destructive',
             onPress: async () => {
-              setFridgeSections(await deleteFridgeSection(name));
-              if (activeStoreId) setFridgeAssignments(await listFridgeAssignments(activeStoreId));
+              setFridgeSections(await deleteFridgeSection(activeStoreId, name));
+              setFridgeAssignments(await listFridgeAssignments(activeStoreId));
             },
           },
         ],
@@ -389,10 +404,14 @@ export default function Order() {
     [activeStoreId, activeSection],
   );
 
-  const onReorderFridgeSections = useCallback((sections: FridgeSection[]) => {
-    setFridgeSections(sections);
-    reorderFridgeSections(sections).catch(() => {});
-  }, []);
+  const onReorderFridgeSections = useCallback(
+    (sections: FridgeSection[]) => {
+      if (!activeStoreId) return;
+      setFridgeSections(sections);
+      reorderFridgeSections(activeStoreId, sections).catch(() => {});
+    },
+    [activeStoreId],
+  );
 
   // 드래그가 좁은 화면에서 조작하기 어려워 화살표 방식을 썼었지만, 먼 거리 이동에 탭이 너무 많이
   // 필요해 불편하다는 피드백으로 탭-투-타겟 방식으로 교체: 이동 아이콘으로 상품 하나를 "대기" 상태로
@@ -609,11 +628,13 @@ export default function Order() {
   }, [settingsProduct]);
 
   const onToggleRowDivider = useCallback(async () => {
-    if (!settingsProduct) return;
+    if (!settingsProduct || !activeStoreId) return;
     const rowLastId = getRowLastProductId(settingsProduct.id);
-    setFridgeSectionDividersState(await toggleFridgeSectionDivider(activeSection, rowLastId));
+    setFridgeSectionDividersState(
+      await toggleFridgeSectionDivider(activeStoreId, activeSection, rowLastId),
+    );
     setSettingsProduct(null);
-  }, [settingsProduct, getRowLastProductId, activeSection]);
+  }, [settingsProduct, getRowLastProductId, activeSection, activeStoreId]);
 
   const onMoveFridgeTile = useCallback(
     async (section: FridgeSection) => {

@@ -252,9 +252,10 @@ export async function setActiveStoreId(id: string | null): Promise<void> {
   else await AsyncStorage.removeItem(ACTIVE_STORE_KEY);
 }
 
-// ---------- 냉장고 구역 (전체 공용, 편집 가능) ----------
+// ---------- 냉장고 구역 (매장별, 편집 가능) ----------
+// 매장마다 실제 냉동고 구성이 달라 구역 목록도 매장별로 따로 관리한다. 아직 이 저장소가 없는
+// 매장(신규 매장, 또는 이 기능 이전부터 쓰던 기존 매장)은 DEFAULT_FRIDGE_SECTIONS로 시작한다.
 
-const FRIDGE_SECTIONS_KEY = 'fridgeSections:v1';
 const DEFAULT_FRIDGE_SECTIONS: FridgeSection[] = [
   '600바-1',
   '600바-2',
@@ -264,104 +265,112 @@ const DEFAULT_FRIDGE_SECTIONS: FridgeSection[] = [
   '홈류/상자류',
 ];
 
-export async function listFridgeSections(): Promise<FridgeSection[]> {
-  const raw = await AsyncStorage.getItem(FRIDGE_SECTIONS_KEY);
+function fridgeSectionsKey(storeId: string): string {
+  return `fridgeSections:${storeId}`;
+}
+
+export async function listFridgeSections(storeId: string): Promise<FridgeSection[]> {
+  const raw = await AsyncStorage.getItem(fridgeSectionsKey(storeId));
   return raw ? (JSON.parse(raw) as FridgeSection[]) : DEFAULT_FRIDGE_SECTIONS;
 }
 
-async function writeFridgeSections(sections: FridgeSection[]): Promise<void> {
-  await AsyncStorage.setItem(FRIDGE_SECTIONS_KEY, JSON.stringify(sections));
+async function writeFridgeSections(storeId: string, sections: FridgeSection[]): Promise<void> {
+  await AsyncStorage.setItem(fridgeSectionsKey(storeId), JSON.stringify(sections));
 }
 
-export async function addFridgeSection(name: string): Promise<FridgeSection[]> {
-  const sections = await listFridgeSections();
+export async function addFridgeSection(storeId: string, name: string): Promise<FridgeSection[]> {
+  const sections = await listFridgeSections(storeId);
   if (sections.includes(name)) return sections;
   const next = [...sections, name];
-  await writeFridgeSections(next);
+  await writeFridgeSections(storeId, next);
   return next;
 }
 
 /** 구역 탭이 보이는 순서를 사용자가 드래그로 정한 순서로 저장한다. */
-export async function reorderFridgeSections(orderedSections: FridgeSection[]): Promise<FridgeSection[]> {
-  await writeFridgeSections(orderedSections);
+export async function reorderFridgeSections(
+  storeId: string,
+  orderedSections: FridgeSection[],
+): Promise<FridgeSection[]> {
+  await writeFridgeSections(storeId, orderedSections);
   return orderedSections;
 }
 
-/** 구역 이름을 바꾸고, 이미 그 구역에 배정된 상품들(모든 매장)의 배정 기록도 새 이름으로
+/** 구역 이름을 바꾸고, 이 매장에서 이미 그 구역에 배정된 상품들의 배정 기록도 새 이름으로
  * 맞춰준다 — 안 그러면 이름을 바꾸는 순간 기존에 배정해둔 상품들이 전부 사라진 것처럼 보인다. */
-export async function renameFridgeSection(from: string, to: string): Promise<FridgeSection[]> {
-  const sections = await listFridgeSections();
+export async function renameFridgeSection(
+  storeId: string,
+  from: string,
+  to: string,
+): Promise<FridgeSection[]> {
+  const sections = await listFridgeSections(storeId);
   const next = sections.map((s) => (s === from ? to : s));
-  await writeFridgeSections(next);
-  const stores = await listStores();
-  for (const store of stores) {
-    const assignments = await listFridgeAssignments(store.id);
-    if (assignments.some((a) => a.section === from)) {
-      await writeFridgeAssignments(
-        store.id,
-        assignments.map((a) => (a.section === from ? { ...a, section: to } : a)),
-      );
-    }
+  await writeFridgeSections(storeId, next);
+  const assignments = await listFridgeAssignments(storeId);
+  if (assignments.some((a) => a.section === from)) {
+    await writeFridgeAssignments(
+      storeId,
+      assignments.map((a) => (a.section === from ? { ...a, section: to } : a)),
+    );
   }
-  const dividers = await listFridgeSectionDividers();
+  const dividers = await listFridgeSectionDividers(storeId);
   if (from in dividers) {
     const { [from]: fromDividers, ...restDividers } = dividers;
-    await writeFridgeSectionDividers({ ...restDividers, [to]: fromDividers });
+    await writeFridgeSectionDividers(storeId, { ...restDividers, [to]: fromDividers });
   }
   return next;
 }
 
-/** 구역을 삭제하고, 모든 매장에서 그 구역에 배정돼 있던 상품들의 배정 기록도 함께 지운다
+/** 구역을 삭제하고, 이 매장에서 그 구역에 배정돼 있던 상품들의 배정 기록도 함께 지운다
  * (배정 기록만 지워질 뿐 상품 자체나 장바구니는 그대로 남는다). */
-export async function deleteFridgeSection(name: string): Promise<FridgeSection[]> {
-  const sections = await listFridgeSections();
+export async function deleteFridgeSection(storeId: string, name: string): Promise<FridgeSection[]> {
+  const sections = await listFridgeSections(storeId);
   const next = sections.filter((s) => s !== name);
-  await writeFridgeSections(next);
-  const stores = await listStores();
-  for (const store of stores) {
-    const assignments = await listFridgeAssignments(store.id);
-    if (assignments.some((a) => a.section === name)) {
-      await writeFridgeAssignments(
-        store.id,
-        assignments.filter((a) => a.section !== name),
-      );
-    }
+  await writeFridgeSections(storeId, next);
+  const assignments = await listFridgeAssignments(storeId);
+  if (assignments.some((a) => a.section === name)) {
+    await writeFridgeAssignments(
+      storeId,
+      assignments.filter((a) => a.section !== name),
+    );
   }
-  const dividers = await listFridgeSectionDividers();
+  const dividers = await listFridgeSectionDividers(storeId);
   if (name in dividers) {
     const { [name]: _removedDividers, ...restDividers } = dividers;
-    await writeFridgeSectionDividers(restDividers);
+    await writeFridgeSectionDividers(storeId, restDividers);
   }
   return next;
 }
 
-// ---------- 구역별 가로 구분선 (매장 공용) ----------
+// ---------- 구역별 가로 구분선 (매장별) ----------
 // 실제 냉동고의 상/하단 선반 구분(가로 철망)을 화면에도 표시하기 위한 순수 시각 요소.
 // 순서/열 개수와 달리 진열 순서에는 아무 영향을 주지 않는다. 그 줄(row)의 마지막 상품 id를
 // 저장해서, 어느 상품에서 토글하든 항상 줄 전체 아래에 온전한 구분선이 그려지게 한다.
 
-const FRIDGE_SECTION_DIVIDERS_KEY = 'fridgeSectionDividers:v1';
+function fridgeSectionDividersKey(storeId: string): string {
+  return `fridgeSectionDividers:${storeId}`;
+}
 
-export async function listFridgeSectionDividers(): Promise<Record<string, string[]>> {
-  const raw = await AsyncStorage.getItem(FRIDGE_SECTION_DIVIDERS_KEY);
+export async function listFridgeSectionDividers(storeId: string): Promise<Record<string, string[]>> {
+  const raw = await AsyncStorage.getItem(fridgeSectionDividersKey(storeId));
   return raw ? (JSON.parse(raw) as Record<string, string[]>) : {};
 }
 
-async function writeFridgeSectionDividers(map: Record<string, string[]>): Promise<void> {
-  await AsyncStorage.setItem(FRIDGE_SECTION_DIVIDERS_KEY, JSON.stringify(map));
+async function writeFridgeSectionDividers(storeId: string, map: Record<string, string[]>): Promise<void> {
+  await AsyncStorage.setItem(fridgeSectionDividersKey(storeId), JSON.stringify(map));
 }
 
 export async function toggleFridgeSectionDivider(
+  storeId: string,
   section: string,
   rowLastProductId: string,
 ): Promise<Record<string, string[]>> {
-  const map = await listFridgeSectionDividers();
+  const map = await listFridgeSectionDividers(storeId);
   const current = map[section] ?? [];
   const nextList = current.includes(rowLastProductId)
     ? current.filter((id) => id !== rowLastProductId)
     : [...current, rowLastProductId];
   const next = { ...map, [section]: nextList };
-  await writeFridgeSectionDividers(next);
+  await writeFridgeSectionDividers(storeId, next);
   return next;
 }
 
