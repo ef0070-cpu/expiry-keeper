@@ -341,6 +341,20 @@ export async function deleteFridgeSection(storeId: string, name: string): Promis
   return next;
 }
 
+/** 구역은 남기고, 이 매장에서 그 구역에 배정된 상품들만 전부 뺀다(진열 초기화).
+ * deleteFridgeSection과 달리 구역 이름 자체는 목록에 그대로 남는다. */
+export async function clearFridgeSection(storeId: string, name: string): Promise<FridgeAssignment[]> {
+  const assignments = await listFridgeAssignments(storeId);
+  const next = assignments.filter((a) => a.section !== name);
+  await writeFridgeAssignments(storeId, next);
+  const dividers = await listFridgeSectionDividers(storeId);
+  if (name in dividers) {
+    const { [name]: _removedDividers, ...restDividers } = dividers;
+    await writeFridgeSectionDividers(storeId, restDividers);
+  }
+  return next;
+}
+
 // ---------- 구역별 가로 구분선 (매장별) ----------
 // 실제 냉동고의 상/하단 선반 구분(가로 철망)을 화면에도 표시하기 위한 순수 시각 요소.
 // 순서/열 개수와 달리 진열 순서에는 아무 영향을 주지 않는다. 그 줄(row)의 마지막 상품 id를

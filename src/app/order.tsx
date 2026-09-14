@@ -19,6 +19,7 @@ import Chip from '@/components/Chip';
 import Thumbnail from '@/components/Thumbnail';
 import {
   addFridgeSection,
+  clearFridgeSection,
   addOrderCategory,
   addStore,
   assignToFridgeSection,
@@ -194,6 +195,27 @@ export default function Order() {
       // 현재 보고 있는 구역이 방금 바뀐 그 구역이면 표시도 새 이름으로 맞춘다.
       setActiveSection((prev) => (prev === from ? to : prev));
       setFridgeAssignments(await listFridgeAssignments(activeStoreId));
+    },
+    [activeStoreId],
+  );
+
+  const onClearFridgeSection = useCallback(
+    (name: string) => {
+      if (!activeStoreId) return;
+      Alert.alert(
+        '구역 초기화',
+        `'${name}' 구역에 진열된 상품을 전부 뺄까요? 구역 자체는 남고, 진열된 상품만 비워집니다.`,
+        [
+          { text: '취소', style: 'cancel' },
+          {
+            text: '초기화',
+            style: 'destructive',
+            onPress: async () => {
+              setFridgeAssignments(await clearFridgeSection(activeStoreId, name));
+            },
+          },
+        ],
+      );
     },
     [activeStoreId],
   );
@@ -989,6 +1011,7 @@ export default function Order() {
             onAdd={onAddFridgeSection}
             onRename={onRenameFridgeSection}
             onDelete={onDeleteFridgeSection}
+            onClear={onClearFridgeSection}
             onReorder={onReorderFridgeSections}
             onClose={() => setShowFridgeSectionModal(false)}
           />
@@ -1704,6 +1727,7 @@ const FridgeSectionModal = memo(function FridgeSectionModal({
   onAdd,
   onRename,
   onDelete,
+  onClear,
   onReorder,
   onClose,
 }: {
@@ -1712,6 +1736,7 @@ const FridgeSectionModal = memo(function FridgeSectionModal({
   onAdd: (name: string) => void;
   onRename: (from: string, to: string) => void;
   onDelete: (name: string) => void;
+  onClear: (name: string) => void;
   onReorder: (sections: string[]) => void;
   onClose: () => void;
 }) {
@@ -1808,6 +1833,9 @@ const FridgeSectionModal = memo(function FridgeSectionModal({
                   </Text>
                   <Pressable onPress={() => startRename(s)} hitSlop={13} className="ml-3">
                     <MaterialCommunityIcons name="pencil-outline" size={18} color="#888888" />
+                  </Pressable>
+                  <Pressable onPress={() => onClear(s)} hitSlop={13} className="ml-3">
+                    <MaterialCommunityIcons name="backup-restore" size={18} color="#888888" />
                   </Pressable>
                   <Pressable onPress={() => onDelete(s)} hitSlop={13} className="ml-3">
                     <MaterialCommunityIcons name="trash-can-outline" size={18} color="#888888" />
