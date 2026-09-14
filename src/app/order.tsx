@@ -1013,26 +1013,6 @@ export default function Order() {
             </View>
           ) : (
             <>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                className="mt-3"
-                contentContainerStyle={{ alignItems: 'center', gap: 8, paddingHorizontal: 16 }}
-              >
-                {fridgeSections.map((s) => (
-                  <Chip
-                    key={s}
-                    label={s}
-                    active={activeSection === s}
-                    onPress={() => setActiveSection(s)}
-                    onLongPress={() => setShowFridgeSectionModal(true)}
-                  />
-                ))}
-              </ScrollView>
-              <Text className="text-muted mt-1 px-4 text-xs">
-                구역을 꾹 누르면 이름 변경·삭제·순서 변경을 할 수 있어요
-              </Text>
-
               <QuickOrderHelpModal visible={showQuickHelp} onClose={() => setShowQuickHelp(false)} />
 
               <FlatList
@@ -1040,6 +1020,29 @@ export default function Order() {
                 data={fridgeGridRows}
                 keyExtractor={(row) => row.key}
                 keyboardShouldPersistTaps="handled"
+                ListHeaderComponent={
+                  <>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      style={{ marginTop: -4 }}
+                      contentContainerStyle={{ alignItems: 'center', gap: 8 }}
+                    >
+                      {fridgeSections.map((s) => (
+                        <Chip
+                          key={s}
+                          label={s}
+                          active={activeSection === s}
+                          onPress={() => setActiveSection(s)}
+                          onLongPress={() => setShowFridgeSectionModal(true)}
+                        />
+                      ))}
+                    </ScrollView>
+                    <Text className="text-muted mb-2 mt-1 text-xs">
+                      구역을 꾹 누르면 이름 변경·삭제·순서 변경을 할 수 있어요
+                    </Text>
+                  </>
+                }
                 contentContainerStyle={{ padding: 16, paddingBottom: 120 + insets.bottom }}
                 renderItem={({ item: row }) =>
                   row.type === 'divider' ? (
