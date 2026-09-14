@@ -139,6 +139,20 @@ export default function OrderProductForm() {
     onPicked: (uri: string) => void,
     aspect?: [number, number]
   ) => {
+    // Alert 버튼의 onPress는 await/catch 없이 호출되므로, 여기서 못 잡은 예외는 사용자에게
+    // 아무 표시도 없이 그냥 사라진다("눌러도 반응이 없다"로 보이는 원인) — 반드시 여기서 잡아 보여준다.
+    try {
+      await launchPickerUnsafe(source, onPicked, aspect);
+    } catch (e) {
+      Alert.alert('사진 선택 실패', errorMessage(e));
+    }
+  };
+
+  const launchPickerUnsafe = async (
+    source: 'camera' | 'library',
+    onPicked: (uri: string) => void,
+    aspect?: [number, number]
+  ) => {
     const options: ImagePicker.ImagePickerOptions = {
       mediaTypes: ['images'],
       allowsEditing: true,
