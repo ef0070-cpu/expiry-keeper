@@ -123,11 +123,18 @@ export type PhotoCandidate = {
 /** 이 바코드의 사진 후보들과 각 후보의 득표 현황, 내 투표 상태를 조회한다. */
 export async function listPhotoCandidates(barcode: string): Promise<PhotoCandidate[]> {
   if (!supabase) return [];
-  const { data: photos, error } = await supabase
-    .from('order_catalog_photos')
-    .select('id, photo_uri')
-    .eq('barcode', barcode)
-    .order('created_at', { ascending: true });
+  // photos 조회와 세션 조회는 서로 무관하니 병렬로 보낸다. getUser()는 매번 Auth 서버까지
+  // 왕복하는 네트워크 호출이라 모바일에서 느리게 느껴지는 주 원인이었다 — 여기선 "내가 투표한
+  // 후보 표시용" UI 정보일 뿐 권한 검사가 아니므로(실제 권한은 서버 RLS가 담당), 로컬 저장소만
+  // 읽는 getSession()으로 충분하다.
+  const [{ data: photos, error }, { data: sessionData }] = await Promise.all([
+    supabase
+      .from('order_catalog_photos')
+      .select('id, photo_uri')
+      .eq('barcode', barcode)
+      .order('created_at', { ascending: true }),
+    supabase.auth.getSession(),
+  ]);
   if (error || !photos || photos.length === 0) return [];
 
   const ids = photos.map((p) => p.id);
@@ -135,8 +142,7 @@ export async function listPhotoCandidates(barcode: string): Promise<PhotoCandida
     .from('order_photo_votes')
     .select('photo_id, voter_id, vote')
     .in('photo_id', ids);
-  const { data: userData } = await supabase.auth.getUser();
-  const myId = userData.user?.id;
+  const myId = sessionData.session?.user.id;
 
   return photos.map((p) => {
     const photoVotes = (votes ?? []).filter((v) => v.photo_id === p.id);
@@ -156,8 +162,8 @@ export async function listPhotoCandidates(barcode: string): Promise<PhotoCandida
 /** 사진에 좋아요/싫어요 투표한다. 이미 같은 값으로 투표했으면 취소(중립)한다. */
 export async function voteOnPhoto(photoId: string, vote: 1 | -1): Promise<void> {
   if (!supabase) throw new Error('로그인이 필요합니다.');
-  const { data: userData } = await supabase.auth.getUser();
-  const voterId = userData.user?.id;
+  const { data: sessionData } = await supabase.auth.getSession();
+  const voterId = sessionData.session?.user.id;
   if (!voterId) throw new Error('로그인이 필요합니다.');
 
   const { data: existing } = await supabase
