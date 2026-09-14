@@ -79,6 +79,12 @@ export async function submitNewOrderProduct(product: OrderProduct): Promise<void
       photo_uri: null,
     });
     if (error) return;
+    // 브랜드도 후보로 제출한다 — apply_approved_order_report 트리거는 더 이상 brand를
+    // 쓰지 않으므로, 후보가 없으면 order_catalog.brand가 NULL로 남아 다음 동기화 때
+    // 방금 입력한 브랜드가 지워진다. (사진과 마찬가지로 order_catalog 행이 생긴 뒤에 넣는다.)
+    if (product.barcode && product.brand.trim()) {
+      await submitBrandCandidate(product.barcode, product.brand.trim());
+    }
     // order_catalog 행이 생성된 뒤에 사진 후보를 넣어야 한다 — 먼저 넣으면 대표 사진
     // 재계산 UPDATE가 대상 행을 못 찾아 조용히 유실된다.
     if (product.imageUri && product.barcode) {

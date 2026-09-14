@@ -8,11 +8,18 @@ create table if not exists public.product_brand_candidates (
   id uuid primary key default gen_random_uuid(),
   barcode text not null,
   brand text not null,
-  submitted_by uuid not null default auth.uid() references auth.users(id),
+  -- submitted_by에 FK 없음: 아래 백필이 대시보드 실행 컨텍스트(auth.uid()가 null)에서
+  -- sentinel uuid를 넣기 때문. FK가 있으면 백필이 실패해 스크립트 전체가 롤백된다.
+  -- (order_catalog_photos.submitted_by와 동일한 이유/구조)
+  submitted_by uuid not null default auth.uid(),
   created_at timestamptz not null default now()
 );
 alter table public.product_brand_candidates alter column submitted_by set default auth.uid();
 create index if not exists product_brand_candidates_barcode_idx on public.product_brand_candidates(barcode);
+-- 같은 브랜드 텍스트를 여러 기기가 각각 제안하면 표가 갈려 대표 선정이 안 된다.
+-- 대소문자/앞뒤 공백을 무시한 유니크 인덱스로 한 후보에 표가 모이게 한다.
+create unique index if not exists product_brand_candidates_barcode_brand_idx
+  on public.product_brand_candidates (barcode, lower(btrim(brand)));
 
 alter table public.product_brand_candidates enable row level security;
 drop policy if exists "product_brand_candidates select all" on public.product_brand_candidates;
@@ -24,11 +31,13 @@ create policy "product_brand_candidates insert own" on public.product_brand_cand
 
 create table if not exists public.product_brand_votes (
   candidate_id uuid not null references public.product_brand_candidates(id) on delete cascade,
-  voter_id uuid not null references auth.users(id),
+  -- 여기엔 sentinel 백필이 없고 항상 실제 로그인 사용자만 insert하므로 FK를 유지해도 안전하다.
+  voter_id uuid not null default auth.uid() references auth.users(id),
   vote smallint not null check (vote in (1, -1)),
   created_at timestamptz not null default now(),
   primary key (candidate_id, voter_id)
 );
+alter table public.product_brand_votes alter column voter_id set default auth.uid();
 
 alter table public.product_brand_votes enable row level security;
 drop policy if exists "product_brand_votes select all" on public.product_brand_votes;
