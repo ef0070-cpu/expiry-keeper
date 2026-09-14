@@ -37,6 +37,17 @@ function matchesChosungPatternFromStart(target: string, query: string): boolean 
 }
 
 /**
+ * target 전체 맨 앞, 또는 공백으로 나눈 각 단어의 맨 앞부터 초성/혼합 패턴이 일치하는지
+ * 확인한다 — "거꾸로 수박바"에서 "ㅅㅂㅂ"(두 번째 단어 "수박바"의 초성)처럼 단어 단위로도
+ * 찾을 수 있게 하되, 단어 경계를 넘나드는 조합(예: "구구바 스트로베리"에서 "바 스"에
+ * 걸치는 "ㅂㅅ")은 여전히 걸리지 않는다.
+ */
+function matchesChosungPatternAnyWordStart(target: string, query: string): boolean {
+  if (matchesChosungPatternFromStart(target, query)) return true;
+  return target.split(/\s+/).some((word) => matchesChosungPatternFromStart(word, query));
+}
+
+/**
  * 일반 부분일치 또는 초성(자음)/혼합(초성+완성형) 검색으로 target이 query와 매칭되는지
  * 확인한다.
  *
@@ -49,7 +60,7 @@ export function matchesSearch(target: string, query: string): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
   if (t.includes(q)) return true;
-  if (matchesChosungPatternFromStart(t, q)) return true;
+  if (matchesChosungPatternAnyWordStart(t, q)) return true;
 
   const tNoSpace = t.replace(/\s+/g, '');
   const qNoSpace = q.replace(/\s+/g, '');
