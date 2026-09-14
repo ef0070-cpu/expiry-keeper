@@ -188,3 +188,88 @@ export async function voteOnPhoto(photoId: string, vote: 1 | -1): Promise<void> 
     .upsert({ photo_id: photoId, vote }, { onConflict: 'photo_id,voter_id' });
   if (error) throw error;
 }
+
+/** 브랜드 후보를 product_brand_candidates에 추가한다. 검토 없이 즉시 접수되지만, 대표
+ * 브랜드가 되려면 다른 사용자의 좋아요를 받아야 한다(사진과 동일한 패턴). */
+export async function submitBrandCandidate(barcode: string, brand: string): Promise<void> {
+  if (!supabase) return;
+  try {
+    const { error } = await supabase.from('product_brand_candidates').insert({ barcode, brand });
+    if (error) throw error;
+  } catch {
+    // best-effort
+  }
+}
+
+export type BrandCandidate = {
+  id: string;
+  brand: string;
+  likes: number;
+  dislikes: number;
+  myVote: 1 | -1 | null;
+};
+
+/** 이 바코드의 브랜드 후보들과 각 후보의 득표 현황, 내 투표 상태를 조회한다. */
+export async function listBrandCandidates(barcode: string): Promise<BrandCandidate[]> {
+  if (!supabase) return [];
+  const [{ data: candidates, error }, { data: sessionData }] = await Promise.all([
+    supabase
+      .from('product_brand_candidates')
+      .select('id, brand')
+      .eq('barcode', barcode)
+      .order('created_at', { ascending: true }),
+    supabase.auth.getSession(),
+  ]);
+  if (error || !candidates || candidates.length === 0) return [];
+
+  const ids = candidates.map((c) => c.id);
+  const { data: votes } = await supabase
+    .from('product_brand_votes')
+    .select('candidate_id, voter_id, vote')
+    .in('candidate_id', ids);
+  const myId = sessionData.session?.user.id;
+
+  return candidates.map((c) => {
+    const candidateVotes = (votes ?? []).filter((v) => v.candidate_id === c.id);
+    const likes = candidateVotes.filter((v) => v.vote === 1).length;
+    const dislikes = candidateVotes.filter((v) => v.vote === -1).length;
+    const mine = candidateVotes.find((v) => v.voter_id === myId);
+    return {
+      id: c.id,
+      brand: c.brand,
+      likes,
+      dislikes,
+      myVote: (mine?.vote as 1 | -1 | undefined) ?? null,
+    };
+  });
+}
+
+/** 브랜드 후보에 좋아요/싫어요 투표한다. 이미 같은 값으로 투표했으면 취소(중립)한다. */
+export async function voteOnBrand(candidateId: string, vote: 1 | -1): Promise<void> {
+  if (!supabase) throw new Error('로그인이 필요합니다.');
+  const { data: sessionData } = await supabase.auth.getSession();
+  const voterId = sessionData.session?.user.id;
+  if (!voterId) throw new Error('로그인이 필요합니다.');
+
+  const { data: existing } = await supabase
+    .from('product_brand_votes')
+    .select('vote')
+    .eq('candidate_id', candidateId)
+    .eq('voter_id', voterId)
+    .maybeSingle();
+
+  if (existing?.vote === vote) {
+    const { error } = await supabase
+      .from('product_brand_votes')
+      .delete()
+      .eq('candidate_id', candidateId)
+      .eq('voter_id', voterId);
+    if (error) throw error;
+    return;
+  }
+
+  const { error } = await supabase
+    .from('product_brand_votes')
+    .upsert({ candidate_id: candidateId, vote }, { onConflict: 'candidate_id,voter_id' });
+  if (error) throw error;
+}
