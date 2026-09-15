@@ -143,3 +143,27 @@ export async function fetchMyOrderProducts(): Promise<OrderProduct[]> {
   if (error || !data) return [];
   return (data as OrderProductRow[]).map(toOrderProduct);
 }
+
+// ---------- 발주 카테고리(검색 필터 칩) ----------
+
+export async function pushCategories(recordId: string, categories: string[]): Promise<void> {
+  if (!supabase) return;
+  const { error } = await supabase
+    .from('order_categories')
+    .upsert(
+      { id: recordId, categories, updated_at: new Date().toISOString() },
+      { onConflict: 'id' },
+    );
+  if (error) throw error;
+}
+
+export async function fetchMyCategories(): Promise<{ id: string; categories: string[] } | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('order_categories')
+    .select('id, categories')
+    .limit(1)
+    .maybeSingle();
+  if (error || !data) return null;
+  return data as { id: string; categories: string[] };
+}
