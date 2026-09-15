@@ -18,8 +18,8 @@ import {
   View,
 } from 'react-native';
 import { recognizeText } from '@infinitered/react-native-mlkit-text-recognition';
+import CandidatesModal from '@/components/CandidatesModal';
 import ImageCandidatesModal from '@/components/ImageCandidatesModal';
-import PhotoCandidatesModal from '@/components/PhotoCandidatesModal';
 import { hasImageSearchKeys, lookupBarcode, searchProductImageCandidates } from '@/lib/barcode-lookup';
 import { extractExpiryDateFromText } from '@/lib/date-ocr';
 import { deleteLocalPhotoIfOwned, persistLocalPhoto } from '@/lib/local-photo';
@@ -59,7 +59,7 @@ export default function ProductForm() {
   const [busy, setBusy] = useState(false);
   const [searching, setSearching] = useState(false);
   const [imageCandidates, setImageCandidates] = useState<string[] | null>(null);
-  const [showPhotoCandidates, setShowPhotoCandidates] = useState(false);
+  const [candidatesTab, setCandidatesTab] = useState<'photo' | 'brand' | 'name' | null>(null);
   const [ocrBusy, setOcrBusy] = useState(false);
   const [manufactureCalcVisible, setManufactureCalcVisible] = useState(false);
   const [manufactureDate, setManufactureDate] = useState('');
@@ -302,10 +302,11 @@ export default function ProductForm() {
         }}
         onClose={() => setImageCandidates(null)}
       />
-      <PhotoCandidatesModal
-        visible={showPhotoCandidates}
+      <CandidatesModal
+        visible={candidatesTab !== null}
         barcode={barcode ?? ''}
-        onClose={() => setShowPhotoCandidates(false)}
+        initialTab={candidatesTab ?? 'photo'}
+        onClose={() => setCandidatesTab(null)}
       />
       <Modal
         visible={manufactureCalcVisible}
@@ -431,9 +432,17 @@ export default function ProductForm() {
               ) : null}
             </View>
             {barcode ? (
-              <Pressable onPress={() => setShowPhotoCandidates(true)} className="mt-1.5">
-                <Text className="text-muted text-xs underline">사진 후보 보기 / 투표</Text>
-              </Pressable>
+              <View className="mt-1.5 flex-row flex-wrap" style={{ gap: 12 }}>
+                <Pressable onPress={() => setCandidatesTab('photo')}>
+                  <Text className="text-muted text-xs underline">사진 후보 보기 / 투표</Text>
+                </Pressable>
+                <Pressable onPress={() => setCandidatesTab('name')}>
+                  <Text className="text-muted text-xs underline">상품명 후보 보기 / 투표</Text>
+                </Pressable>
+                <Pressable onPress={() => setCandidatesTab('brand')}>
+                  <Text className="text-muted text-xs underline">브랜드 후보 보기 / 투표</Text>
+                </Pressable>
+              </View>
             ) : null}
           </View>
         </View>
