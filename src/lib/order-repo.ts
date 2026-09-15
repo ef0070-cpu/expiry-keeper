@@ -114,6 +114,7 @@ export async function saveOrderProduct(p: OrderProduct): Promise<OrderProduct> {
     recordPriceOverride(p.barcode, p.price).catch(() => {});
     reportOrderProductIssue(p, '가격 수정 (앱에서 자동 제출됨)').catch(() => {});
   }
+  pushOrderProduct(p).catch(() => {});
   return p;
 }
 
@@ -176,6 +177,7 @@ export async function deleteOrderProduct(id: string): Promise<void> {
     delete next[id];
     await writeOrderCart(next);
   }
+  deleteOrderProductCloud(id).catch(() => {});
 }
 
 /** 사진 후보에 좋아요를 눌러 그 사진을 내 상품 사진으로 즉시 반영한다. saveOrderProduct를
