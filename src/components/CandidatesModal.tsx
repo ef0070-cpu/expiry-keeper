@@ -103,11 +103,19 @@ export default function CandidatesModal({
   useEffect(() => {
     if (!visible) return;
     setNewValue('');
+    let cancelled = false;
     setLoading(true);
     TAB_CONFIG[tab]
       .list(barcode)
-      .then(setCandidates)
-      .finally(() => setLoading(false));
+      .then((result) => {
+        if (!cancelled) setCandidates(result);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [visible, barcode, tab]);
 
   const vote = async (candidateId: string, value: 1 | -1) => {
