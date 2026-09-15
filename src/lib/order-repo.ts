@@ -604,3 +604,83 @@ export async function clearCatalogUpdateBadge(barcode: string): Promise<void> {
 export async function clearAllCatalogUpdateBadges(): Promise<void> {
   await AsyncStorage.removeItem(CATALOG_UPDATE_BADGE_KEY);
 }
+
+// ---------- 매장/레이아웃/장바구니/발주상품 클라우드 동기화 ----------
+
+/** 이 매장의 레이아웃(구역/구분선/배정)을 클라우드에서 당겨온다. 세 로컬 키 중 하나라도 이미
+ * 이 기기에 쓰인 적 있으면(재설치 직후가 아니라면 거의 항상 그렇다) 건드리지 않는다 — 매
+ * 수정마다 이미 push가 따라붙으므로 로컬이 서버보다 뒤처질 일이 없다. */
+async function pullStoreLayoutIfLocalEmpty(storeId: string): Promise<void> {
+  const [sectionsRaw, dividersRaw, assignmentsRaw] = await Promise.all([
+    AsyncStorage.getItem(fridgeSectionsKey(storeId)),
+    AsyncStorage.getItem(fridgeSectionDividersKey(storeId)),
+    AsyncStorage.getItem(fridgeAssignmentsKey(storeId)),
+  ]);
+  if (sectionsRaw !== null && dividersRaw !== null && assignmentsRaw !== null) return;
+  const layout = await fetchStoreLayout(storeId);
+  if (!layout) return;
+  if (sectionsRaw === null) {
+    await AsyncStorage.setItem(fridgeSectionsKey(storeId), JSON.stringify(layout.sections));
+  }
+  if (dividersRaw === null) {
+    await AsyncStorage.setItem(fridgeSectionDividersKey(storeId), JSON.stringify(layout.dividers));
+  }
+  if (assignmentsRaw === null) {
+    await AsyncStorage.setItem(fridgeAssignmentsKey(storeId), JSON.stringify(layout.assignments));
+  }
+}
+
+/** 이 매장의 장바구니를 클라우드에서 당겨온다. 로컬에 이미 있으면 건드리지 않는다. */
+async function pullCartIfLocalEmpty(storeId: string): Promise<void> {
+  const key = `orderCart:${storeId}`;
+  const raw = await AsyncStorage.getItem(key);
+  if (raw !== null) return;
+  const cart = await fetchCart(storeId);
+  if (!cart) return;
+  await AsyncStorage.setItem(key, JSON.stringify(cart.items));
+}
+
+/**
+ * 매장/레이아웃/장바구니/발주상품을 Supabase에서 당겨와 로컬과 합친다. 로컬에 없는 서버
+ * 레코드는 추가하고, 로컬에 이미 있는 레코드는 그대로 둔다(이미 매 수정마다 push가 따라붙어
+ * 로컬이 최신이라고 신뢰). 로컬에만 있고 서버에 없는 레코드(아직 push 안 됐거나 실패한 경우)는
+ * 재push를 시도한다. 실패(오프라인 등)하면 조용히 무시 — 로컬 캐시를 그대로 쓴다.
+ */
+export async function syncOrderStores(): Promise<void> {
+  if (!supabase) return;
+  try {
+    const [remoteStores, localStores] = await Promise.all([fetchMyStores(), listStores()]);
+    const localStoreIds = new Set(localStores.map((s) => s.id));
+    const remoteStoreIds = new Set(remoteStores.map((s) => s.id));
+
+    const newFromRemote = remoteStores
+      .filter((r) => !localStoreIds.has(r.id))
+      .map((r) => ({ id: r.id, name: r.name }));
+    if (newFromRemote.length > 0) {
+      await writeStores([...localStores, ...newFromRemote]);
+    }
+    for (const local of localStores) {
+      if (!remoteStoreIds.has(local.id)) pushStore(local).catch(() => {});
+    }
+
+    const allStoreIds = new Set([...localStoreIds, ...remoteStoreIds]);
+    for (const storeId of allStoreIds) {
+      await pullStoreLayoutIfLocalEmpty(storeId);
+      await pullCartIfLocalEmpty(storeId);
+    }
+
+    const [remoteProducts, localProducts] = await Promise.all([fetchMyOrderProducts(), listOrderProducts()]);
+    const localProductIds = new Set(localProducts.map((p) => p.id));
+    const remoteProductIds = new Set(remoteProducts.map((p) => p.id));
+
+    const newProductsFromRemote = remoteProducts.filter((r) => !localProductIds.has(r.id));
+    if (newProductsFromRemote.length > 0) {
+      await writeOrderProducts([...localProducts, ...newProductsFromRemote]);
+    }
+    for (const local of localProducts) {
+      if (!remoteProductIds.has(local.id)) pushOrderProduct(local).catch(() => {});
+    }
+  } catch {
+    // best-effort
+  }
+}
