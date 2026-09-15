@@ -195,13 +195,36 @@ export async function voteOnPhoto(photoId: string, vote: 1 | -1): Promise<void> 
   if (error) throw error;
 }
 
-/** 브랜드 후보를 product_brand_candidates에 추가한다. 검토 없이 즉시 접수되지만, 대표
- * 브랜드가 되려면 다른 사용자의 좋아요를 받아야 한다(사진과 동일한 패턴). */
+/** 브랜드 후보를 product_brand_candidates에 추가하고 제출자가 자동으로 좋아요를 누른다.
+ * 자동 좋아요가 없으면 기존 브랜드(배포 시 0표로 백필됨)와 득표 동점이 되고, 동점이면
+ * 먼저 등록된 후보가 우선하는 규칙 때문에 방금 낸 후보가 절대 대표값이 되지 못한다
+ * (수정해서 저장해도 화면에 반영 안 되는 것처럼 보이는 원인). 자동 좋아요로 1표를 줘서
+ * 기존 0표 후보를 즉시 앞서게 한다 — 다른 사용자가 다시 수정하면 마찬가지로 역전 가능
+ * (득표제 취지 유지, "먼저 우긴 사람이 영구히 이김"이 되지 않게 함). */
 export async function submitBrandCandidate(barcode: string, brand: string): Promise<void> {
   if (!supabase) return;
   try {
-    const { error } = await supabase.from('product_brand_candidates').insert({ barcode, brand });
-    if (error) throw error;
+    const { data: inserted, error } = await supabase
+      .from('product_brand_candidates')
+      .insert({ barcode, brand })
+      .select('id')
+      .single();
+    let candidateId = inserted?.id as string | undefined;
+    if (error) {
+      // 유니크 제약(barcode, lower(btrim(brand))) 충돌 = 이미 같은 텍스트의 후보가 있음.
+      // 이 경우에도 그 기존 후보에 좋아요를 눌러줘야 자동 좋아요 효과가 있다.
+      const { data: existing } = await supabase
+        .from('product_brand_candidates')
+        .select('id')
+        .eq('barcode', barcode)
+        .ilike('brand', brand.trim())
+        .maybeSingle();
+      candidateId = existing?.id;
+    }
+    if (!candidateId) return;
+    await supabase
+      .from('product_brand_votes')
+      .upsert({ candidate_id: candidateId, vote: 1 }, { onConflict: 'candidate_id,voter_id' });
   } catch {
     // best-effort
   }
