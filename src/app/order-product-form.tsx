@@ -16,9 +16,8 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import BrandCandidatesModal from '@/components/BrandCandidatesModal';
+import CandidatesModal from '@/components/CandidatesModal';
 import Chip from '@/components/Chip';
-import PhotoCandidatesModal from '@/components/PhotoCandidatesModal';
 import { hasImageSearchKeys, lookupBarcode } from '@/lib/barcode-lookup';
 import { deleteLocalPhotoIfOwned, persistLocalPhoto } from '@/lib/local-photo';
 import {
@@ -67,9 +66,8 @@ export default function OrderProductForm() {
   const [reportPhotoUri, setReportPhotoUri] = useState<string | null>(null);
   const [reportCopyright, setReportCopyright] = useState(false);
   const [reporting, setReporting] = useState(false);
-  const [showPhotoCandidates, setShowPhotoCandidates] = useState(false);
+  const [candidatesTab, setCandidatesTab] = useState<'photo' | 'brand' | 'name' | null>(null);
   const [removingPhoto, setRemovingPhoto] = useState(false);
-  const [showBrandCandidates, setShowBrandCandidates] = useState(false);
   const [referencePrice, setReferencePrice] = useState<number | null>(null);
 
   useEffect(() => {
@@ -357,16 +355,12 @@ export default function OrderProductForm() {
       className="flex-1"
     >
       <Stack.Screen options={{ title: isEdit ? '발주 상품 수정' : '발주 상품 등록' }} />
-      <PhotoCandidatesModal
-        visible={showPhotoCandidates}
+      <CandidatesModal
+        visible={candidatesTab !== null}
         barcode={barcode.trim()}
-        onClose={() => setShowPhotoCandidates(false)}
+        initialTab={candidatesTab ?? 'photo'}
+        onClose={() => setCandidatesTab(null)}
         onPhotoApplied={setImageUri}
-      />
-      <BrandCandidatesModal
-        visible={showBrandCandidates}
-        barcode={barcode.trim()}
-        onClose={() => setShowBrandCandidates(false)}
       />
       <ScrollView
         className="flex-1 bg-bg"
@@ -421,9 +415,14 @@ export default function OrderProductForm() {
               onChangeText={setName}
             />
             {isEdit && barcode.trim() ? (
-              <Pressable onPress={() => setShowPhotoCandidates(true)} className="mt-1.5">
-                <Text className="text-muted text-xs underline">사진 후보 보기 / 투표</Text>
-              </Pressable>
+              <View className="mt-1.5 flex-row flex-wrap" style={{ gap: 12 }}>
+                <Pressable onPress={() => setCandidatesTab('photo')}>
+                  <Text className="text-muted text-xs underline">사진 후보 보기 / 투표</Text>
+                </Pressable>
+                <Pressable onPress={() => setCandidatesTab('name')}>
+                  <Text className="text-muted text-xs underline">상품명 후보 보기 / 투표</Text>
+                </Pressable>
+              </View>
             ) : null}
             <Text className="text-muted mt-1.5 text-xs">
               이 사진은 다른 사용자들의 투표를 통해 대표 사진으로 채택될 수 있어요
@@ -466,7 +465,7 @@ export default function OrderProductForm() {
               onChangeText={setBrand}
             />
             {isEdit && barcode.trim() ? (
-              <Pressable onPress={() => setShowBrandCandidates(true)} className="mt-1.5">
+              <Pressable onPress={() => setCandidatesTab('brand')} className="mt-1.5">
                 <Text className="text-muted text-xs underline">브랜드 후보 보기 / 투표</Text>
               </Pressable>
             ) : null}
