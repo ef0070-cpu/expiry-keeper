@@ -8,7 +8,7 @@ import { LogBox } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useAppMode } from '@/lib/settings';
-import { syncOrderCatalog } from '@/lib/order-repo';
+import { migrateLocalOrderDataToCloud, syncOrderCatalog, syncOrderStores } from '@/lib/order-repo';
 import { isCloudMode, supabase } from '@/lib/supabase';
 
 // Expo Go는 원격 푸시를 지원하지 않는다는 경고 — 이 앱은 로컬 알림만 쓰므로 해당 없음
@@ -21,11 +21,18 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (!supabase) return;
+    const syncOrderStoreData = () => {
+      migrateLocalOrderDataToCloud().then(() => syncOrderStores());
+    };
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
       setReady(true);
+      if (data.session) syncOrderStoreData();
     });
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => setSession(s));
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
+      setSession(s);
+      if (s) syncOrderStoreData();
+    });
     syncOrderCatalog();
     return () => sub.subscription.unsubscribe();
   }, []);

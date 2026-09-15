@@ -49,6 +49,7 @@ import {
   seedDefaultOrderProducts,
   setActiveStoreId,
   syncOrderCatalog,
+  syncOrderStores,
   toggleFridgeSectionDivider,
   writeOrderCart,
 } from '@/lib/order-repo';
@@ -248,6 +249,7 @@ export default function Order() {
     setSyncing(true);
     try {
       await syncOrderCatalog();
+      await syncOrderStores();
       await loadCatalog();
     } finally {
       setSyncing(false);
