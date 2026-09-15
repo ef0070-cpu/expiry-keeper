@@ -1008,8 +1008,233 @@ git commit -m "feat: 앱 실행/로그인/발주 화면 진입 시 매장 클라
 
 ---
 
+---
+
+### Task 8: 발주 카테고리(검색 필터 칩) 클라우드 동기화
+
+**Files:**
+- Create: `supabase/migration-order-categories-cloud-sync.sql`
+- Modify: `src/lib/order-cloud-sync.ts` (파일 끝에 함수 2개 추가)
+- Modify: `src/lib/order-repo.ts:192-194`(writeOrderCategories), 파일 끝의 `syncOrderStores()`와 `migrateLocalOrderDataToCloud()`
+
+**Interfaces:**
+- Consumes: 같은 파일의 `supabase` 클라이언트, `public.my_team_id()`(Task 1에서 이미 씀).
+- Produces: `pushCategories(recordId: string, categories: string[]): Promise<void>`, `fetchMyCategories(): Promise<{id: string; categories: string[]} | null>` (`order-cloud-sync.ts`). `order-repo.ts`의 `writeOrderCategories`가 자동으로 push하게 됨, `syncOrderStores()`/`migrateLocalOrderDataToCloud()`가 카테고리도 같이 다루게 됨.
+
+발주 검색 화면의 "전체/바/콘/튜브/샌드기타" 필터 칩 목록(`orderCategories:v1`, `listOrderCategories`가 비어있으면 `DEFAULT_CATEGORIES`로 대체)도 매장과 동일하게 AsyncStorage 전용이라 재설치 시 기본값으로 초기화된다. 매장/발주상품처럼 팀 안에서 여러 명이 각자 등록한 카테고리가 하나로 모여야 하므로, 매장당이 아니라 **팀-또는-개인당 카테고리 목록 1행**으로 저장한다. 행의 `id`는 클라이언트가 최초 push 시 한 번 생성해 로컬에 캐시해두는 방식(매장 id와 동일한 방식)을 쓴다 — 팀/유저 id를 그대로 PK로 못 쓰는 이유는 팀 탈퇴/가입으로 바뀔 수 있어서다.
+
+- [ ] **Step 1: SQL 파일 작성**
+
+`supabase/migration-order-categories-cloud-sync.sql` 생성:
+
+```sql
+-- 발주 카테고리(검색 필터 칩) 클라우드 동기화 (2026-09-15)
+-- 매장(order_stores)과 동일한 팀-또는-개인 소유 패턴. 한 팀(또는 개인)당 카테고리 목록 1행.
+-- Supabase 대시보드 > SQL Editor 에 붙여넣고 실행하세요.
+
+create table if not exists public.order_categories (
+  id text primary key,
+  user_id uuid not null,
+  team_id uuid references public.teams(id) on delete set null,
+  categories jsonb not null default '[]'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
+create or replace function public.set_order_categories_owner()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  new.user_id := auth.uid();
+  new.team_id := public.my_team_id();
+  return new;
+end;
+$$;
+
+drop trigger if exists order_categories_set_owner on public.order_categories;
+create trigger order_categories_set_owner
+  before insert on public.order_categories
+  for each row execute function public.set_order_categories_owner();
+
+alter table public.order_categories enable row level security;
+
+drop policy if exists "order_categories select" on public.order_categories;
+create policy "order_categories select" on public.order_categories for select using (
+  user_id = auth.uid() or (team_id is not null and team_id = public.my_team_id())
+);
+drop policy if exists "order_categories insert" on public.order_categories;
+create policy "order_categories insert" on public.order_categories for insert with check (user_id = auth.uid());
+drop policy if exists "order_categories update" on public.order_categories;
+create policy "order_categories update" on public.order_categories for update using (
+  user_id = auth.uid() or (team_id is not null and team_id = public.my_team_id())
+) with check (team_id is null or team_id = public.my_team_id());
+drop policy if exists "order_categories delete" on public.order_categories;
+create policy "order_categories delete" on public.order_categories for delete using (
+  user_id = auth.uid() or (team_id is not null and team_id = public.my_team_id())
+);
+```
+
+- [ ] **Step 2: Supabase 대시보드에서 실행 + 확인**
+
+대시보드 → SQL Editor → 실행. 이어서:
+
+```sql
+select table_name from information_schema.tables
+where table_schema = 'public' and table_name = 'order_categories';
+```
+
+1행 나오는지 확인.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add supabase/migration-order-categories-cloud-sync.sql
+git commit -m "feat: 발주 카테고리 Supabase 마이그레이션 추가"
+```
+
+- [ ] **Step 4: `order-cloud-sync.ts` 끝에 함수 2개 추가**
+
+`src/lib/order-cloud-sync.ts` 파일 끝에 추가:
+
+```ts
+
+// ---------- 발주 카테고리(검색 필터 칩) ----------
+
+export async function pushCategories(recordId: string, categories: string[]): Promise<void> {
+  if (!supabase) return;
+  const { error } = await supabase
+    .from('order_categories')
+    .upsert(
+      { id: recordId, categories, updated_at: new Date().toISOString() },
+      { onConflict: 'id' },
+    );
+  if (error) throw error;
+}
+
+export async function fetchMyCategories(): Promise<{ id: string; categories: string[] } | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('order_categories')
+    .select('id, categories')
+    .limit(1)
+    .maybeSingle();
+  if (error || !data) return null;
+  return data as { id: string; categories: string[] };
+}
+```
+
+- [ ] **Step 5: 타입 체크 + Commit**
+
+```bash
+npx tsc --noEmit
+git add src/lib/order-cloud-sync.ts
+git commit -m "feat: order-cloud-sync.ts에 카테고리 push/fetch 함수 추가"
+```
+
+- [ ] **Step 6: `order-repo.ts` import 교체**
+
+Task 5에서 만든 import 문을 다음으로 교체(카테고리 함수 2개 추가):
+
+```ts
+import {
+  deleteOrderProductCloud,
+  deleteStoreCloud,
+  fetchCart,
+  fetchMyCategories,
+  fetchMyOrderProducts,
+  fetchMyStores,
+  fetchStoreLayout,
+  pushCart,
+  pushCategories,
+  pushOrderProduct,
+  pushStore,
+  pushStoreLayoutPart,
+} from './order-cloud-sync';
+```
+
+- [ ] **Step 7: `writeOrderCategories`에 로컬 레코드 id 캐시 + push 연결**
+
+기존(192~194줄):
+
+```ts
+async function writeOrderCategories(items: string[]): Promise<void> {
+  await AsyncStorage.setItem(CATEGORIES_KEY, JSON.stringify(items));
+}
+```
+
+교체:
+
+```ts
+const CATEGORIES_RECORD_ID_KEY = 'orderCategoriesRecordId:v1';
+
+/** 이 팀(또는 개인)의 카테고리 레코드 id. 최초 한 번 생성해 로컬에 캐시하고 재사용한다 —
+ * 팀 id를 그대로 PK로 쓰면 팀 탈퇴/가입 시 끊기므로 클라이언트가 독립적으로 생성한다. */
+async function getOrCreateCategoriesRecordId(): Promise<string> {
+  const existing = await AsyncStorage.getItem(CATEGORIES_RECORD_ID_KEY);
+  if (existing) return existing;
+  const id = newId();
+  await AsyncStorage.setItem(CATEGORIES_RECORD_ID_KEY, id);
+  return id;
+}
+
+async function writeOrderCategories(items: string[]): Promise<void> {
+  await AsyncStorage.setItem(CATEGORIES_KEY, JSON.stringify(items));
+  const recordId = await getOrCreateCategoriesRecordId();
+  pushCategories(recordId, items).catch(() => {});
+}
+```
+
+- [ ] **Step 8: `syncOrderStores()`에 카테고리 pull 추가**
+
+Task 5에서 작성한 `syncOrderStores()` 함수 본문 맨 앞(`if (!supabase) return;` 다음 줄, `try {` 안쪽 첫 줄)에 추가:
+
+```ts
+    const categoriesRaw = await AsyncStorage.getItem(CATEGORIES_KEY);
+    if (categoriesRaw === null) {
+      const remoteCategories = await fetchMyCategories();
+      if (remoteCategories) {
+        await AsyncStorage.setItem(CATEGORIES_KEY, JSON.stringify(remoteCategories.categories));
+        await AsyncStorage.setItem(CATEGORIES_RECORD_ID_KEY, remoteCategories.id);
+      }
+    }
+```
+
+(로컬에 카테고리가 한 번도 쓰인 적 없을 때만 서버 값을 채택하고, 그 서버 레코드의 id를 그대로 이어 써서 — 새로 생성하지 않아 — 이후 push가 같은 행을 계속 갱신하게 한다.)
+
+- [ ] **Step 9: `migrateLocalOrderDataToCloud()`에 카테고리 마이그레이션 추가**
+
+Task 6에서 작성한 `migrateLocalOrderDataToCloud()` 함수 본문에서, `const stores = await listStores();` 줄 바로 앞에 추가:
+
+```ts
+    const categories = await listOrderCategories();
+    const categoriesRecordId = await getOrCreateCategoriesRecordId();
+    await pushCategories(categoriesRecordId, categories);
+
+```
+
+- [ ] **Step 10: 타입 체크**
+
+Run: `npx tsc --noEmit`
+Expected: 기존 베이스라인 에러 외 새 에러 없음.
+
+- [ ] **Step 11: 수동 QA**
+
+발주 검색 화면에서 새 카테고리 추가 → `select * from order_categories;`에 반영되는지 확인. 앱 삭제 → 재설치 → 로그인 → 발주 검색 화면 진입 → 추가했던 카테고리가 복원되는지 확인.
+
+- [ ] **Step 12: Commit**
+
+```bash
+git add src/lib/order-repo.ts
+git commit -m "feat: 발주 카테고리 클라우드 동기화 배선 연결"
+```
+
+---
+
 ## Self-Review Notes (계획 작성자용, 실행 불필요)
 
 - **스펙 커버리지**: 09-15 스펙의 데이터 모델(4테이블) → Task 1, 동기화 메커니즘 → Task 3·4·5, 마이그레이션 → Task 6, 트리거 배선 → Task 7. 전부 대응됨. 단, "updated_at 최신 채택" 병합 규칙은 Global Constraints에 명시한 대로 더 단순한 "로컬에 있으면 로컬 신뢰" 규칙으로 대체했다(실제 문제 해결엔 충분하고 코드가 훨씬 적음) — 스펙 문서 자체는 수정하지 않았으나, 이 플랜이 실제로 구현하는 최종 규칙이다.
+- **Task 8은 스펙 문서에 없음**: 플랜 작성 이후 세션 중 사용자가 발견한 동일 근본 원인(카테고리 필터 칩도 AsyncStorage 전용) 문제를 사용자 승인 하에 같은 플랜에 추가한 것. 스펙 문서(`docs/superpowers/specs/2026-09-15-order-store-cloud-sync-design.md`)는 갱신하지 않았다 — 필요하면 나중에 반영.
 - **플레이스홀더 스캔**: 없음.
 - **타입 일관성**: `order-cloud-sync.ts`의 `pushStore`/`fetchMyStores` 등이 반환/소비하는 필드명(`id`, `name`)이 `order-repo.ts`의 `Store` 타입과 일치. `OrderProductRow`→`OrderProduct` 변환(`toOrderProduct`)이 `image_uri`→`imageUri` 등 필드명 매핑을 정확히 반영. `syncOrderStores()`가 Task 2의 `fetchMyOrderProducts()`(이미 `OrderProduct[]`로 변환된 값을 반환)를 그대로 쓰는 것과 Task 6의 `pushOrderProduct(p: OrderProduct)`가 서로 대칭되는지 확인함 — 일치.
