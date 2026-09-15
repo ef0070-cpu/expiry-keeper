@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { upsertBarcodeCatalog } from './barcode-catalog';
 import { submitPhotoCandidateIfChanged } from './photo-candidates';
+import { submitNameCandidateIfChanged } from './name-candidates';
 import { getCachedAppMode } from './settings';
 import { uploadPhotoToBucket } from './storage';
 import { supabase } from './supabase';
@@ -175,6 +176,9 @@ export async function saveProduct(p: Product): Promise<Product> {
     if (error) throw new Error(error.message);
     // 실패해도 상품 저장 자체는 이미 끝났으니 조용히 무시한다 (best-effort).
     await upsertBarcodeCatalog(uploaded.barcode, uploaded.name, uploaded.imageUri).catch(() => {});
+    if (uploaded.barcode) {
+      submitNameCandidateIfChanged(uploaded.barcode, uploaded.name).catch(() => {});
+    }
     if (uploaded.barcode && uploaded.imageUri) {
       submitPhotoCandidateIfChanged(uploaded.barcode, uploaded.imageUri).catch(() => {});
     }

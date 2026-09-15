@@ -3,6 +3,7 @@ import { upsertBarcodeCatalog } from './barcode-catalog';
 import { mergeCatalogIntoProducts, type OrderCatalogRow } from './order-catalog-merge';
 import { reportOrderProductIssue, submitNewOrderProduct } from './order-report';
 import { submitBrandCandidateIfChanged } from './brand-candidates';
+import { submitNameCandidateIfChanged } from './name-candidates';
 import {
   getSubmittedPhotoCandidates,
   recordSubmittedPhotoCandidate,
@@ -69,6 +70,9 @@ export async function saveOrderProduct(p: OrderProduct): Promise<OrderProduct> {
   else items[idx] = p;
   await writeOrderProducts(items);
   upsertBarcodeCatalog(p.barcode, p.name, p.imageUri).catch(() => {});
+  if (p.barcode) {
+    submitNameCandidateIfChanged(p.barcode, p.name).catch(() => {});
+  }
   if (isNew) {
     submitNewOrderProduct(p).catch(() => {});
   } else if (p.barcode && p.imageUri) {
