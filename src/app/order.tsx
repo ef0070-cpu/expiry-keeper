@@ -607,6 +607,7 @@ export default function Order() {
   const onLongPressProduct = useCallback(
     (p: OrderProduct) => {
       Alert.alert(p.name, '어떻게 처리할까요?', [
+        { text: '취소', style: 'cancel' },
         {
           text: '수정',
           onPress: () => router.push({ pathname: '/order-product-form', params: { id: p.id } }),
