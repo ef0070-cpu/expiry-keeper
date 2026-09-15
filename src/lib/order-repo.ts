@@ -15,10 +15,12 @@ import {
   deleteOrderProductCloud,
   deleteStoreCloud,
   fetchCart,
+  fetchMyCategories,
   fetchMyOrderProducts,
   fetchMyStores,
   fetchStoreLayout,
   pushCart,
+  pushCategories,
   pushOrderProduct,
   pushStore,
   pushStoreLayoutPart,
@@ -203,8 +205,22 @@ export async function listOrderCategories(): Promise<string[]> {
   return raw ? (JSON.parse(raw) as string[]) : DEFAULT_CATEGORIES;
 }
 
+const CATEGORIES_RECORD_ID_KEY = 'orderCategoriesRecordId:v1';
+
+/** 이 팀(또는 개인)의 카테고리 레코드 id. 최초 한 번 생성해 로컬에 캐시하고 재사용한다 —
+ * 팀 id를 그대로 PK로 쓰면 팀 탈퇴/가입 시 끊기므로 클라이언트가 독립적으로 생성한다. */
+async function getOrCreateCategoriesRecordId(): Promise<string> {
+  const existing = await AsyncStorage.getItem(CATEGORIES_RECORD_ID_KEY);
+  if (existing) return existing;
+  const id = newId();
+  await AsyncStorage.setItem(CATEGORIES_RECORD_ID_KEY, id);
+  return id;
+}
+
 async function writeOrderCategories(items: string[]): Promise<void> {
   await AsyncStorage.setItem(CATEGORIES_KEY, JSON.stringify(items));
+  const recordId = await getOrCreateCategoriesRecordId();
+  pushCategories(recordId, items).catch(() => {});
 }
 
 export async function addOrderCategory(name: string): Promise<string[]> {
@@ -649,6 +665,14 @@ async function pullCartIfLocalEmpty(storeId: string): Promise<void> {
 export async function syncOrderStores(): Promise<void> {
   if (!supabase) return;
   try {
+    const categoriesRaw = await AsyncStorage.getItem(CATEGORIES_KEY);
+    if (categoriesRaw === null) {
+      const remoteCategories = await fetchMyCategories();
+      if (remoteCategories) {
+        await AsyncStorage.setItem(CATEGORIES_KEY, JSON.stringify(remoteCategories.categories));
+        await AsyncStorage.setItem(CATEGORIES_RECORD_ID_KEY, remoteCategories.id);
+      }
+    }
     const [remoteStores, localStores] = await Promise.all([fetchMyStores(), listStores()]);
     const localStoreIds = new Set(localStores.map((s) => s.id));
     const remoteStoreIds = new Set(remoteStores.map((s) => s.id));
@@ -699,6 +723,10 @@ export async function migrateLocalOrderDataToCloud(): Promise<void> {
   if (!sessionData.session) return;
 
   try {
+    const categories = await listOrderCategories();
+    const categoriesRecordId = await getOrCreateCategoriesRecordId();
+    await pushCategories(categoriesRecordId, categories);
+
     const stores = await listStores();
     for (const store of stores) {
       await pushStore(store);
