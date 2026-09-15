@@ -70,17 +70,21 @@ export async function saveOrderProduct(p: OrderProduct): Promise<OrderProduct> {
   else items[idx] = p;
   await writeOrderProducts(items);
   upsertBarcodeCatalog(p.barcode, p.name, p.imageUri).catch(() => {});
-  if (p.barcode) {
-    submitNameCandidateIfChanged(p.barcode, p.name).catch(() => {});
-  }
   if (isNew) {
     submitNewOrderProduct(p).catch(() => {});
-  } else if (p.barcode && p.imageUri) {
-    // 로컬 오버라이드 기록까지는 기다린다(빠른 로컬 저장) — 그래야 저장 직후 목록으로 돌아가
-    // syncOrderCatalog가 실행돼도 방금 고른 사진이 도로 덮어써지지 않는다. 네트워크 후보 제출
-    // 자체는 이 함수 내부에서 best-effort로 처리되어 여기서 더 기다리지 않는다. 이 로컬 기록이
-    // 실패해도(예: AsyncStorage 오류) 이미 저장된 상품 자체는 살아있으니 저장 실패로 취급하지 않는다.
-    await submitPhotoCandidateIfChanged(p.barcode, p.imageUri).catch(() => {});
+  } else {
+    // 신규 등록은 submitNewOrderProduct 내부에서 order_catalog 행 생성 뒤에 제출한다
+    // (먼저 넣으면 대표 이름 재계산 UPDATE가 대상 행을 못 찾아 조용히 유실된다).
+    if (p.barcode) {
+      submitNameCandidateIfChanged(p.barcode, p.name).catch(() => {});
+    }
+    if (p.barcode && p.imageUri) {
+      // 로컬 오버라이드 기록까지는 기다린다(빠른 로컬 저장) — 그래야 저장 직후 목록으로 돌아가
+      // syncOrderCatalog가 실행돼도 방금 고른 사진이 도로 덮어써지지 않는다. 네트워크 후보 제출
+      // 자체는 이 함수 내부에서 best-effort로 처리되어 여기서 더 기다리지 않는다. 이 로컬 기록이
+      // 실패해도(예: AsyncStorage 오류) 이미 저장된 상품 자체는 살아있으니 저장 실패로 취급하지 않는다.
+      await submitPhotoCandidateIfChanged(p.barcode, p.imageUri).catch(() => {});
+    }
   }
   // 카테고리 수정은 공용 카탈로그 승인 절차를 안 거치므로, 다음 syncOrderCatalog가
   // 공용 값으로 도로 덮어쓰지 않도록 이 바코드의 로컬 지정값을 기억해둔다.

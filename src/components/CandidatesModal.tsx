@@ -119,6 +119,7 @@ export default function CandidatesModal({
   }, [visible, barcode, tab]);
 
   const vote = async (candidateId: string, value: 1 | -1) => {
+    const startedTab = tab;
     const target = candidates.find((c) => c.id === candidateId);
     // 이미 좋아요 상태에서 다시 누르면 투표 취소(중립)이지 "선택"이 아니므로, 그때는 적용하지 않는다.
     const applyAsMyPhoto = tab === 'photo' && value === 1 && target?.myVote !== 1;
@@ -126,8 +127,8 @@ export default function CandidatesModal({
     try {
       await TAB_CONFIG[tab].vote(candidateId, value);
       const fresh = await TAB_CONFIG[tab].list(barcode);
-      setCandidates(fresh);
-      if (applyAsMyPhoto && target) {
+      if (startedTab === tab) setCandidates(fresh);
+      if (startedTab === tab && applyAsMyPhoto && target) {
         const photoUri = (target as PhotoCandidate).photoUri;
         await applyOrderProductPhoto(barcode, photoUri);
         onPhotoApplied?.(photoUri);
@@ -140,6 +141,7 @@ export default function CandidatesModal({
   };
 
   const submitNew = async () => {
+    const startedTab = tab;
     const submit = TAB_CONFIG[tab].submit;
     const v = newValue.trim();
     if (!submit || !v) return;
@@ -147,7 +149,8 @@ export default function CandidatesModal({
     try {
       await submit(barcode, v);
       setNewValue('');
-      setCandidates(await TAB_CONFIG[tab].list(barcode));
+      const result = await TAB_CONFIG[tab].list(barcode);
+      if (startedTab === tab) setCandidates(result);
     } finally {
       setSubmitting(false);
     }

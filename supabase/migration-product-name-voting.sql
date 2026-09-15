@@ -144,8 +144,8 @@ begin
     return new;
   end if;
 
-  insert into public.order_catalog (barcode, price, category, updated_at)
-  values (new.barcode, new.price, nullif(new.category, ''), now())
+  insert into public.order_catalog (barcode, name, price, category, updated_at)
+  values (new.barcode, nullif(new.name, ''), new.price, nullif(new.category, ''), now())
   on conflict (barcode) do update set
     price = coalesce(excluded.price, order_catalog.price),
     category = coalesce(nullif(excluded.category, ''), order_catalog.category),

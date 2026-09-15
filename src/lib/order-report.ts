@@ -85,6 +85,11 @@ export async function submitNewOrderProduct(product: OrderProduct): Promise<void
     if (product.barcode && product.brand.trim()) {
       await submitBrandCandidate(product.barcode, product.brand.trim());
     }
+    // 이름도 후보로 제출한다 — 마찬가지로 order_catalog 행이 생긴 뒤에 넣어야
+    // 대표 이름 재계산 UPDATE가 대상 행을 찾을 수 있다.
+    if (product.barcode && product.name.trim()) {
+      await submitNameCandidate(product.barcode, product.name.trim());
+    }
     // order_catalog 행이 생성된 뒤에 사진 후보를 넣어야 한다 — 먼저 넣으면 대표 사진
     // 재계산 UPDATE가 대상 행을 못 찾아 조용히 유실된다.
     if (product.imageUri && product.barcode) {
