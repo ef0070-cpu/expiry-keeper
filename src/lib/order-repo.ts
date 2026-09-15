@@ -684,3 +684,41 @@ export async function syncOrderStores(): Promise<void> {
     // best-effort
   }
 }
+
+const ORDER_CLOUD_MIGRATED_KEY = 'orderCloudMigrated:v1';
+
+/**
+ * 이 기능 도입 이전부터 로컬에 있던 매장/레이아웃/장바구니/발주상품을 1회성으로 Supabase에
+ * 올린다. 로그인 상태에서만 실행한다. 전부 성공해야 완료 플래그를 세운다 — 부분 실패 시
+ * 플래그를 세우지 않아 다음 실행 때 안전하게 재시도한다(전부 PK 기준 upsert라 멱등).
+ */
+export async function migrateLocalOrderDataToCloud(): Promise<void> {
+  if (!supabase) return;
+  if (await AsyncStorage.getItem(ORDER_CLOUD_MIGRATED_KEY)) return;
+  const { data: sessionData } = await supabase.auth.getSession();
+  if (!sessionData.session) return;
+
+  try {
+    const stores = await listStores();
+    for (const store of stores) {
+      await pushStore(store);
+      const [sections, dividers, assignments, cartRaw] = await Promise.all([
+        listFridgeSections(store.id),
+        listFridgeSectionDividers(store.id),
+        listFridgeAssignments(store.id),
+        AsyncStorage.getItem(`orderCart:${store.id}`),
+      ]);
+      await pushStoreLayoutPart(store.id, { sections, dividers, assignments });
+      if (cartRaw !== null) {
+        await pushCart(store.id, JSON.parse(cartRaw) as OrderCart);
+      }
+    }
+    const products = await listOrderProducts();
+    for (const p of products) {
+      await pushOrderProduct(p);
+    }
+    await AsyncStorage.setItem(ORDER_CLOUD_MIGRATED_KEY, '1');
+  } catch {
+    // 부분 실패 — 플래그를 세우지 않아 다음 실행 때 재시도
+  }
+}
