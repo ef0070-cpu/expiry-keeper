@@ -11,6 +11,18 @@ import {
 } from './photo-candidates';
 import { newId } from './repo';
 import { supabase } from './supabase';
+import {
+  deleteOrderProductCloud,
+  deleteStoreCloud,
+  fetchCart,
+  fetchMyOrderProducts,
+  fetchMyStores,
+  fetchStoreLayout,
+  pushCart,
+  pushOrderProduct,
+  pushStore,
+  pushStoreLayoutPart,
+} from './order-cloud-sync';
 import { FridgeAssignment, FridgeSection, OrderCart, OrderProduct, Store } from './order-types';
 import { DEFAULT_ORDER_PRODUCTS } from './order-seed-data';
 
@@ -228,8 +240,10 @@ async function writeStores(stores: Store[]): Promise<void> {
 
 export async function addStore(name: string): Promise<Store[]> {
   const stores = await listStores();
-  const next = [...stores, { id: newId(), name }];
+  const store = { id: newId(), name };
+  const next = [...stores, store];
   await writeStores(next);
+  pushStore(store).catch(() => {});
   return next;
 }
 
@@ -237,6 +251,8 @@ export async function renameStore(id: string, name: string): Promise<Store[]> {
   const stores = await listStores();
   const next = stores.map((s) => (s.id === id ? { ...s, name } : s));
   await writeStores(next);
+  const updated = next.find((s) => s.id === id);
+  if (updated) pushStore(updated).catch(() => {});
   return next;
 }
 
@@ -249,6 +265,7 @@ export async function deleteStore(id: string): Promise<Store[]> {
   await AsyncStorage.removeItem(`orderCart:${id}`);
   await AsyncStorage.removeItem(fridgeAssignmentsKey(id));
   if ((await getActiveStoreId()) === id) await setActiveStoreId(null);
+  deleteStoreCloud(id).catch(() => {});
   return next;
 }
 
@@ -285,6 +302,7 @@ export async function listFridgeSections(storeId: string): Promise<FridgeSection
 
 async function writeFridgeSections(storeId: string, sections: FridgeSection[]): Promise<void> {
   await AsyncStorage.setItem(fridgeSectionsKey(storeId), JSON.stringify(sections));
+  pushStoreLayoutPart(storeId, { sections }).catch(() => {});
 }
 
 export async function addFridgeSection(storeId: string, name: string): Promise<FridgeSection[]> {
@@ -380,6 +398,7 @@ export async function listFridgeSectionDividers(storeId: string): Promise<Record
 
 async function writeFridgeSectionDividers(storeId: string, map: Record<string, string[]>): Promise<void> {
   await AsyncStorage.setItem(fridgeSectionDividersKey(storeId), JSON.stringify(map));
+  pushStoreLayoutPart(storeId, { dividers: map }).catch(() => {});
 }
 
 export async function toggleFridgeSectionDivider(
@@ -410,6 +429,7 @@ export async function listFridgeAssignments(storeId: string): Promise<FridgeAssi
 
 async function writeFridgeAssignments(storeId: string, list: FridgeAssignment[]): Promise<void> {
   await AsyncStorage.setItem(fridgeAssignmentsKey(storeId), JSON.stringify(list));
+  pushStoreLayoutPart(storeId, { assignments: list }).catch(() => {});
 }
 
 /** 상품을 이 매장의 특정 구역에 배정한다.
@@ -475,6 +495,8 @@ export async function getOrderCart(): Promise<OrderCart> {
 
 export async function writeOrderCart(cart: OrderCart): Promise<void> {
   await AsyncStorage.setItem(await resolveCartKey(), JSON.stringify(cart));
+  const storeId = await getActiveStoreId();
+  if (storeId) pushCart(storeId, cart).catch(() => {});
 }
 
 /** 수량을 절대값으로 설정한다 (0 이하면 항목 제거). 갱신된 전체 카트를 반환한다. */
