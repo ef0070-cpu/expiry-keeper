@@ -219,9 +219,9 @@ export default function Dashboard() {
                 />
               ) : null}
               <HeaderIcon
-                icon="chart-box-outline"
-                label="통계"
-                onPress={() => router.push('/stats')}
+                icon="tag-outline"
+                label="가격표"
+                onPress={() => router.push('/price-tag-maker')}
               />
               <HeaderIcon
                 icon="calendar-month-outline"

@@ -64,7 +64,14 @@
           "contactsPermission": "연락처 친구를 초대하기 위해 연락처 접근 권한이 필요합니다."
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "가격표 이미지를 갤러리에 저장하기 위해 접근 권한이 필요합니다.",
+          "savePhotosPermission": "가격표 이미지를 갤러리에 저장하기 위해 접근 권한이 필요합니다."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
