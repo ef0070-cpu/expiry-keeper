@@ -1,5 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { BarcodeScanningResult, CameraView, useCameraPermissions } from 'expo-camera';
+import * as Haptics from 'expo-haptics';
 import * as Linking from 'expo-linking';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useRef, useState } from 'react';
@@ -15,8 +16,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { lookupBarcode } from '@/lib/barcode-lookup';
-import { listProductsByBarcode } from '@/lib/repo';
 import { listOrderProductsByBarcode } from '@/lib/order-repo';
+import { listProductsByBarcode } from '@/lib/repo';
+import { getScanHapticEnabled } from '@/lib/settings';
 
 // 가이드 사각형 크기 (아래 오버레이의 h-40 w-72 와 동일한 값, px 단위)
 const GUIDE_W = 288;
@@ -95,6 +97,9 @@ export default function Scan() {
     if (!isValidBarcode(type, data)) return;
     if (!isInsideGuide(bounds)) return;
     scannedRef.current = true;
+    if (await getScanHapticEnabled()) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    }
     await handleBarcode(data);
   };
 

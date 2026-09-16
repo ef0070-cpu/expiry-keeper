@@ -202,3 +202,44 @@ export function useDateOcrOrder(): DateOcrOrder {
   }, []);
   return order;
 }
+
+// ---------- 바코드 스캔 진동 피드백 ----------
+
+const SCAN_HAPTIC_KEY = 'scanHapticEnabled:v1';
+const DEFAULT_SCAN_HAPTIC = true;
+
+let scanHapticCache: boolean | undefined;
+const scanHapticListeners = new Set<() => void>();
+
+async function loadScanHaptic(): Promise<void> {
+  if (scanHapticCache !== undefined) return;
+  const raw = await AsyncStorage.getItem(SCAN_HAPTIC_KEY);
+  scanHapticCache = raw === null ? DEFAULT_SCAN_HAPTIC : raw === '1';
+}
+
+export async function setScanHapticEnabled(enabled: boolean): Promise<void> {
+  scanHapticCache = enabled;
+  scanHapticListeners.forEach((fn) => fn());
+  await AsyncStorage.setItem(SCAN_HAPTIC_KEY, enabled ? '1' : '0');
+}
+
+/** 로딩 없이 즉시 읽는다 — 스캔 순간에 훅 없이 바로 써야 하는 scan.tsx용. */
+export async function getScanHapticEnabled(): Promise<boolean> {
+  await loadScanHaptic();
+  return scanHapticCache!;
+}
+
+/** 로딩 중에도 기본값(켜짐)을 즉시 돌려준다. 설정 화면의 스위치 표시용. */
+export function useScanHapticEnabled(): boolean {
+  const [enabled, setEnabled] = useState<boolean>(scanHapticCache ?? DEFAULT_SCAN_HAPTIC);
+  useEffect(() => {
+    const update = () => setEnabled(scanHapticCache ?? DEFAULT_SCAN_HAPTIC);
+    scanHapticListeners.add(update);
+    if (scanHapticCache === undefined) loadScanHaptic().then(update);
+    else update();
+    return () => {
+      scanHapticListeners.delete(update);
+    };
+  }, []);
+  return enabled;
+}

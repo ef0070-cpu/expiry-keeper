@@ -1,9 +1,10 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
 import * as Linking from 'expo-linking';
 import * as Notifications from 'expo-notifications';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ddayLabel } from '@/lib/dates';
 import { rescheduleAllExpiryAlerts } from '@/lib/notifications';
@@ -21,10 +22,12 @@ import {
   setAppMode,
   setDateInputMethod,
   setDateOcrOrder,
+  setScanHapticEnabled,
   useAlertSettings,
   useAppMode,
   useDateInputMethod,
   useDateOcrOrder,
+  useScanHapticEnabled,
 } from '@/lib/settings';
 import { isCloudMode, supabase } from '@/lib/supabase';
 
@@ -33,6 +36,7 @@ export default function Settings() {
   const { count, hour, minute } = useAlertSettings();
   const dateInputMethod = useDateInputMethod();
   const dateOcrOrder = useDateOcrOrder();
+  const scanHapticEnabled = useScanHapticEnabled();
   const [deleting, setDeleting] = useState(false);
   const [notifDenied, setNotifDenied] = useState(false);
   const insets = useSafeAreaInsets();
@@ -130,6 +134,9 @@ export default function Settings() {
       </View>
 
       <SectionTitle text="알림" />
+      <Text className="text-muted mb-2 text-xs">
+        선택한 횟수만큼, 유통기한이 가까워질 때 알려드려요.
+      </Text>
       {notifDenied ? (
         <Pressable
           onPress={() => Linking.openSettings()}
@@ -160,6 +167,18 @@ export default function Settings() {
             <TinyStepper icon="plus" label="알림 횟수 증가" onPress={() => changeCount(1)} />
           </View>
         </View>
+        <Pressable
+          onPress={() => {
+            if (count === 1) return;
+            setAlertSettings({ count: 1 });
+            rescheduleAllExpiryAlerts();
+          }}
+          className="mt-2 self-start"
+        >
+          <Text className={`text-xs ${count === 1 ? 'text-muted' : 'text-primary font-medium'}`}>
+            {count === 1 ? '✓ 당일만 알림으로 설정됨' : '당일만 알림으로 바꾸기'}
+          </Text>
+        </Pressable>
 
         <View className="my-4 h-px bg-line" />
 
@@ -187,6 +206,15 @@ export default function Settings() {
             </View>
           </View>
         </View>
+      </View>
+
+      <SectionTitle text="스캔" />
+      <View className="flex-row items-center justify-between rounded-xl border border-line bg-paper p-4">
+        <View className="flex-1 pr-3">
+          <Text className="text-ink text-base font-bold">스캔 진동 피드백</Text>
+          <Text className="text-muted mt-0.5 text-xs">바코드 인식 성공 시 짧게 진동해요.</Text>
+        </View>
+        <Switch value={scanHapticEnabled} onValueChange={setScanHapticEnabled} />
       </View>
 
       <SectionTitle text="기능" />
@@ -255,6 +283,10 @@ export default function Settings() {
           </View>
         </>
       ) : null}
+
+      <Text className="text-muted mt-6 text-center text-xs">
+        버전 {Constants.expoConfig?.version ?? '?'} ({Constants.platform?.android?.versionCode ?? '?'})
+      </Text>
     </ScrollView>
   );
 }
