@@ -77,13 +77,14 @@ https://ocbwjiziwzkgkwzzkvvf.supabase.co/storage/v1/object/public/product-images
 
 - `play-icon-512.png` — 앱 아이콘 (512x512)
 - `feature-graphic-1024x500.png` — 피처 그래픽 (1024x500)
-- **스크린샷 (미준비)**: 폰 스크린샷 최소 2장 필요 (권장 4~8장). 실기기에서 프리뷰 빌드(APK) 설치 후 아래 화면 위주로 캡처 추천:
-  1. 대시보드 (D-day 그룹핑된 상품 목록)
-  2. 바코드 스캔 화면
-  3. 캘린더 화면
-  4. 소진/폐기 통계 화면
-  5. 레시피 추천 화면
-  - 프리뷰 APK 다운로드: https://expo.dev/artifacts/eas/hBP90dYYcq5JGgPGDvfsWvdrEolx2vF_47hp0mROl9w.apk (build 7b5c1ae6, 우유팩 아이콘 반영된 최신 빌드)
+- **스크린샷 (준비 완료, 2026-09-09)**: `store-assets/screenshots/`에 7장 정리됨
+  1. `01-dashboard.jpg` — 대시보드 요약 카드 (만료 임박 현황)
+  2. `02-product-list.jpg` — 상품 목록 (D-day 배지)
+  3. `03-order-management.jpg` — 발주 관리 (빠른발주 사용법)
+  4. `04-calculator.jpg` — 원가 계산기
+  5. `05-calendar.jpg` — 유통기한 달력
+  6. `06-recipe.jpg` — 레시피 추천
+  7. `07-settings.jpg` — 설정 (가정용/소매점용 모드)
 
 ## 8. 데이터 보안 섹션 (데이터 안전) 설문 답변
 
@@ -135,8 +136,7 @@ https://ocbwjiziwzkgkwzzkvvf.supabase.co/storage/v1/object/public/product-images
 ## 아직 남은 것 (본인 확인 통과 후 진행)
 
 1. Play Console "앱 만들기"
-2. 위 정보로 스토어 등록정보 입력
-3. 스크린샷 촬영 (실기기 필요)
-4. 데이터 보안/콘텐츠 등급/타겟층 설문 제출
-5. 프로덕션 AAB 업로드 (build `c2418c60-508b-473a-b92b-aaab724fa52f`)
-6. 비공개 테스트 또는 프로덕션 트랙 출시
+2. 위 정보로 스토어 등록정보 입력 (스크린샷 포함, 준비 완료)
+3. 데이터 보안/콘텐츠 등급/타겟층 설문 제출
+4. 프로덕션 AAB 업로드 (build `c2418c60-508b-473a-b92b-aaab724fa52f`)
+5. 비공개 테스트 또는 프로덕션 트랙 출시
