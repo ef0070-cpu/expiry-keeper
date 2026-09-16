@@ -168,6 +168,28 @@ async function recordRemovedBarcode(barcode: string | null): Promise<void> {
   await AsyncStorage.setItem(REMOVED_BARCODES_KEY, JSON.stringify([...removed]));
 }
 
+const DELETED_ORDER_PRODUCT_IDS_KEY = 'deletedOrderProductIds:v1';
+
+/** 삭제했지만 클라우드 삭제가 아직 확인 안 된 발주상품 id 목록(tombstone). syncOrderStores()의
+ * pull 병합이 이 목록의 id는 서버에 남아있어도 로컬에 다시 추가하지 않게 막는다 — REMOVED_BARCODES_KEY와
+ * 같은 목적(로컬 삭제가 다음 동기화에서 되살아나는 것 방지). */
+async function getDeletedOrderProductIds(): Promise<Set<string>> {
+  const raw = await AsyncStorage.getItem(DELETED_ORDER_PRODUCT_IDS_KEY);
+  return new Set<string>(raw ? (JSON.parse(raw) as string[]) : []);
+}
+
+async function recordDeletedOrderProductId(id: string): Promise<void> {
+  const ids = await getDeletedOrderProductIds();
+  ids.add(id);
+  await AsyncStorage.setItem(DELETED_ORDER_PRODUCT_IDS_KEY, JSON.stringify([...ids]));
+}
+
+async function clearDeletedOrderProductId(id: string): Promise<void> {
+  const ids = await getDeletedOrderProductIds();
+  if (!ids.delete(id)) return;
+  await AsyncStorage.setItem(DELETED_ORDER_PRODUCT_IDS_KEY, JSON.stringify([...ids]));
+}
+
 export async function deleteOrderProduct(id: string): Promise<void> {
   const items = await listOrderProducts();
   const removed = items.find((p) => p.id === id);
@@ -179,7 +201,10 @@ export async function deleteOrderProduct(id: string): Promise<void> {
     delete next[id];
     await writeOrderCart(next);
   }
-  deleteOrderProductCloud(id).catch(() => {});
+  await recordDeletedOrderProductId(id);
+  deleteOrderProductCloud(id)
+    .then(() => clearDeletedOrderProductId(id))
+    .catch(() => {});
 }
 
 /** 사진 후보에 좋아요를 눌러 그 사진을 내 상품 사진으로 즉시 반영한다. saveOrderProduct를
@@ -188,13 +213,17 @@ export async function deleteOrderProduct(id: string): Promise<void> {
  * 로컬 표시만 바꾸고, 오버라이드만 남겨 다음 syncOrderCatalog가 이 선택을 덮어쓰지 않게 한다. */
 export async function applyOrderProductPhoto(barcode: string, photoUri: string): Promise<void> {
   const items = await listOrderProducts();
-  let changed = false;
+  const changedItems: OrderProduct[] = [];
   const next = items.map((p) => {
     if (p.barcode !== barcode || p.imageUri === photoUri) return p;
-    changed = true;
-    return { ...p, imageUri: photoUri };
+    const updated = { ...p, imageUri: photoUri };
+    changedItems.push(updated);
+    return updated;
   });
-  if (changed) await writeOrderProducts(next);
+  if (changedItems.length > 0) {
+    await writeOrderProducts(next);
+    for (const p of changedItems) pushOrderProduct(p).catch(() => {});
+  }
   await recordSubmittedPhotoCandidate(barcode, photoUri);
 }
 
@@ -235,9 +264,12 @@ export async function renameOrderCategory(from: string, to: string): Promise<voi
   const categories = await listOrderCategories();
   await writeOrderCategories(categories.map((c) => (c === from ? to : c)));
   const products = await listOrderProducts();
+  const changed = products.filter((p) => p.category === from);
+  if (changed.length === 0) return;
   await writeOrderProducts(
     products.map((p) => (p.category === from ? { ...p, category: to } : p)),
   );
+  for (const p of changed) pushOrderProduct({ ...p, category: to }).catch(() => {});
 }
 
 export async function deleteOrderCategory(name: string): Promise<void> {
@@ -254,6 +286,27 @@ export async function listStores(): Promise<Store[]> {
 
 async function writeStores(stores: Store[]): Promise<void> {
   await AsyncStorage.setItem(STORES_KEY, JSON.stringify(stores));
+}
+
+const DELETED_STORE_IDS_KEY = 'deletedStoreIds:v1';
+
+/** 삭제했지만 클라우드 삭제가 아직 확인 안 된 매장 id 목록(tombstone) — DELETED_ORDER_PRODUCT_IDS_KEY와
+ * 동일 목적. */
+async function getDeletedStoreIds(): Promise<Set<string>> {
+  const raw = await AsyncStorage.getItem(DELETED_STORE_IDS_KEY);
+  return new Set<string>(raw ? (JSON.parse(raw) as string[]) : []);
+}
+
+async function recordDeletedStoreId(id: string): Promise<void> {
+  const ids = await getDeletedStoreIds();
+  ids.add(id);
+  await AsyncStorage.setItem(DELETED_STORE_IDS_KEY, JSON.stringify([...ids]));
+}
+
+async function clearDeletedStoreId(id: string): Promise<void> {
+  const ids = await getDeletedStoreIds();
+  if (!ids.delete(id)) return;
+  await AsyncStorage.setItem(DELETED_STORE_IDS_KEY, JSON.stringify([...ids]));
 }
 
 export async function addStore(name: string): Promise<Store[]> {
@@ -283,7 +336,10 @@ export async function deleteStore(id: string): Promise<Store[]> {
   await AsyncStorage.removeItem(`orderCart:${id}`);
   await AsyncStorage.removeItem(fridgeAssignmentsKey(id));
   if ((await getActiveStoreId()) === id) await setActiveStoreId(null);
-  deleteStoreCloud(id).catch(() => {});
+  await recordDeletedStoreId(id);
+  deleteStoreCloud(id)
+    .then(() => clearDeletedStoreId(id))
+    .catch(() => {});
   return next;
 }
 
@@ -673,12 +729,17 @@ export async function syncOrderStores(): Promise<void> {
         await AsyncStorage.setItem(CATEGORIES_RECORD_ID_KEY, remoteCategories.id);
       }
     }
+    const deletedStoreIds = await getDeletedStoreIds();
+    for (const id of deletedStoreIds) {
+      deleteStoreCloud(id).then(() => clearDeletedStoreId(id)).catch(() => {});
+    }
+
     const [remoteStores, localStores] = await Promise.all([fetchMyStores(), listStores()]);
     const localStoreIds = new Set(localStores.map((s) => s.id));
     const remoteStoreIds = new Set(remoteStores.map((s) => s.id));
 
     const newFromRemote = remoteStores
-      .filter((r) => !localStoreIds.has(r.id))
+      .filter((r) => !localStoreIds.has(r.id) && !deletedStoreIds.has(r.id))
       .map((r) => ({ id: r.id, name: r.name }));
     if (newFromRemote.length > 0) {
       await writeStores([...localStores, ...newFromRemote]);
@@ -693,11 +754,18 @@ export async function syncOrderStores(): Promise<void> {
       await pullCartIfLocalEmpty(storeId);
     }
 
+    const deletedProductIds = await getDeletedOrderProductIds();
+    for (const id of deletedProductIds) {
+      deleteOrderProductCloud(id).then(() => clearDeletedOrderProductId(id)).catch(() => {});
+    }
+
     const [remoteProducts, localProducts] = await Promise.all([fetchMyOrderProducts(), listOrderProducts()]);
     const localProductIds = new Set(localProducts.map((p) => p.id));
     const remoteProductIds = new Set(remoteProducts.map((p) => p.id));
 
-    const newProductsFromRemote = remoteProducts.filter((r) => !localProductIds.has(r.id));
+    const newProductsFromRemote = remoteProducts.filter(
+      (r) => !localProductIds.has(r.id) && !deletedProductIds.has(r.id),
+    );
     if (newProductsFromRemote.length > 0) {
       await writeOrderProducts([...localProducts, ...newProductsFromRemote]);
     }
