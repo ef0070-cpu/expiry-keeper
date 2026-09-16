@@ -30,6 +30,7 @@ export default function Dashboard() {
   const [query, setQuery] = useState('');
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
   const [signalFilter, setSignalFilter] = useState<SignalKey | null>(null);
+  const [sortBy, setSortBy] = useState<'expiry' | 'name'>('expiry');
   const [refreshing, setRefreshing] = useState(false);
   const scanParams = useLocalSearchParams<{ scannedBarcode?: string; nonce?: string }>();
   const [scannedBarcode, setScannedBarcode] = useState<string | null>(null);
@@ -90,9 +91,15 @@ export default function Dashboard() {
     return SIGNAL_ORDER.filter((k) => grouped.has(k)).map((k) => ({
       key: k,
       title: SIGNAL_TITLES[k],
-      data: grouped.get(k)!.sort((a, b) => a.expiryDate.localeCompare(b.expiryDate)),
+      data: grouped
+        .get(k)!
+        .sort((a, b) =>
+          sortBy === 'name'
+            ? a.name.localeCompare(b.name, 'ko')
+            : a.expiryDate.localeCompare(b.expiryDate),
+        ),
     }));
-  }, [products, deferredQuery, selectedCategories, signalFilter]);
+  }, [products, deferredQuery, selectedCategories, signalFilter, sortBy]);
 
   useEffect(() => {
     if (!scannedBarcode) return;
@@ -261,6 +268,19 @@ export default function Dashboard() {
         >
           <MaterialCommunityIcons name="barcode-scan" size={20} color="#888888" />
         </Pressable>
+        <Pressable
+          onPress={() => setSortBy((v) => (v === 'expiry' ? 'name' : 'expiry'))}
+          hitSlop={12}
+          className="ml-2"
+          accessibilityRole="button"
+          accessibilityLabel={sortBy === 'expiry' ? '이름순으로 정렬' : '유통기한순으로 정렬'}
+        >
+          <MaterialCommunityIcons
+            name={sortBy === 'expiry' ? 'sort-calendar-ascending' : 'sort-alphabetical-ascending'}
+            size={20}
+            color="#888888"
+          />
+        </Pressable>
       </View>
 
       {/* 카테고리 필터 */}
@@ -365,7 +385,12 @@ export default function Dashboard() {
         stickySectionHeadersEnabled={false}
       />
 
-      <Fab onPress={() => router.push(mode === 'home' ? '/product-form' : '/scan')} />
+      <Fab
+        onPress={() => router.push(mode === 'home' ? '/product-form' : '/scan')}
+        icon={mode === 'home' ? 'plus' : 'barcode-scan'}
+        label={mode === 'home' ? '상품추가' : undefined}
+        accessibilityLabel={mode === 'home' ? '상품 추가' : '바코드 스캔'}
+      />
     </View>
   );
 }
