@@ -17,7 +17,6 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { recognizeText } from '@infinitered/react-native-mlkit-text-recognition';
 import CandidatesModal from '@/components/CandidatesModal';
 import ImageCandidatesModal from '@/components/ImageCandidatesModal';
 import { hasImageSearchKeys, lookupBarcode, searchProductImageCandidates } from '@/lib/barcode-lookup';
@@ -26,7 +25,14 @@ import { deleteLocalPhotoIfOwned, persistLocalPhoto } from '@/lib/local-photo';
 import { uploadPhotoToBucket } from '@/lib/storage';
 import { addMonths, autoFormatDate, formatDate, isValidDateStr } from '@/lib/dates';
 import { cancelExpiryAlerts, scheduleExpiryAlerts } from '@/lib/notifications';
-import { deleteProduct, getProduct, listProducts, newId, saveProduct } from '@/lib/repo';
+import {
+  deleteProduct,
+  getProduct,
+  listProducts,
+  listProductsByBarcode,
+  newId,
+  saveProduct,
+} from '@/lib/repo';
 import { AppMode, useAppMode, useDateInputMethod, useDateOcrOrder } from '@/lib/settings';
 import { Product, ProductStatus } from '@/lib/types';
 
@@ -185,6 +191,7 @@ export default function ProductForm() {
 
     setOcrBusy(true);
     try {
+      const { recognizeText } = await import('@infinitered/react-native-mlkit-text-recognition');
       const { text } = await recognizeText(result.assets[0].uri);
       const found = extractExpiryDateFromText(text, dateOcrOrder);
       if (found) {
@@ -231,15 +238,7 @@ export default function ProductForm() {
     setImageCandidates(candidates);
   };
 
-  const save = async () => {
-    if (!name.trim()) {
-      Alert.alert('입력 확인', '상품명을 입력해 주세요.');
-      return;
-    }
-    if (!isValidDateStr(expiryDate)) {
-      Alert.alert('입력 확인', '유통기한을 YYYY-MM-DD 형식으로 입력해 주세요.\n예: 2026-12-31');
-      return;
-    }
+  const doSave = async () => {
     setBusy(true);
     try {
       const product: Product = {
@@ -264,6 +263,52 @@ export default function ProductForm() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const addQuantityTo = async (existing: Product) => {
+    setBusy(true);
+    try {
+      const merged: Product = { ...existing, quantity: existing.quantity + quantity };
+      await saveProduct(merged);
+      await scheduleExpiryAlerts(merged);
+      router.dismissAll();
+    } catch (e) {
+      Alert.alert('저장 실패', e instanceof Error ? e.message : '알 수 없는 오류');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const save = async () => {
+    if (!name.trim()) {
+      Alert.alert('입력 확인', '상품명을 입력해 주세요.');
+      return;
+    }
+    if (!isValidDateStr(expiryDate)) {
+      Alert.alert('입력 확인', '유통기한을 YYYY-MM-DD 형식으로 입력해 주세요.\n예: 2026-12-31');
+      return;
+    }
+
+    // 신규 등록이고 바코드가 있으면, 같은 바코드+같은 유통기한의 기존(보관 중) 상품이 있는지
+    // 확인해 수량만 합칠지 물어본다 — 반복 스캔 시 매번 별도 행으로 쌓이는 걸 막기 위함.
+    if (!isEdit && barcode) {
+      const existing = await listProductsByBarcode(barcode);
+      const sameExpiry = existing.find((p) => p.expiryDate === expiryDate);
+      if (sameExpiry) {
+        Alert.alert(
+          '같은 유통기한 상품이 있어요',
+          `"${sameExpiry.name}" (${expiryDate})에 이미 ${sameExpiry.quantity}개가 등록돼 있어요.`,
+          [
+            { text: '취소', style: 'cancel' },
+            { text: '새로 등록', onPress: () => doSave() },
+            { text: `수량 추가 (+${quantity})`, onPress: () => addQuantityTo(sameExpiry) },
+          ],
+        );
+        return;
+      }
+    }
+
+    await doSave();
   };
 
   const remove = () => {
@@ -407,7 +452,7 @@ export default function ProductForm() {
             </View>
             <TextInput
               className="text-ink mt-1.5 rounded-xl border border-line bg-paper px-3 py-2.5 text-base"
-              placeholder="예: 해태 오예스 360g"
+              placeholder={mode === 'home' ? '예: 두부' : '예: 해태 오예스 360g'}
               placeholderTextColor="#BBBBBB"
               value={name}
               onChangeText={setName}
