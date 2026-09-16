@@ -79,17 +79,6 @@ export async function submitNewOrderProduct(product: OrderProduct): Promise<void
       photo_uri: null,
     });
     if (error) return;
-    // 브랜드도 후보로 제출한다 — apply_approved_order_report 트리거는 더 이상 brand를
-    // 쓰지 않으므로, 후보가 없으면 order_catalog.brand가 NULL로 남아 다음 동기화 때
-    // 방금 입력한 브랜드가 지워진다. (사진과 마찬가지로 order_catalog 행이 생긴 뒤에 넣는다.)
-    if (product.barcode && product.brand.trim()) {
-      await submitBrandCandidate(product.barcode, product.brand.trim());
-    }
-    // 이름도 후보로 제출한다 — 마찬가지로 order_catalog 행이 생긴 뒤에 넣어야
-    // 대표 이름 재계산 UPDATE가 대상 행을 찾을 수 있다.
-    if (product.barcode && product.name.trim()) {
-      await submitNameCandidate(product.barcode, product.name.trim());
-    }
     // order_catalog 행이 생성된 뒤에 사진 후보를 넣어야 한다 — 먼저 넣으면 대표 사진
     // 재계산 UPDATE가 대상 행을 못 찾아 조용히 유실된다.
     if (product.imageUri && product.barcode) {
@@ -146,16 +135,19 @@ export async function listPhotoCandidates(barcode: string): Promise<PhotoCandida
       .order('created_at', { ascending: true }),
     supabase.auth.getSession(),
   ]);
-  if (error || !photos || photos.length === 0) return [];
+  // 과거 백필/제출 경로에서 빈 문자열 photo_uri가 들어간 행은 걸러낸다 — 투표 모달에 빈
+  // 사진 칸으로 나타나던 원인(사진이 없는데도 후보로 뜨는 문제).
+  const validPhotos = (photos ?? []).filter((p) => p.photo_uri && p.photo_uri.trim());
+  if (error || validPhotos.length === 0) return [];
 
-  const ids = photos.map((p) => p.id);
+  const ids = validPhotos.map((p) => p.id);
   const { data: votes } = await supabase
     .from('order_photo_votes')
     .select('photo_id, voter_id, vote')
     .in('photo_id', ids);
   const myId = sessionData.session?.user.id;
 
-  return photos.map((p) => {
+  return validPhotos.map((p) => {
     const photoVotes = (votes ?? []).filter((v) => v.photo_id === p.id);
     const likes = photoVotes.filter((v) => v.vote === 1).length;
     const dislikes = photoVotes.filter((v) => v.vote === -1).length;
@@ -200,216 +192,3 @@ export async function voteOnPhoto(photoId: string, vote: 1 | -1): Promise<void> 
   if (error) throw error;
 }
 
-/** 브랜드 후보를 product_brand_candidates에 추가하고 제출자가 자동으로 좋아요를 누른다.
- * 자동 좋아요가 없으면 기존 브랜드(배포 시 0표로 백필됨)와 득표 동점이 되고, 동점이면
- * 먼저 등록된 후보가 우선하는 규칙 때문에 방금 낸 후보가 절대 대표값이 되지 못한다
- * (수정해서 저장해도 화면에 반영 안 되는 것처럼 보이는 원인). 자동 좋아요로 1표를 줘서
- * 기존 0표 후보를 즉시 앞서게 한다 — 다른 사용자가 다시 수정하면 마찬가지로 역전 가능
- * (득표제 취지 유지, "먼저 우긴 사람이 영구히 이김"이 되지 않게 함). */
-export async function submitBrandCandidate(barcode: string, brand: string): Promise<void> {
-  if (!supabase) return;
-  try {
-    const { data: inserted, error } = await supabase
-      .from('product_brand_candidates')
-      .insert({ barcode, brand })
-      .select('id')
-      .single();
-    let candidateId = inserted?.id as string | undefined;
-    if (error) {
-      // 유니크 제약(barcode, lower(btrim(brand))) 충돌 = 이미 같은 텍스트의 후보가 있음.
-      // 이 경우에도 그 기존 후보에 좋아요를 눌러줘야 자동 좋아요 효과가 있다.
-      const { data: existing } = await supabase
-        .from('product_brand_candidates')
-        .select('id')
-        .eq('barcode', barcode)
-        .ilike('brand', brand.trim())
-        .maybeSingle();
-      candidateId = existing?.id;
-    }
-    if (!candidateId) return;
-    await supabase
-      .from('product_brand_votes')
-      .upsert({ candidate_id: candidateId, vote: 1 }, { onConflict: 'candidate_id,voter_id' });
-  } catch {
-    // best-effort
-  }
-}
-
-export type BrandCandidate = {
-  id: string;
-  brand: string;
-  likes: number;
-  dislikes: number;
-  myVote: 1 | -1 | null;
-};
-
-/** 이 바코드의 브랜드 후보들과 각 후보의 득표 현황, 내 투표 상태를 조회한다. */
-export async function listBrandCandidates(barcode: string): Promise<BrandCandidate[]> {
-  if (!supabase) return [];
-  const [{ data: candidates, error }, { data: sessionData }] = await Promise.all([
-    supabase
-      .from('product_brand_candidates')
-      .select('id, brand')
-      .eq('barcode', barcode)
-      .order('created_at', { ascending: true }),
-    supabase.auth.getSession(),
-  ]);
-  if (error || !candidates || candidates.length === 0) return [];
-
-  const ids = candidates.map((c) => c.id);
-  const { data: votes } = await supabase
-    .from('product_brand_votes')
-    .select('candidate_id, voter_id, vote')
-    .in('candidate_id', ids);
-  const myId = sessionData.session?.user.id;
-
-  return candidates.map((c) => {
-    const candidateVotes = (votes ?? []).filter((v) => v.candidate_id === c.id);
-    const likes = candidateVotes.filter((v) => v.vote === 1).length;
-    const dislikes = candidateVotes.filter((v) => v.vote === -1).length;
-    const mine = candidateVotes.find((v) => v.voter_id === myId);
-    return {
-      id: c.id,
-      brand: c.brand,
-      likes,
-      dislikes,
-      myVote: (mine?.vote as 1 | -1 | undefined) ?? null,
-    };
-  });
-}
-
-/** 브랜드 후보에 좋아요/싫어요 투표한다. 이미 같은 값으로 투표했으면 취소(중립)한다. */
-export async function voteOnBrand(candidateId: string, vote: 1 | -1): Promise<void> {
-  if (!supabase) throw new Error('로그인이 필요합니다.');
-  const { data: sessionData } = await supabase.auth.getSession();
-  const voterId = sessionData.session?.user.id;
-  if (!voterId) throw new Error('로그인이 필요합니다.');
-
-  const { data: existing } = await supabase
-    .from('product_brand_votes')
-    .select('vote')
-    .eq('candidate_id', candidateId)
-    .eq('voter_id', voterId)
-    .maybeSingle();
-
-  if (existing?.vote === vote) {
-    const { error } = await supabase
-      .from('product_brand_votes')
-      .delete()
-      .eq('candidate_id', candidateId)
-      .eq('voter_id', voterId);
-    if (error) throw error;
-    return;
-  }
-
-  const { error } = await supabase
-    .from('product_brand_votes')
-    .upsert({ candidate_id: candidateId, vote }, { onConflict: 'candidate_id,voter_id' });
-  if (error) throw error;
-}
-
-/** 상품명 후보를 product_name_candidates에 추가하고 제출자가 자동으로 좋아요를 누른다.
- * 자동 좋아요가 없으면 기존 이름(배포 시 0표로 백필됨)과 득표 동점이 되고, 동점이면
- * 먼저 등록된 후보가 우선하는 규칙 때문에 방금 낸 후보가 절대 대표값이 되지 못한다
- * (브랜드와 동일한 이유 — submitBrandCandidate 참고). */
-export async function submitNameCandidate(barcode: string, name: string): Promise<void> {
-  if (!supabase) return;
-  try {
-    const { data: inserted, error } = await supabase
-      .from('product_name_candidates')
-      .insert({ barcode, name })
-      .select('id')
-      .single();
-    let candidateId = inserted?.id as string | undefined;
-    if (error) {
-      // 유니크 제약(barcode, lower(btrim(name))) 충돌 = 이미 같은 텍스트의 후보가 있음.
-      // 이 경우에도 그 기존 후보에 좋아요를 눌러줘야 자동 좋아요 효과가 있다.
-      const { data: existing } = await supabase
-        .from('product_name_candidates')
-        .select('id')
-        .eq('barcode', barcode)
-        .ilike('name', name.trim())
-        .maybeSingle();
-      candidateId = existing?.id;
-    }
-    if (!candidateId) return;
-    await supabase
-      .from('product_name_votes')
-      .upsert({ candidate_id: candidateId, vote: 1 }, { onConflict: 'candidate_id,voter_id' });
-  } catch {
-    // best-effort
-  }
-}
-
-export type NameCandidate = {
-  id: string;
-  name: string;
-  likes: number;
-  dislikes: number;
-  myVote: 1 | -1 | null;
-};
-
-/** 이 바코드의 상품명 후보들과 각 후보의 득표 현황, 내 투표 상태를 조회한다. */
-export async function listNameCandidates(barcode: string): Promise<NameCandidate[]> {
-  if (!supabase) return [];
-  const [{ data: candidates, error }, { data: sessionData }] = await Promise.all([
-    supabase
-      .from('product_name_candidates')
-      .select('id, name')
-      .eq('barcode', barcode)
-      .order('created_at', { ascending: true }),
-    supabase.auth.getSession(),
-  ]);
-  if (error || !candidates || candidates.length === 0) return [];
-
-  const ids = candidates.map((c) => c.id);
-  const { data: votes } = await supabase
-    .from('product_name_votes')
-    .select('candidate_id, voter_id, vote')
-    .in('candidate_id', ids);
-  const myId = sessionData.session?.user.id;
-
-  return candidates.map((c) => {
-    const candidateVotes = (votes ?? []).filter((v) => v.candidate_id === c.id);
-    const likes = candidateVotes.filter((v) => v.vote === 1).length;
-    const dislikes = candidateVotes.filter((v) => v.vote === -1).length;
-    const mine = candidateVotes.find((v) => v.voter_id === myId);
-    return {
-      id: c.id,
-      name: c.name,
-      likes,
-      dislikes,
-      myVote: (mine?.vote as 1 | -1 | undefined) ?? null,
-    };
-  });
-}
-
-/** 상품명 후보에 좋아요/싫어요 투표한다. 이미 같은 값으로 투표했으면 취소(중립)한다. */
-export async function voteOnName(candidateId: string, vote: 1 | -1): Promise<void> {
-  if (!supabase) throw new Error('로그인이 필요합니다.');
-  const { data: sessionData } = await supabase.auth.getSession();
-  const voterId = sessionData.session?.user.id;
-  if (!voterId) throw new Error('로그인이 필요합니다.');
-
-  const { data: existing } = await supabase
-    .from('product_name_votes')
-    .select('vote')
-    .eq('candidate_id', candidateId)
-    .eq('voter_id', voterId)
-    .maybeSingle();
-
-  if (existing?.vote === vote) {
-    const { error } = await supabase
-      .from('product_name_votes')
-      .delete()
-      .eq('candidate_id', candidateId)
-      .eq('voter_id', voterId);
-    if (error) throw error;
-    return;
-  }
-
-  const { error } = await supabase
-    .from('product_name_votes')
-    .upsert({ candidate_id: candidateId, vote }, { onConflict: 'candidate_id,voter_id' });
-  if (error) throw error;
-}

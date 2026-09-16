@@ -65,7 +65,7 @@ export default function ProductForm() {
   const [busy, setBusy] = useState(false);
   const [searching, setSearching] = useState(false);
   const [imageCandidates, setImageCandidates] = useState<string[] | null>(null);
-  const [candidatesTab, setCandidatesTab] = useState<'photo' | 'brand' | 'name' | null>(null);
+  const [showPhotoPicker, setShowPhotoPicker] = useState(false);
   const [ocrBusy, setOcrBusy] = useState(false);
   const [manufactureCalcVisible, setManufactureCalcVisible] = useState(false);
   const [manufactureDate, setManufactureDate] = useState('');
@@ -348,10 +348,9 @@ export default function ProductForm() {
         onClose={() => setImageCandidates(null)}
       />
       <CandidatesModal
-        visible={candidatesTab !== null}
+        visible={showPhotoPicker}
         barcode={barcode ?? ''}
-        initialTab={candidatesTab ?? 'photo'}
-        onClose={() => setCandidatesTab(null)}
+        onClose={() => setShowPhotoPicker(false)}
       />
       <Modal
         visible={manufactureCalcVisible}
@@ -419,26 +418,33 @@ export default function ProductForm() {
       >
         {/* 사진 + 상품명 (한 줄 배치) */}
         <View className="flex-row">
-          <Pressable
-            onPress={pickImage}
-            className="items-center justify-center rounded-xl border border-line bg-paper active:opacity-70"
-            style={{ width: 96, height: 96 }}
-            accessibilityRole="button"
-            accessibilityLabel={imageUri ? '사진 변경' : '사진 추가'}
-          >
+          <View className="items-center">
+            <Pressable
+              onPress={pickImage}
+              className="items-center justify-center rounded-xl border border-line bg-paper active:opacity-70"
+              style={{ width: 96, height: 96 }}
+              accessibilityRole="button"
+              accessibilityLabel={imageUri ? '사진 변경' : '사진 추가'}
+            >
+              {imageUri ? (
+                <Image
+                  source={{ uri: imageUri }}
+                  style={{ width: 96, height: 96, borderRadius: 12 }}
+                  contentFit="cover"
+                />
+              ) : (
+                <View className="items-center">
+                  <MaterialCommunityIcons name="camera-plus-outline" size={26} color="#888888" />
+                  <Text className="text-muted mt-1 text-xs">사진 추가</Text>
+                </View>
+              )}
+            </Pressable>
             {imageUri ? (
-              <Image
-                source={{ uri: imageUri }}
-                style={{ width: 96, height: 96, borderRadius: 12 }}
-                contentFit="cover"
-              />
-            ) : (
-              <View className="items-center">
-                <MaterialCommunityIcons name="camera-plus-outline" size={26} color="#888888" />
-                <Text className="text-muted mt-1 text-xs">사진 추가</Text>
-              </View>
-            )}
-          </Pressable>
+              <Pressable onPress={() => setImageUri(null)} className="mt-1.5">
+                <Text className="text-muted text-xs underline">사진 제거</Text>
+              </Pressable>
+            ) : null}
+          </View>
 
           <View className="ml-3 flex-1">
             <View className="flex-row items-center justify-between">
@@ -470,22 +476,11 @@ export default function ProductForm() {
                 )}
                 <Text className="text-primary ml-1 text-xs font-medium">웹에서 이미지 찾기</Text>
               </Pressable>
-              {imageUri ? (
-                <Pressable onPress={() => setImageUri(null)}>
-                  <Text className="text-muted text-xs underline">사진 제거</Text>
-                </Pressable>
-              ) : null}
             </View>
             {barcode ? (
               <View className="mt-1.5 flex-row flex-wrap" style={{ gap: 12 }}>
-                <Pressable onPress={() => setCandidatesTab('photo')}>
-                  <Text className="text-muted text-xs underline">사진 후보 보기 / 투표</Text>
-                </Pressable>
-                <Pressable onPress={() => setCandidatesTab('name')}>
-                  <Text className="text-muted text-xs underline">상품명 후보 보기 / 투표</Text>
-                </Pressable>
-                <Pressable onPress={() => setCandidatesTab('brand')}>
-                  <Text className="text-muted text-xs underline">브랜드 후보 보기 / 투표</Text>
+                <Pressable onPress={() => setShowPhotoPicker(true)}>
+                  <Text className="text-muted text-xs underline">제품 사진 선택 하기</Text>
                 </Pressable>
               </View>
             ) : null}

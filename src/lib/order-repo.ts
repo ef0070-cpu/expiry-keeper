@@ -2,8 +2,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { upsertBarcodeCatalog } from './barcode-catalog';
 import { mergeCatalogIntoProducts, type OrderCatalogRow } from './order-catalog-merge';
 import { reportOrderProductIssue, submitNewOrderProduct } from './order-report';
-import { submitBrandCandidateIfChanged } from './brand-candidates';
-import { submitNameCandidateIfChanged } from './name-candidates';
 import {
   getSubmittedPhotoCandidates,
   recordSubmittedPhotoCandidate,
@@ -36,6 +34,8 @@ const CART_KEY = 'orderCart:v1';
 const REMOVED_BARCODES_KEY = 'removedOrderBarcodes:v1';
 const CATEGORY_OVERRIDE_KEY = 'orderCategoryOverrides:v1';
 const PRICE_OVERRIDE_KEY = 'orderPriceOverrides:v1';
+const BRAND_OVERRIDE_KEY = 'orderBrandOverrides:v1';
+const NAME_OVERRIDE_KEY = 'orderNameOverrides:v1';
 const CATALOG_REFERENCE_PRICE_KEY = 'orderCatalogReferencePrice:v1';
 const CATALOG_UPDATE_BADGE_KEY = 'orderCatalogUpdateBadges:v1';
 const STORES_KEY = 'stores:v1';
@@ -73,12 +73,19 @@ export async function listOrderProductsByBarcode(barcode: string): Promise<Order
  * 사진이 이전 제출과 달라졌으면 새 사진 후보로 접수한다(submitPhotoCandidateIfChanged, best-effort) —
  * 대표 사진이 되려면 다른 사용자의 좋아요를 받아야 한다.
  */
-export async function saveOrderProduct(p: OrderProduct): Promise<OrderProduct> {
+export async function saveOrderProduct(rawP: OrderProduct): Promise<OrderProduct> {
   const items = await listOrderProducts();
+  // 신규 등록인데 같은 바코드의 상품이 이미 있으면 새로 만들지 않고 그 상품을 갱신한다 —
+  // 그렇지 않으면 같은 바코드를 여러 번 등록할 때마다(재스캔, 중복 탭 등) id만 다른 중복
+  // 상품이 계속 쌓인다(검색 결과에 같은 이름이 여러 줄 나오던 원인).
+  const existingByBarcode =
+    !items.some((x) => x.id === rawP.id) && rawP.barcode
+      ? items.find((x) => x.barcode === rawP.barcode)
+      : undefined;
+  const p = existingByBarcode ? { ...rawP, id: existingByBarcode.id } : rawP;
   const idx = items.findIndex((x) => x.id === p.id);
   const isNew = idx < 0;
   const categoryChanged = !isNew && items[idx].category !== p.category;
-  const brandChanged = !isNew && items[idx].brand !== p.brand;
   const priceChanged = !isNew && items[idx].price !== p.price;
   if (isNew) items.push(p);
   else items[idx] = p;
@@ -87,11 +94,6 @@ export async function saveOrderProduct(p: OrderProduct): Promise<OrderProduct> {
   if (isNew) {
     submitNewOrderProduct(p).catch(() => {});
   } else {
-    // 신규 등록은 submitNewOrderProduct 내부에서 order_catalog 행 생성 뒤에 제출한다
-    // (먼저 넣으면 대표 이름 재계산 UPDATE가 대상 행을 못 찾아 조용히 유실된다).
-    if (p.barcode) {
-      submitNameCandidateIfChanged(p.barcode, p.name).catch(() => {});
-    }
     if (p.barcode && p.imageUri) {
       // 로컬 오버라이드 기록까지는 기다린다(빠른 로컬 저장) — 그래야 저장 직후 목록으로 돌아가
       // syncOrderCatalog가 실행돼도 방금 고른 사진이 도로 덮어써지지 않는다. 네트워크 후보 제출
@@ -105,10 +107,16 @@ export async function saveOrderProduct(p: OrderProduct): Promise<OrderProduct> {
   if (categoryChanged && p.barcode) {
     recordCategoryOverride(p.barcode, p.category).catch(() => {});
   }
-  // 브랜드는 이제 투표로 대표값이 결정되므로, 로컬 오버라이드 대신 후보로 제출한다(다른 후보와
-  // 동률/신규일 때만 즉시 대표가 되고, 그 외엔 투표를 받아야 한다).
-  if (brandChanged && p.barcode) {
-    submitBrandCandidateIfChanged(p.barcode, p.brand).catch(() => {});
+  // 상품명 후보/투표 기능 제거됨 — apply_approved_order_report 트리거가 order_catalog.name을
+  // 갱신하지 않으므로, 브랜드와 동일하게 로컬 오버라이드로 이 기기가 입력한 이름을 기억해둔다.
+  if (p.barcode && p.name.trim()) {
+    recordNameOverride(p.barcode, p.name).catch(() => {});
+  }
+  // 브랜드 후보/투표 기능 제거됨 — apply_approved_order_report 트리거가 order_catalog.brand를
+  // 갱신하지 않으므로, 카테고리/가격과 동일하게 로컬 오버라이드로 이 기기가 입력한 브랜드를
+  // 기억해둔다(없으면 다음 syncOrderCatalog가 빈 값으로 덮어쓴다).
+  if (p.barcode && p.brand.trim()) {
+    recordBrandOverride(p.barcode, p.brand).catch(() => {});
   }
   // 가격 수정은 매장마다 실제로 다를 수 있어(가맹점별 판매가 차이) 대표값으로 만들지 않는다.
   // 로컬 오버라이드만 남겨 동기화가 내 가격을 덮어쓰지 못하게 하고, 참고용 신고만 접수한다.
@@ -135,6 +143,32 @@ async function recordCategoryOverride(barcode: string, category: string): Promis
   const overrides = await getCategoryOverrides();
   overrides.set(barcode, category);
   await AsyncStorage.setItem(CATEGORY_OVERRIDE_KEY, JSON.stringify(Object.fromEntries(overrides)));
+}
+
+/** 바코드→사용자가 이 기기에서 직접 지정한 브랜드(브랜드 후보/투표 기능 제거로 도입 —
+ * 카테고리 오버라이드와 동일한 이유). syncOrderCatalog가 공용 값(대부분 빈 값)으로 덮어쓰지 않게 막는다. */
+export async function getBrandOverrides(): Promise<Map<string, string>> {
+  const raw = await AsyncStorage.getItem(BRAND_OVERRIDE_KEY);
+  return new Map(Object.entries(raw ? (JSON.parse(raw) as Record<string, string>) : {}));
+}
+
+async function recordBrandOverride(barcode: string, brand: string): Promise<void> {
+  const overrides = await getBrandOverrides();
+  overrides.set(barcode, brand);
+  await AsyncStorage.setItem(BRAND_OVERRIDE_KEY, JSON.stringify(Object.fromEntries(overrides)));
+}
+
+/** 바코드→사용자가 이 기기에서 직접 지정한 상품명(상품명 후보/투표 기능 제거로 도입 —
+ * 브랜드 오버라이드와 동일한 이유). syncOrderCatalog가 공용 값으로 덮어쓰지 않게 막는다. */
+export async function getNameOverrides(): Promise<Map<string, string>> {
+  const raw = await AsyncStorage.getItem(NAME_OVERRIDE_KEY);
+  return new Map(Object.entries(raw ? (JSON.parse(raw) as Record<string, string>) : {}));
+}
+
+async function recordNameOverride(barcode: string, name: string): Promise<void> {
+  const overrides = await getNameOverrides();
+  overrides.set(barcode, name);
+  await AsyncStorage.setItem(NAME_OVERRIDE_KEY, JSON.stringify(Object.fromEntries(overrides)));
 }
 
 /** 바코드→사용자가 이 기기에서 직접 지정한 가격. syncOrderCatalog가 공용 값으로 덮어쓰지 않게 막는다. */
@@ -314,7 +348,10 @@ export async function addStore(name: string): Promise<Store[]> {
   const store = { id: newId(), name };
   const next = [...stores, store];
   await writeStores(next);
-  pushStore(store).catch(() => {});
+  // 매장 생성 직후 곧바로 구역/장바구니를 추가할 수 있어, 서버에 order_stores 행이 아직
+  // 없는 상태로 그 push들이 도착해 FK 위반으로 조용히 실패하는 걸 막기 위해 await한다
+  // (fire-and-forget이면 이 함수가 반환된 뒤에도 push가 안 끝났을 수 있다).
+  await pushStore(store).catch(() => {});
   return next;
 }
 
@@ -610,13 +647,16 @@ export async function syncOrderCatalog(): Promise<void> {
       .select('barcode, name, brand, price, category, image_uri');
     if (error || !data) return;
 
-    const [items, removedBarcodes, categoryOverrides, priceOverrides, photoOverrides] = await Promise.all([
-      listOrderProducts(),
-      getRemovedBarcodes(),
-      getCategoryOverrides(),
-      getPriceOverrides(),
-      getSubmittedPhotoCandidates(),
-    ]);
+    const [items, removedBarcodes, categoryOverrides, priceOverrides, brandOverrides, nameOverrides, photoOverrides] =
+      await Promise.all([
+        listOrderProducts(),
+        getRemovedBarcodes(),
+        getCategoryOverrides(),
+        getPriceOverrides(),
+        getBrandOverrides(),
+        getNameOverrides(),
+        getSubmittedPhotoCandidates(),
+      ]);
     const referencePrices: Record<string, number> = {};
     for (const row of data as OrderCatalogRow[]) {
       if (row.price != null) referencePrices[row.barcode] = row.price;
@@ -630,11 +670,17 @@ export async function syncOrderCatalog(): Promise<void> {
       const withPrice = priceOverrides.has(row.barcode)
         ? { ...withCategory, price: priceOverrides.get(row.barcode)! }
         : withCategory;
-      // 이 기기에서 직접 고른 사진은 투표로 대표사진이 되기 전까지 공용 값이 덮어쓰지 않게 한다
-      // (카테고리 오버라이드와 같은 이유). 브랜드는 이제 오버라이드 없이 공용 값(투표 결과)을 그대로 쓴다.
-      return photoOverrides.has(row.barcode)
-        ? { ...withPrice, image_uri: photoOverrides.get(row.barcode)! }
+      const withBrand = brandOverrides.has(row.barcode)
+        ? { ...withPrice, brand: brandOverrides.get(row.barcode)! }
         : withPrice;
+      const withName = nameOverrides.has(row.barcode)
+        ? { ...withBrand, name: nameOverrides.get(row.barcode)! }
+        : withBrand;
+      // 이 기기에서 직접 고른 사진은 투표로 대표사진이 되기 전까지 공용 값이 덮어쓰지 않게 한다
+      // (카테고리/브랜드/상품명 오버라이드와 같은 이유).
+      return photoOverrides.has(row.barcode)
+        ? { ...withName, image_uri: photoOverrides.get(row.barcode)! }
+        : withName;
     });
     const { items: merged, changed, newBarcodes, updatedBarcodes } = mergeCatalogIntoProducts(
       items,
@@ -721,11 +767,17 @@ async function pullCartIfLocalEmpty(storeId: string): Promise<void> {
 export async function syncOrderStores(): Promise<void> {
   if (!supabase) return;
   try {
-    const categoriesRaw = await AsyncStorage.getItem(CATEGORIES_KEY);
-    if (categoriesRaw === null) {
+    // 레코드 id를 아직 이 기기가 모른다면(신규 설치, 또는 이 기능 이전부터 쓰던 기기) 원격에
+    // 이미 있는 레코드를 그대로 채택한다 — 로컬 카테고리가 이미 있어도 마찬가지다. 그렇지 않으면
+    // 이 기기가 나중에 writeOrderCategories()에서 자기 것을 새로 만들어버려, 같은 계정을 쓰는
+    // 다른 기기와 카테고리 목록이 영구히 갈라진다.
+    const existingRecordId = await AsyncStorage.getItem(CATEGORIES_RECORD_ID_KEY);
+    if (existingRecordId === null) {
       const remoteCategories = await fetchMyCategories();
       if (remoteCategories) {
-        await AsyncStorage.setItem(CATEGORIES_KEY, JSON.stringify(remoteCategories.categories));
+        const localCategories = await listOrderCategories();
+        const merged = Array.from(new Set([...localCategories, ...remoteCategories.categories]));
+        await AsyncStorage.setItem(CATEGORIES_KEY, JSON.stringify(merged));
         await AsyncStorage.setItem(CATEGORIES_RECORD_ID_KEY, remoteCategories.id);
       }
     }
@@ -817,4 +869,90 @@ export async function migrateLocalOrderDataToCloud(): Promise<void> {
   } catch {
     // 부분 실패 — 플래그를 세우지 않아 다음 실행 때 재시도
   }
+}
+
+const ORDER_PRODUCTS_DEDUPED_KEY = 'orderProductsDedupedByBarcode:v1';
+
+/**
+ * 과거 saveOrderProduct 버그(같은 바코드를 재등록할 때마다 id만 다른 새 상품이 생기던 문제,
+ * 이제는 위 saveOrderProduct에서 막힘)로 이미 쌓인 중복 상품을 바코드 기준 1회성으로 정리한다.
+ * 바코드별로 가장 먼저 등록된 걸 대표로 남기고(빈 사진/별칭은 중복 항목에서 보완), 나머지는
+ * 지운다. 모든 매장(+ 매장 미선택 전역) 장바구니 수량은 대표 상품으로 합산하고, 냉장고 배정은
+ * 매장별로 대표 상품 배정이 이미 있으면 중복 배정을 버린다.
+ */
+export async function dedupeOrderProductsByBarcode(): Promise<void> {
+  if (await AsyncStorage.getItem(ORDER_PRODUCTS_DEDUPED_KEY)) return;
+
+  const items = await listOrderProducts();
+  const byBarcode = new Map<string, OrderProduct[]>();
+  for (const p of items) {
+    if (!p.barcode) continue;
+    const list = byBarcode.get(p.barcode) ?? [];
+    list.push(p);
+    byBarcode.set(p.barcode, list);
+  }
+
+  const idRemap = new Map<string, string>(); // 제거될 id -> 대표 id
+  const keepers = new Map<string, OrderProduct>(); // 대표 id -> 병합된 상품
+
+  for (const dupes of byBarcode.values()) {
+    if (dupes.length < 2) continue;
+    let keeper = dupes[0];
+    for (const dup of dupes.slice(1)) {
+      keeper = {
+        ...keeper,
+        imageUri: keeper.imageUri ?? dup.imageUri,
+        aliases: keeper.aliases?.length ? keeper.aliases : dup.aliases,
+      };
+      idRemap.set(dup.id, keeper.id);
+    }
+    keepers.set(keeper.id, keeper);
+  }
+
+  if (idRemap.size === 0) {
+    await AsyncStorage.setItem(ORDER_PRODUCTS_DEDUPED_KEY, '1');
+    return;
+  }
+
+  const removedIds = new Set(idRemap.keys());
+  await writeOrderProducts(items.filter((p) => !removedIds.has(p.id)).map((p) => keepers.get(p.id) ?? p));
+
+  const cartKeys = [CART_KEY, ...(await listStores()).map((s) => `orderCart:${s.id}`)];
+  for (const key of cartKeys) {
+    const raw = await AsyncStorage.getItem(key);
+    if (!raw) continue;
+    const cart = JSON.parse(raw) as OrderCart;
+    let changed = false;
+    const next: OrderCart = {};
+    for (const [productId, qty] of Object.entries(cart)) {
+      const keeperId = idRemap.get(productId) ?? productId;
+      if (keeperId !== productId) changed = true;
+      next[keeperId] = (next[keeperId] ?? 0) + qty;
+    }
+    if (changed) await AsyncStorage.setItem(key, JSON.stringify(next));
+  }
+
+  for (const store of await listStores()) {
+    const assignments = await listFridgeAssignments(store.id);
+    if (assignments.length === 0) continue;
+    const seen = new Set<string>();
+    let changed = false;
+    const next: FridgeAssignment[] = [];
+    for (const a of assignments) {
+      const keeperId = idRemap.get(a.productId) ?? a.productId;
+      if (keeperId !== a.productId) changed = true;
+      if (seen.has(keeperId)) {
+        changed = true;
+        continue; // 대표 상품이 이미 배정돼 있으면 중복 배정은 버린다
+      }
+      seen.add(keeperId);
+      next.push(keeperId === a.productId ? a : { ...a, productId: keeperId });
+    }
+    if (changed) await AsyncStorage.setItem(fridgeAssignmentsKey(store.id), JSON.stringify(next));
+  }
+
+  for (const removedId of removedIds) deleteOrderProductCloud(removedId).catch(() => {});
+  for (const keeper of keepers.values()) pushOrderProduct(keeper).catch(() => {});
+
+  await AsyncStorage.setItem(ORDER_PRODUCTS_DEDUPED_KEY, '1');
 }

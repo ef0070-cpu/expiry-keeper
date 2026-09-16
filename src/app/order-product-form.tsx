@@ -66,7 +66,7 @@ export default function OrderProductForm() {
   const [reportPhotoUri, setReportPhotoUri] = useState<string | null>(null);
   const [reportCopyright, setReportCopyright] = useState(false);
   const [reporting, setReporting] = useState(false);
-  const [candidatesTab, setCandidatesTab] = useState<'photo' | 'brand' | 'name' | null>(null);
+  const [showPhotoPicker, setShowPhotoPicker] = useState(false);
   const [removingPhoto, setRemovingPhoto] = useState(false);
   const [referencePrice, setReferencePrice] = useState<number | null>(null);
 
@@ -356,10 +356,9 @@ export default function OrderProductForm() {
     >
       <Stack.Screen options={{ title: isEdit ? '발주 상품 수정' : '발주 상품 등록' }} />
       <CandidatesModal
-        visible={candidatesTab !== null}
+        visible={showPhotoPicker}
         barcode={barcode.trim()}
-        initialTab={candidatesTab ?? 'photo'}
-        onClose={() => setCandidatesTab(null)}
+        onClose={() => setShowPhotoPicker(false)}
         onPhotoApplied={setImageUri}
       />
       <ScrollView
@@ -416,11 +415,8 @@ export default function OrderProductForm() {
             />
             {isEdit && barcode.trim() ? (
               <View className="mt-1.5 flex-row flex-wrap" style={{ gap: 12 }}>
-                <Pressable onPress={() => setCandidatesTab('photo')}>
-                  <Text className="text-muted text-xs underline">사진 후보 보기 / 투표</Text>
-                </Pressable>
-                <Pressable onPress={() => setCandidatesTab('name')}>
-                  <Text className="text-muted text-xs underline">상품명 후보 보기 / 투표</Text>
+                <Pressable onPress={() => setShowPhotoPicker(true)}>
+                  <Text className="text-muted text-xs underline">제품 사진 선택 하기</Text>
                 </Pressable>
               </View>
             ) : null}
@@ -464,11 +460,6 @@ export default function OrderProductForm() {
               value={brand}
               onChangeText={setBrand}
             />
-            {isEdit && barcode.trim() ? (
-              <Pressable onPress={() => setCandidatesTab('brand')} className="mt-1.5">
-                <Text className="text-muted text-xs underline">브랜드 후보 보기 / 투표</Text>
-              </Pressable>
-            ) : null}
           </View>
           <View className="flex-1">
             <Label text="가격 (원)" />

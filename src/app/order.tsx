@@ -606,6 +606,8 @@ export default function Order() {
     [load],
   );
 
+  // Android Alert.alert는 버튼 3개까지만 표시되므로(위 onChangeStatus 주석과 동일한 이유)
+  // 여기도 '취소' 버튼 없이 3개만 둔다 — 뒤로가기·바깥 탭으로 닫으면 된다.
   const onLongPressProduct = useCallback(
     (p: OrderProduct) => {
       Alert.alert(p.name, '어떻게 처리할까요?', [
@@ -634,7 +636,6 @@ export default function Order() {
             ]);
           },
         },
-        { text: '취소', style: 'cancel' },
       ]);
     },
     [load, onChangeStatus],

@@ -159,9 +159,12 @@ export async function pushCategories(recordId: string, categories: string[]): Pr
 
 export async function fetchMyCategories(): Promise<{ id: string; categories: string[] } | null> {
   if (!supabase) return null;
+  // 기기마다 서로 다른 레코드를 만들어버린 경우에도 항상 같은 행을 골라야 여러 기기가
+  // 한 레코드로 수렴한다 — order 없는 limit(1)은 호출마다 다른 행을 반환할 수 있다.
   const { data, error } = await supabase
     .from('order_categories')
     .select('id, categories')
+    .order('updated_at', { ascending: true })
     .limit(1)
     .maybeSingle();
   if (error || !data) return null;
