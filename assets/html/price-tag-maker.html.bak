@@ -1,0 +1,1227 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PRICE TAG MAKER V3</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Do+Hyeon&family=Gowun+Dodum&family=Jua&family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet" crossorigin="anonymous">
+  
+  <!-- React & ReactDOM -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  
+  <!-- Babel -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <!-- html2canvas -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* Custom scrollbar for better aesthetics */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.05);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(0, 0, 0, 0.4);
+    }
+
+    /* 재단선(Cut Guide) 스타일 */
+    .cut-guide {
+      outline: 1px dashed rgba(0, 0, 0, 0.3) !important;
+      outline-offset: 2px !important;
+    }
+
+    /* Animations */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    .animate-fade-in {
+      animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useRef, useCallback, useEffect, useMemo } = React;
+
+    // 폰트 목록
+    const FONT_OPTIONS = [
+      { name: '기본 깔끔한 체 (Noto Sans)', value: "'Noto Sans KR', sans-serif" },
+      { name: '가장 굵은 강렬한 체 (Black Han Sans)', value: "'Black Han Sans', sans-serif" },
+      { name: '레트로 포스터 체 (Do Hyeon)', value: "'Do Hyeon', sans-serif" },
+      { name: '귀여운 둥근 체 (Jua)', value: "'Jua', sans-serif" },
+      { name: '단정한 돋움 체 (Gowun Dodum)', value: "'Gowun Dodum', sans-serif" },
+    ];
+
+    // 13번 ~ 50번까지 동적으로 생성될 다채로운 컬러 및 레이아웃 테마 시스템 (총 38개)
+    const EXTENDED_THEMES = {
+      M: { id: 'M', name: 'M안 (라일락 파스텔)', tag: '파스텔', layout: 'top', bg: '#faf5ff', border: '#d8b4fe', headerBg: '#d8b4fe', headerText: '#581c87', priceText: '#7e22ce', origText: '#c084fc', badgeBg: '#a855f7', badgeText: '#ffffff', emoji: '🌸' },
+      N: { id: 'N', name: 'N안 (네온 팝 핑크)', tag: '네온', layout: 'bottom', bg: '#000000', border: '#ff1493', headerBg: '#ff1493', headerText: '#ffffff', priceText: '#ff1493', origText: '#666666', badgeBg: '#ffffff', badgeText: '#ff1493', emoji: '⚡' },
+      O: { id: 'O', name: 'O안 (민트 초코)', tag: '유니크', layout: 'top', bg: '#f0fdf4', border: '#4ade80', headerBg: '#4ade80', headerText: '#064e3b', priceText: '#065f46', origText: '#86efac', badgeBg: '#059669', badgeText: '#ffffff', emoji: '🍦' },
+      P: { id: 'P', name: 'P안 (스카이 블루)', tag: '청량', layout: 'top', bg: '#f0f9ff', border: '#7dd3fc', headerBg: '#7dd3fc', headerText: '#0369a1', priceText: '#0284c7', origText: '#bae6fd', badgeBg: '#0ea5e9', badgeText: '#fff', emoji: '☁️' },
+      Q: { id: 'Q', name: 'Q안 (피치 코랄)', tag: '화사함', layout: 'bottom', bg: '#fff5f5', border: '#fc8181', headerBg: '#fc8181', headerText: '#fff', priceText: '#c53030', origText: '#feb2b2', badgeBg: '#e53e3e', badgeText: '#fff', emoji: '🍑' },
+      R: { id: 'R', name: 'R안 (다크 시크)', tag: '시크', layout: 'top', bg: '#1a202c', border: '#4a5568', headerBg: '#4a5568', headerText: '#f7fafc', priceText: '#e2e8f0', origText: '#718096', badgeBg: '#f7fafc', badgeText: '#1a202c', emoji: '🕶️' },
+      S: { id: 'S', name: 'S안 (인더스트리얼)', tag: '빈티지', layout: 'top', bg: '#e2e8f0', border: '#718096', headerBg: '#718096', headerText: '#1a202c', priceText: '#2d3748', origText: '#a0aec0', badgeBg: '#1a202c', badgeText: '#edf2f7', emoji: '⚙️' },
+      T: { id: 'T', name: 'T안 (로맨틱 핑크)', tag: '로맨틱', layout: 'top', bg: '#fff0f6', border: '#f687b3', headerBg: '#f687b3', headerText: '#702459', priceText: '#97266d', origText: '#fbb6ce', badgeBg: '#d53f8c', badgeText: '#fff', emoji: '💝' },
+      U: { id: 'U', name: 'U안 (썸머 비치)', tag: '여름', layout: 'bottom', bg: '#e6fffa', border: '#319795', headerBg: '#319795', headerText: '#fff', priceText: '#234e52', origText: '#81e6d9', badgeBg: '#285e61', badgeText: '#fff', emoji: '🏖️' },
+      V: { id: 'V', name: 'V안 (어텀 브라운)', tag: '가을', layout: 'top', bg: '#fbf8f1', border: '#8b4513', headerBg: '#8b4513', headerText: '#fff', priceText: '#5c4033', origText: '#cd853f', badgeBg: '#a0522d', badgeText: '#fff', emoji: '🍂' },
+      W: { id: 'W', name: 'W안 (윈터 스노우)', tag: '겨울', layout: 'top', bg: '#f0f8ff', border: '#87cefa', headerBg: '#87cefa', headerText: '#4682b4', priceText: '#4169e1', origText: '#b0c4de', badgeBg: '#1e90ff', badgeText: '#fff', emoji: '⛄' },
+      X: { id: 'X', name: 'X안 (할로윈 펌킨)', tag: '시즌', layout: 'top', bg: '#1c1917', border: '#f97316', headerBg: '#f97316', headerText: '#1c1917', priceText: '#f97316', origText: '#78716c', badgeBg: '#ea580c', badgeText: '#fff', emoji: '🎃' },
+      Y: { id: 'Y', name: 'Y안 (크리스마스)', tag: '시즌', layout: 'bottom', bg: '#fdf2f8', border: '#dc2626', headerBg: '#dc2626', headerText: '#fff', priceText: '#166534', origText: '#fca5a5', badgeBg: '#166534', badgeText: '#fff', emoji: '🎄' },
+      Z: { id: 'Z', name: 'Z안 (사이버 펑크)', tag: '트렌디', layout: 'top', bg: '#000', border: '#00ff00', headerBg: '#00ff00', headerText: '#000', priceText: '#00ff00', origText: '#333', badgeBg: '#00ff00', badgeText: '#000', emoji: '🦾' },
+      AA: { id: 'AA', name: 'AA안 (딥 퍼플)', tag: '고급', layout: 'top', bg: '#faf5ff', border: '#581c87', headerBg: '#581c87', headerText: '#fff', priceText: '#4c1d95', origText: '#a78bfa', badgeBg: '#7c3aed', badgeText: '#fff', emoji: '🔮' },
+      AB: { id: 'AB', name: 'AB안 (마린 네이비)', tag: '깔끔', layout: 'bottom', bg: '#f0f9ff', border: '#1e3a8a', headerBg: '#1e3a8a', headerText: '#fff', priceText: '#1e40af', origText: '#93c5fd', badgeBg: '#2563eb', badgeText: '#fff', emoji: '⚓' },
+      AC: { id: 'AC', name: 'AC안 (선셋 오렌지)', tag: '강렬', layout: 'top', bg: '#fff7ed', border: '#c2410c', headerBg: '#c2410c', headerText: '#fff', priceText: '#9a3412', origText: '#fdba74', badgeBg: '#ea580c', badgeText: '#fff', emoji: '🌅' },
+      AD: { id: 'AD', name: 'AD안 (체리 블라썸)', tag: '화사함', layout: 'top', bg: '#fdf2f8', border: '#db2777', headerBg: '#db2777', headerText: '#fff', priceText: '#be185d', origText: '#f472b6', badgeBg: '#e11d48', badgeText: '#fff', emoji: '🌸' },
+      AE: { id: 'AE', name: 'AE안 (포레스트)', tag: '자연', layout: 'bottom', bg: '#f0fdf4', border: '#14532d', headerBg: '#14532d', headerText: '#fff', priceText: '#166534', origText: '#86efac', badgeBg: '#15803d', badgeText: '#fff', emoji: '🌲' },
+      AF: { id: 'AF', name: 'AF안 (골든 아워)', tag: '황금빛', layout: 'top', bg: '#fefce8', border: '#a16207', headerBg: '#a16207', headerText: '#fff', priceText: '#854d0e', origText: '#fde047', badgeBg: '#ca8a04', badgeText: '#fff', emoji: '🌞' },
+      AG: { id: 'AG', name: 'AG안 (실버 스틸)', tag: '모던', layout: 'top', bg: '#f8fafc', border: '#64748b', headerBg: '#64748b', headerText: '#fff', priceText: '#334155', origText: '#cbd5e1', badgeBg: '#475569', badgeText: '#fff', emoji: '⚙️' },
+      AH: { id: 'AH', name: 'AH안 (로즈 골드)', tag: '우아함', layout: 'bottom', bg: '#fff1f2', border: '#9f1239', headerBg: '#9f1239', headerText: '#fff', priceText: '#be123c', origText: '#fda4af', badgeBg: '#e11d48', badgeText: '#fff', emoji: '🌹' },
+      AI: { id: 'AI', name: 'AI안 (블루베리)', tag: '상큼', layout: 'top', bg: '#f5f3ff', border: '#4c1d95', headerBg: '#4c1d95', headerText: '#fff', priceText: '#5b21b6', origText: '#c4b5fd', badgeBg: '#6d28d9', badgeText: '#fff', emoji: '🫐' },
+      AJ: { id: 'AJ', name: 'AJ안 (아쿠아 마린)', tag: '시원함', layout: 'top', bg: '#f0fdfa', border: '#0f766e', headerBg: '#0f766e', headerText: '#fff', priceText: '#115e59', origText: '#5eead4', badgeBg: '#14b8a6', badgeText: '#fff', emoji: '💧' },
+      AK: { id: 'AK', name: 'AK안 (해바라기)', tag: '밝음', layout: 'bottom', bg: '#fefce8', border: '#eab308', headerBg: '#eab308', headerText: '#fff', priceText: '#ca8a04', origText: '#fef08a', badgeBg: '#facc15', badgeText: '#713f12', emoji: '🌻' },
+      AL: { id: 'AL', name: 'AL안 (미드나잇)', tag: '차분함', layout: 'top', bg: '#0f172a', border: '#334155', headerBg: '#334155', headerText: '#f8fafc', priceText: '#38bdf8', origText: '#64748b', badgeBg: '#0284c7', badgeText: '#fff', emoji: '🌙' },
+      AM: { id: 'AM', name: 'AM안 (크라프트지)', tag: '수제', layout: 'top', bg: '#f5deb3', border: '#8b4513', headerBg: '#8b4513', headerText: '#f5deb3', priceText: '#8b4513', origText: '#deb887', badgeBg: '#a0522d', badgeText: '#fff', emoji: '📜' },
+      AN: { id: 'AN', name: 'AN안 (모노 화이트)', tag: '심플', layout: 'bottom', bg: '#ffffff', border: '#e5e7eb', headerBg: '#f3f4f6', headerText: '#111827', priceText: '#111827', origText: '#9ca3af', badgeBg: '#111827', badgeText: '#fff', emoji: '⚪' },
+      AO: { id: 'AO', name: 'AO안 (네온 오렌지)', tag: '톡톡', layout: 'top', bg: '#fffaf0', border: '#ff4500', headerBg: '#ff4500', headerText: '#fff', priceText: '#ff4500', origText: '#ffb347', badgeBg: '#ff4500', badgeText: '#fff', emoji: '🔥' },
+      AP: { id: 'AP', name: 'AP안 (블랙 앤 골드)', tag: '럭셔리', layout: 'top', bg: '#000000', border: '#ffd700', headerBg: '#ffd700', headerText: '#000', priceText: '#ffd700', origText: '#888', badgeBg: '#b8860b', badgeText: '#000', emoji: '✨' },
+      AQ: { id: 'AQ', name: 'AQ안 (화이트 앤 레드)', tag: '세일', layout: 'bottom', bg: '#ffffff', border: '#e53e3e', headerBg: '#e53e3e', headerText: '#fff', priceText: '#e53e3e', origText: '#fc8181', badgeBg: '#c53030', badgeText: '#fff', emoji: '🚨' },
+      AR: { id: 'AR', name: 'AR안 (코스믹 우주)', tag: '신비', layout: 'top', bg: '#170b3b', border: '#8b5cf6', headerBg: '#8b5cf6', headerText: '#fff', priceText: '#c4b5fd', origText: '#6d28d9', badgeBg: '#a855f7', badgeText: '#fff', emoji: '🌌' },
+      AS: { id: 'AS', name: 'AS안 (마카롱)', tag: '귀여움', layout: 'top', bg: '#fef0f5', border: '#fbb6ce', headerBg: '#fbb6ce', headerText: '#702459', priceText: '#d53f8c', origText: '#fed7e2', badgeBg: '#ed64a6', badgeText: '#fff', emoji: '🍬' },
+      AT: { id: 'AT', name: 'AT안 (말차 그린)', tag: '차분함', layout: 'bottom', bg: '#f0f4f1', border: '#4f6952', headerBg: '#4f6952', headerText: '#fff', priceText: '#2d3b2f', origText: '#a4b3a6', badgeBg: '#3a4a3c', badgeText: '#fff', emoji: '🍵' },
+      AU: { id: 'AU', name: 'AU안 (카모플라쥬)', tag: '밀리터리', layout: 'top', bg: '#4b5320', border: '#2e3b1f', headerBg: '#2e3b1f', headerText: '#a5b076', priceText: '#a5b076', origText: '#727d50', badgeBg: '#667035', badgeText: '#fff', emoji: '🪖' },
+      AV: { id: 'AV', name: 'AV안 (캔디 팝)', tag: '통통', layout: 'top', bg: '#fff5f8', border: '#ff66a3', headerBg: '#ff66a3', headerText: '#fff', priceText: '#00d2ff', origText: '#ffb3d1', badgeBg: '#00d2ff', badgeText: '#fff', emoji: '🍭' },
+      AW: { id: 'AW', name: 'AW안 (체스 보드)', tag: '모던', layout: 'bottom', bg: '#ffffff', border: '#000000', headerBg: '#000000', headerText: '#ffffff', priceText: '#000000', origText: '#999999', badgeBg: '#000000', badgeText: '#ffffff', emoji: '♟️' },
+      AX: { id: 'AX', name: 'AX안 (폴카 도트)', tag: '발랄', layout: 'top', bg: '#ffebf0', border: '#ff0055', headerBg: '#ff0055', headerText: '#ffffff', priceText: '#ff0055', origText: '#ffb3cc', badgeBg: '#ff0055', badgeText: '#ffffff', emoji: '🔴' }
+    };
+
+    // 디자인 안 (기본 12가지 + 동적 테마 38가지 = 총 50가지)
+    const DESIGN_OPTIONS = [
+      { id: 'A', name: 'A안 (기본 오리지널)', tag: '인기' },
+      { id: 'B', name: 'B안 (모던 심플 블랙)', tag: '깔끔' },
+      { id: 'C', name: 'C안 (마트 세일 강렬)', tag: '강조' },
+      { id: 'D', name: 'D안 (네온 사이버 다크)', tag: '트렌디' },
+      { id: 'E', name: 'E안 (에코 그린 내추럴)', tag: '자연' },
+      { id: 'F', name: 'F안 (카페 베이커리 핑크)', tag: '감성' },
+      { id: 'G', name: 'G안 (프리미엄 다크 골드)', tag: '고급' },
+      { id: 'H', name: 'H안 (초특가 세일 폭탄)', tag: '파격' },
+      { id: 'I', name: 'I안 (빈티지 크래프트)', tag: '수제' },
+      { id: 'J', name: 'J안 (바코드 스마트 리테일)', tag: '매장' },
+      { id: 'K', name: 'K안 (스트릿 팝아트)', tag: '개성' },
+      { id: 'L', name: 'L안 (노르딕 클린 블루)', tag: '세련' },
+      ...Object.values(EXTENDED_THEMES).map(t => ({ id: t.id, name: t.name, tag: t.tag }))
+    ];
+
+    // 규격 프리셋 (단위: mm)
+    const SIZE_PRESETS = [
+      { id: 'standard', name: '표준 소형 (55 × 40 mm)', widthMm: 55, heightMm: 40 },
+      { id: 'medium', name: '중형 라벨 (70 × 50 mm)', widthMm: 70, heightMm: 50 },
+      { id: 'large', name: '대형 세일 (90 × 65 mm)', widthMm: 90, heightMm: 65 },
+      { id: 'long', name: '슬림 롱 (80 × 35 mm)', widthMm: 80, heightMm: 35 },
+      { id: 'square', name: '정사각형 (50 × 50 mm)', widthMm: 50, heightMm: 50 },
+      { id: 'custom', name: '📐 사용자 직접 입력 (Custom)', widthMm: 55, heightMm: 40 },
+    ];
+
+    const MM_TO_PX = 3.7795275591; // 1mm ≈ 3.78px (96DPI)
+    const MAX_PRICE_DIGITS = 7;
+    const A4_WIDTH_PX = 794;
+    const A4_HEIGHT_PX = 1123;
+
+    const isIOSDevice = () => {
+      const ua = navigator.userAgent || '';
+      return /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    };
+
+    const CustomDialog = ({ dialog, onClose }) => {
+      if (!dialog.isOpen) return null;
+      
+      return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
+          <div className="bg-white border-4 border-black rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0_0_#000] animate-fade-in" onClick={e => e.stopPropagation()}>
+            <h3 className="text-xl font-black mb-3 border-b-2 border-black pb-2">{dialog.title}</h3>
+            <p className="text-sm font-bold text-gray-800 mb-6 leading-relaxed whitespace-pre-wrap">{dialog.message}</p>
+            <div className="flex gap-3 justify-end mt-4">
+              {dialog.isConfirm && (
+                <button onClick={onClose} className="px-4 py-2 bg-white border-2 border-black rounded-xl font-bold hover:bg-gray-100 transition-colors">
+                  취소
+                </button>
+              )}
+              <button onClick={() => { if(dialog.onConfirm) dialog.onConfirm(); onClose(); }} className="px-5 py-2 bg-black text-[#CCFF00] border-2 border-black rounded-xl font-black shadow-[3px_3px_0_0_#CCFF00] hover:translate-y-[2px] transition-transform">
+                확인
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    const SettingsModal = ({ isOpen, onClose, settings, onUpdateSettings, sampleProduct, selectedFont, setSelectedFont }) => {
+      // 팝업이 열려있는 동안 배경 페이지 스크롤을 잠근다 — 안 그러면 팝업 안에서 드래그할 때
+      // 뒤에 깔린 배경 화면까지 같이 스크롤/터치되는 문제가 있었다.
+      useEffect(() => {
+        if (!isOpen) return;
+        const prevOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => { document.body.style.overflow = prevOverflow; };
+      }, [isOpen]);
+
+      if (!isOpen) return null;
+
+      const handleChange = (key, value) => {
+        onUpdateSettings(prev => ({ ...prev, [key]: value }));
+      };
+
+      const handlePresetChange = (presetId) => {
+        const preset = SIZE_PRESETS.find(p => p.id === presetId);
+        if (preset) {
+          onUpdateSettings(prev => ({ ...prev, presetId, widthMm: preset.widthMm, heightMm: preset.heightMm }));
+        }
+      };
+
+      return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={onClose}>
+          <div className="bg-white border-4 border-black rounded-3xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto overscroll-contain shadow-[12px_12px_0_0_#000] animate-fade-in" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center border-b-4 border-black pb-4 mb-6">
+              <h2 className="text-base sm:text-xl font-black flex items-center gap-2 text-black">⚙️ 환경 설정 (디자인 및 규격)</h2>
+              <button onClick={onClose} className="w-10 h-10 border-2 border-black rounded-full flex items-center justify-center font-black text-xl hover:bg-gray-100 transition-colors">✕</button>
+            </div>
+
+            <div className="space-y-6">
+              <div className="bg-purple-50 p-4 rounded-2xl border-2 border-purple-200 shadow-sm">
+                <label className="block text-sm font-black mb-3 text-purple-900 flex items-center justify-between">
+                  <span>🎨 디자인 테마 선택</span>
+                  <span className="text-[10px] text-gray-500 font-normal">총 {DESIGN_OPTIONS.length}종</span>
+                </label>
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-56 overflow-y-auto p-2 bg-white/80 rounded-xl border-2 border-black mb-4">
+                  {DESIGN_OPTIONS.map((d) => (
+                    <button
+                      key={d.id}
+                      onClick={() => onUpdateSettings((prev) => ({ ...prev, design: d.id }))}
+                      className={`p-2 rounded-lg border-2 text-center text-xs font-black transition-all flex flex-col items-center justify-center ${
+                        settings.design === d.id
+                          ? 'border-black bg-black text-[#CCFF00] shadow-[2px_2px_0_0_#000] scale-105'
+                          : 'border-gray-300 bg-white text-gray-800 hover:border-black'
+                      }`}
+                    >
+                      <span>{d.id}안</span>
+                      <span className="text-[10px] font-normal opacity-80 mt-0.5">{d.tag}</span>
+                    </button>
+                  ))}
+                </div>
+
+                <label className="block text-sm font-black mb-3 text-purple-900 mt-4">
+                  ✍️ 글꼴(폰트) 선택
+                </label>
+                <select
+                  value={selectedFont}
+                  onChange={(e) => setSelectedFont(e.target.value)}
+                  className="w-full p-3 border-3 border-black rounded-xl font-bold shadow-[2px_2px_0_0_#000] bg-white cursor-pointer"
+                  style={{ fontFamily: selectedFont }}
+                >
+                  {FONT_OPTIONS.map((font, idx) => (
+                    <option key={idx} value={font.value} style={{ fontFamily: font.value }}>
+                      {font.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="bg-blue-50 p-4 rounded-2xl border-2 border-blue-200">
+                <label className="block text-sm font-black mb-3 text-blue-900 flex items-center gap-2">
+                  📏 규격 프리셋 선택
+                </label>
+                <select
+                  value={settings.presetId}
+                  onChange={e => handlePresetChange(e.target.value)}
+                  className="w-full p-3 border-3 border-black rounded-xl font-bold shadow-[2px_2px_0_0_#000] bg-white cursor-pointer"
+                >
+                  {SIZE_PRESETS.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+
+                <div className="flex gap-4 mt-4">
+                  <div className="flex-1">
+                    <label className="block text-xs font-bold mb-1.5 text-blue-800">가로 (Width mm)</label>
+                    <input
+                      type="number"
+                      value={settings.widthMm}
+                      onChange={e => {
+                        handleChange('presetId', 'custom');
+                        const val = e.target.value;
+                        // 입력 중에는 빈 칸 허용
+                        handleChange('widthMm', val === '' ? '' : Number(val));
+                      }}
+                      onBlur={() => {
+                        // 입력을 마쳤을 때 빈 칸이거나 너무 작으면 20으로 자동 보정
+                        let val = Number(settings.widthMm);
+                        if (!val || val < 20) handleChange('widthMm', 20);
+                        if (val > 200) handleChange('widthMm', 200);
+                      }}
+                      className="w-full p-2.5 border-2 border-black rounded-lg font-bold bg-white"
+                      min="20" max="200"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-xs font-bold mb-1.5 text-blue-800">세로 (Height mm)</label>
+                    <input
+                      type="number"
+                      value={settings.heightMm}
+                      onChange={e => {
+                        handleChange('presetId', 'custom');
+                        const val = e.target.value;
+                        handleChange('heightMm', val === '' ? '' : Number(val));
+                      }}
+                      onBlur={() => {
+                        let val = Number(settings.heightMm);
+                        if (!val || val < 20) handleChange('heightMm', 20);
+                        if (val > 200) handleChange('heightMm', 200);
+                      }}
+                      className="w-full p-2.5 border-2 border-black rounded-lg font-bold bg-white"
+                      min="20" max="200"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-black mb-3 text-black">👀 설정 미리보기</label>
+                <div className="bg-gray-200 rounded-2xl p-6 border-4 border-dashed border-gray-400 flex items-center justify-center relative">
+                  <span className="absolute top-3 left-3 text-xs font-bold text-gray-500 bg-white/80 px-2 py-1 rounded shadow-sm">실제 크기 비율 반영</span>
+                  <PriceTag
+                    {...sampleProduct}
+                    widthMm={settings.widthMm || 20}
+                    heightMm={settings.heightMm || 20}
+                    currency={settings.currency}
+                    showOriginal={settings.showOriginal}
+                    showCutGuide={settings.showCutGuide}
+                    fontFamily={selectedFont}
+                    design={settings.design}
+                  />
+                </div>
+              </div>
+
+              <div className="bg-gray-50 p-4 rounded-2xl border-2 border-gray-200 space-y-3">
+                <label className="flex items-center gap-3 cursor-pointer p-3 bg-white border-2 border-black rounded-xl hover:bg-gray-100 transition-colors shadow-sm">
+                  <input type="checkbox" checked={settings.showOriginal} onChange={e => handleChange('showOriginal', e.target.checked)} className="w-5 h-5 accent-black" />
+                  <span className="font-bold text-sm">정가(취소선) 표시하기</span>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer p-3 bg-white border-2 border-black rounded-xl hover:bg-gray-100 transition-colors shadow-sm">
+                  <input type="checkbox" checked={settings.showCutGuide} onChange={e => handleChange('showCutGuide', e.target.checked)} className="w-5 h-5 accent-black" />
+                  <span className="font-bold text-sm">재단선(가이드선) 표시하기</span>
+                </label>
+              </div>
+            </div>
+
+            <div className="mt-8 pt-5 border-t-4 border-black flex justify-end">
+              <button onClick={onClose} className="w-full lg:w-auto px-10 py-4 bg-black text-white text-lg font-black rounded-xl shadow-[6px_6px_0_0_#CCFF00] hover:translate-y-[2px] transition-transform">
+                설정 완료 및 닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    const PriceTag = ({
+      productName,
+      originalPrice,
+      discountPrice,
+      discountRate,
+      fontFamily,
+      design = 'A',
+      widthMm = 55,
+      heightMm = 40,
+      currency = '원',
+      showOriginal = true,
+      showCutGuide = true,
+      onClick,
+    }) => {
+      // 렌더링 방어 코드: 비어있을 땐 최소치로 계산
+      const safeWidth = Number(widthMm) || 20;
+      const safeHeight = Number(heightMm) || 20;
+
+      const widthPx = Math.round(safeWidth * MM_TO_PX);
+      const heightPx = Math.round(safeHeight * MM_TO_PX);
+      const baseScale = heightPx / 151; 
+      const bannerHeightPx = Math.round(heightPx * 0.3);
+
+      const formatPrice = (p) => (!p ? '0' : Number(p).toLocaleString());
+      const formattedOriginal = formatPrice(originalPrice);
+      const formattedDiscount = formatPrice(discountPrice);
+
+      const getNameFontSize = (name) => {
+        const len = (name || '').length;
+        let base = 28;
+        if (len <= 5) base = 28;
+        else if (len <= 7) base = 22;
+        else if (len <= 10) base = 18;
+        else base = 15;
+        return Math.max(10, Math.round(base * baseScale));
+      };
+
+      const getPriceFontSize = (priceStr) => {
+        const len = (priceStr || '').length;
+        let base = 42;
+        if (len <= 5) base = 42;
+        else if (len <= 7) base = 36;
+        else base = 28; // 긴 텍스트 잘림 방지를 위해 30에서 28로 약간 축소
+        return Math.max(14, Math.round(base * baseScale));
+      };
+
+      const nameFontSize = getNameFontSize(productName);
+      const priceFontSize = getPriceFontSize(formattedDiscount);
+      const currencyFontSize = Math.max(10, Math.round(priceFontSize * 0.5));
+
+      const hasRealBoldWeight = fontFamily && fontFamily.includes('Noto Sans KR');
+      const boldWeight = hasRealBoldWeight ? 900 : 400;
+      const semiBoldWeight = hasRealBoldWeight ? 700 : 400;
+
+      const containerStyle = {
+        width: widthPx + 'px',
+        height: heightPx + 'px',
+        fontFamily: fontFamily,
+        boxSizing: 'border-box',
+        cursor: onClick ? 'pointer' : 'default',
+      };
+
+      // 💡 [핵심 보완] 이모지가 깨지거나 잘리지 않도록 시스템 기본 이모지 폰트 지정
+      const emojiFontFamily = '"Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji", sans-serif';
+
+      if (design === 'A') {
+        return (
+          <div onClick={onClick} className={`relative flex flex-col bg-white overflow-hidden transition-transform hover:brightness-95 ${showCutGuide ? 'cut-guide' : ''}`} style={{ ...containerStyle, border: `${Math.max(2, Math.round(3 * baseScale))}px solid #000` }}>
+            <div className="relative flex flex-col justify-between overflow-hidden" style={{ height: (heightPx - bannerHeightPx) + 'px', padding: `${Math.max(3, Math.round(6 * baseScale))}px`, backgroundImage: "url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMiIgY3k9IjIiIHI9IjEiIGZpbGw9IiNlNWU3ZWIiLz48L3N2Zz4=')" }}>
+              {showOriginal && (
+                <div className="relative inline-block" style={{ marginLeft: '4px' }}>
+                  <span className="text-gray-500" style={{ fontSize: Math.max(10, Math.round(16 * baseScale)) + 'px', zIndex: 10, fontWeight: semiBoldWeight }}>{formattedOriginal}{currency}</span>
+                  <svg style={{ position: 'absolute', top: '1px', left: '-4px', width: (100 * baseScale) + 'px', height: (60 * baseScale) + 'px', pointerEvents: 'none', zIndex: 20 }} viewBox="0 0 110 70">
+                    <polyline points="0,13 68,13 90,60" fill="none" stroke="#dc2626" strokeWidth="4" strokeLinejoin="round" />
+                    <polygon points="90,60 79,47 98,52" fill="#dc2626" />
+                  </svg>
+                </div>
+              )}
+              <div className="text-right truncate w-full mt-auto" style={{ zIndex: 30 }}>
+                <span className="text-black truncate block" style={{ fontSize: priceFontSize + 'px', lineHeight: 1.1, fontWeight: boldWeight }}>{formattedDiscount}<span style={{ fontSize: currencyFontSize + 'px', marginLeft: '2px', fontWeight: semiBoldWeight }}>{currency}</span></span>
+              </div>
+              {discountRate > 0 && (
+                <div className="flex flex-col items-center justify-center text-white whitespace-nowrap" style={{ position: 'absolute', top: '6px', right: '6px', width: Math.max(32, Math.round(50 * baseScale)) + 'px', height: Math.max(32, Math.round(50 * baseScale)) + 'px', backgroundColor: '#dc2626', borderRadius: '9999px', border: `${Math.max(1.5, Math.round(2.5 * baseScale))}px solid #000`, zIndex: 10, transform: 'rotate(12deg)' }}>
+                  <span style={{ fontSize: Math.max(8, Math.round(11 * baseScale)) + 'px', fontWeight: boldWeight }}>SALE</span>
+                  <span style={{ fontSize: Math.max(8, Math.round(11 * baseScale)) + 'px', lineHeight: 1.1, fontWeight: semiBoldWeight }}>{discountRate}%</span>
+                </div>
+              )}
+            </div>
+            <div className="flex items-center justify-center bg-[#001c55] text-white px-1 overflow-hidden" style={{ height: bannerHeightPx + 'px', borderTop: `${Math.max(2, Math.round(3 * baseScale))}px solid #000`, zIndex: 20 }}>
+              <span className="text-center truncate" style={{ fontSize: nameFontSize + 'px', lineHeight: 1.1, fontWeight: boldWeight }}>{productName || '\u00A0'}</span>
+            </div>
+          </div>
+        );
+      }
+
+      if (design === 'B') {
+        return (
+          <div onClick={onClick} className={`relative flex flex-col bg-white overflow-hidden transition-transform hover:brightness-95 ${showCutGuide ? 'cut-guide' : ''}`} style={{ ...containerStyle, border: `${Math.max(2, Math.round(3 * baseScale))}px solid #000` }}>
+            <div className="flex items-center justify-between bg-black text-white px-2 overflow-hidden gap-1" style={{ height: bannerHeightPx + 'px' }}>
+              <span className="truncate font-bold" style={{ fontSize: nameFontSize + 'px', lineHeight: 1.1, fontWeight: boldWeight }}>{productName || '\u00A0'}</span>
+              {discountRate > 0 && <span className="bg-red-600 text-white font-black px-1.5 py-0.5 rounded text-[10px] whitespace-nowrap flex-shrink-0" style={{ fontSize: Math.max(8, Math.round(10 * baseScale)) + 'px' }}>-{discountRate}%</span>}
+            </div>
+            <div className="relative flex-1 p-2 flex flex-col justify-between overflow-hidden">
+              {showOriginal && <div className="text-gray-400 font-medium truncate" style={{ fontSize: Math.max(10, Math.round(14 * baseScale)) + 'px', textDecoration: 'line-through', fontWeight: semiBoldWeight }}>{formattedOriginal}{currency}</div>}
+              <div className="text-right mt-auto truncate w-full">
+                <span className="text-black" style={{ fontSize: priceFontSize + 'px', fontWeight: boldWeight, lineHeight: 1.1 }}>{formattedDiscount}</span>
+                <span className="text-black" style={{ fontSize: currencyFontSize + 'px', fontWeight: semiBoldWeight, marginLeft: '2px' }}>{currency}</span>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      if (design === 'C') {
+        return (
+          <div onClick={onClick} className={`relative flex flex-col bg-white overflow-hidden transition-transform hover:brightness-95 ${showCutGuide ? 'cut-guide' : ''}`} style={{ ...containerStyle, border: `${Math.max(2, Math.round(3.5 * baseScale))}px solid #dc2626` }}>
+            <div className="flex items-center justify-center gap-1 bg-[#facc15] text-[#991b1b] px-1 border-b-2 border-[#dc2626] overflow-hidden" style={{ height: bannerHeightPx + 'px' }}>
+              <span style={{ fontSize: nameFontSize + 'px', lineHeight: 1.1, fontFamily: emojiFontFamily, flexShrink: 0 }}>🔥</span>
+              <span className="text-center truncate font-black" style={{ fontSize: nameFontSize + 'px', lineHeight: 1.1, fontWeight: boldWeight }}>{productName || '\u00A0'}</span>
+            </div>
+            <div className="relative flex-1 p-2 flex flex-col justify-between overflow-hidden">
+              {showOriginal && <div className="text-gray-400 font-bold truncate" style={{ fontSize: Math.max(10, Math.round(14 * baseScale)) + 'px', textDecoration: 'line-through', fontWeight: semiBoldWeight }}>{formattedOriginal}{currency}</div>}
+              <div className="text-right mt-auto truncate w-full">
+                <span className="text-[#dc2626]" style={{ fontSize: priceFontSize + 'px', fontWeight: boldWeight, lineHeight: 1.1 }}>{formattedDiscount}</span>
+                <span className="text-[#dc2626]" style={{ fontSize: currencyFontSize + 'px', fontWeight: semiBoldWeight, marginLeft: '2px' }}>{currency}</span>
+              </div>
+              {discountRate > 0 && <div className="absolute top-2 right-2 bg-red-600 text-yellow-300 font-black rounded-full px-2 py-0.5 whitespace-nowrap" style={{ fontSize: Math.max(9, Math.round(11 * baseScale)) + 'px' }}>{discountRate}% 특가</div>}
+            </div>
+          </div>
+        );
+      }
+
+      if (design === 'D') {
+        return (
+          <div onClick={onClick} className={`relative flex flex-col bg-slate-950 text-white overflow-hidden transition-transform hover:brightness-110 ${showCutGuide ? 'cut-guide' : ''}`} style={{ ...containerStyle, border: `${Math.max(2, Math.round(2.5 * baseScale))}px solid #00f0ff` }}>
+            <div className="flex items-center justify-center bg-black border-b-2 border-[#00f0ff] px-1 overflow-hidden" style={{ height: bannerHeightPx + 'px' }}>
+              <span className="text-[#00f0ff] text-center truncate tracking-wider" style={{ fontSize: nameFontSize + 'px', lineHeight: 1.1, fontWeight: boldWeight }}>{productName || '\u00A0'}</span>
+            </div>
+            <div className="relative flex-1 p-2 flex flex-col justify-between bg-slate-900 overflow-hidden">
+              {showOriginal && <div className="text-slate-400 font-medium truncate" style={{ fontSize: Math.max(10, Math.round(13 * baseScale)) + 'px', textDecoration: 'line-through', fontWeight: semiBoldWeight }}>{formattedOriginal}{currency}</div>}
+              <div className="text-right mt-auto truncate w-full">
+                <span className="text-[#ff0055]" style={{ fontSize: priceFontSize + 'px', fontWeight: boldWeight, lineHeight: 1.1, textShadow: '0 0 6px rgba(255,0,85,0.6)' }}>{formattedDiscount}</span>
+                <span className="text-[#ff0055]" style={{ fontSize: currencyFontSize + 'px', fontWeight: semiBoldWeight, marginLeft: '2px' }}>{currency}</span>
+              </div>
+              {discountRate > 0 && <div className="absolute top-2 right-2 bg-[#ff0055] text-white font-bold rounded whitespace-nowrap" style={{ padding: '2px 5px', fontSize: Math.max(9, Math.round(10 * baseScale)) + 'px', fontWeight: boldWeight }}>-{discountRate}%</div>}
+            </div>
+          </div>
+        );
+      }
+
+      if (design === 'E') {
+        return (
+          <div onClick={onClick} className={`relative flex flex-col bg-[#f4f7f4] overflow-hidden transition-transform hover:brightness-95 ${showCutGuide ? 'cut-guide' : ''}`} style={{ ...containerStyle, border: `${Math.max(2, Math.round(2.5 * baseScale))}px solid #2e5a36` }}>
+            <div className="flex items-center justify-center gap-1 bg-[#2e5a36] text-white px-1 overflow-hidden" style={{ height: bannerHeightPx + 'px' }}>
+              <span style={{ fontSize: nameFontSize + 'px', lineHeight: 1.1, fontFamily: emojiFontFamily, flexShrink: 0 }}>🌿</span>
+              <span className="text-center truncate" style={{ fontSize: nameFontSize + 'px', lineHeight: 1.1, fontWeight: boldWeight }}>{productName || '\u00A0'}</span>
+            </div>
+            <div className="relative flex-1 p-2 flex flex-col justify-between overflow-hidden">
+              {showOriginal && <div className="text-stone-400 truncate" style={{ fontSize: Math.max(10, Math.round(13 * baseScale)) + 'px', textDecoration: 'line-through', fontWeight: semiBoldWeight }}>{formattedOriginal}{currency}</div>}
+              <div className="text-right mt-auto truncate w-full">
+                <span className="text-[#1b4322]" style={{ fontSize: priceFontSize + 'px', fontWeight: boldWeight, lineHeight: 1.1 }}>{formattedDiscount}</span>
+                <span className="text-[#1b4322]" style={{ fontSize: currencyFontSize + 'px', fontWeight: semiBoldWeight, marginLeft: '2px' }}>{currency}</span>
+              </div>
+              {discountRate > 0 && <div className="absolute top-2 right-2 bg-[#d97706] text-white font-bold rounded-full flex items-center justify-center whitespace-nowrap" style={{ width: Math.max(28, Math.round(34 * baseScale)) + 'px', height: Math.max(28, Math.round(34 * baseScale)) + 'px', fontSize: Math.max(9, Math.round(10 * baseScale)) + 'px' }}>{discountRate}%</div>}
+            </div>
+          </div>
+        );
+      }
+
+      if (design === 'F') {
+        return (
+          <div onClick={onClick} className={`relative flex flex-col bg-[#fffaf5] overflow-hidden transition-transform hover:brightness-95 ${showCutGuide ? 'cut-guide' : ''}`} style={{ ...containerStyle, border: `${Math.max(2, Math.round(2.5 * baseScale))}px solid #f43f5e`, borderRadius: '6px' }}>
+            <div className="flex items-center justify-center bg-[#ffe4e6] text-[#9f1239] border-b border-[#f43f5e] px-1 overflow-hidden" style={{ height: bannerHeightPx + 'px' }}>
+              <span className="text-center truncate" style={{ fontSize: nameFontSize + 'px', lineHeight: 1.1, fontWeight: boldWeight }}>{productName || '\u00A0'}</span>
+            </div>
+            <div className="relative flex-1 p-2 flex flex-col justify-between overflow-hidden">
+              {showOriginal && <div className="text-rose-300 truncate" style={{ fontSize: Math.max(10, Math.round(13 * baseScale)) + 'px', textDecoration: 'line-through', fontWeight: semiBoldWeight }}>{formattedOriginal}{currency}</div>}
+              <div className="text-right mt-auto truncate w-full">
+                <span className="text-[#be123c]" style={{ fontSize: priceFontSize + 'px', fontWeight: boldWeight, lineHeight: 1.1 }}>{formattedDiscount}</span>
+                <span className="text-[#be123c]" style={{ fontSize: currencyFontSize + 'px', fontWeight: semiBoldWeight, marginLeft: '2px' }}>{currency}</span>
+              </div>
+              {discountRate > 0 && <div className="absolute top-2 right-2 bg-[#f43f5e] text-white flex items-center justify-center rounded-lg px-1.5 py-0.5 whitespace-nowrap" style={{ fontSize: Math.max(9, Math.round(10 * baseScale)) + 'px', fontWeight: boldWeight }}>★ {discountRate}% OFF</div>}
+            </div>
+          </div>
+        );
+      }
+
+      if (design === 'G') {
+        return (
+          <div onClick={onClick} className={`relative flex flex-col bg-[#1c1917] text-[#fef08a] overflow-hidden transition-transform hover:brightness-110 ${showCutGuide ? 'cut-guide' : ''}`} style={{ ...containerStyle, border: `${Math.max(2, Math.round(2.5 * baseScale))}px solid #eab308` }}>
+            <div className="flex items-center justify-center bg-[#292524] border-b border-[#eab308] px-1 overflow-hidden" style={{ height: bannerHeightPx + 'px' }}>
+              <span className="text-[#fef08a] text-center truncate tracking-widest" style={{ fontSize: nameFontSize + 'px', lineHeight: 1.1, fontWeight: boldWeight }}>{productName || '\u00A0'}</span>
+            </div>
+            <div className="relative flex-1 p-2 flex flex-col justify-between overflow-hidden">
+              {showOriginal && <div className="text-stone-500 truncate" style={{ fontSize: Math.max(10, Math.round(13 * baseScale)) + 'px', textDecoration: 'line-through', fontWeight: semiBoldWeight }}>{formattedOriginal}{currency}</div>}
+              <div className="text-right mt-auto truncate w-full">
+                <span className="text-[#eab308]" style={{ fontSize: priceFontSize + 'px', fontWeight: boldWeight, lineHeight: 1.1 }}>{formattedDiscount}</span>
+                <span className="text-[#eab308]" style={{ fontSize: currencyFontSize + 'px', fontWeight: semiBoldWeight, marginLeft: '2px' }}>{currency}</span>
+              </div>
+              {discountRate > 0 && <div className="absolute top-2 right-2 border border-[#eab308] text-[#eab308] px-1.5 py-0.5 rounded whitespace-nowrap" style={{ fontSize: Math.max(8, Math.round(9 * baseScale)) + 'px', fontWeight: boldWeight }}>SPECIAL {discountRate}%</div>}
+            </div>
+          </div>
+        );
+      }
+
+      if (design === 'H') {
+        return (
+          <div onClick={onClick} className={`relative flex flex-col bg-[#facc15] overflow-hidden transition-transform hover:brightness-95 ${showCutGuide ? 'cut-guide' : ''}`} style={{ ...containerStyle, border: `${Math.max(3, Math.round(3.5 * baseScale))}px solid #dc2626` }}>
+            <div className="flex items-center justify-center gap-1 bg-[#dc2626] text-white px-1 overflow-hidden" style={{ height: bannerHeightPx + 'px' }}>
+              <span style={{ fontSize: nameFontSize + 'px', lineHeight: 1.1, fontFamily: emojiFontFamily, flexShrink: 0 }}>💥</span>
+              <span className="text-center truncate font-black" style={{ fontSize: nameFontSize + 'px', lineHeight: 1.1, fontWeight: boldWeight }}>{productName || '\u00A0'}</span>
+            </div>
+            <div className="relative flex-1 p-2 flex flex-col justify-between overflow-hidden">
+              {showOriginal && <div className="text-red-900/60 font-bold truncate" style={{ fontSize: Math.max(10, Math.round(13 * baseScale)) + 'px', textDecoration: 'line-through', fontWeight: semiBoldWeight }}>{formattedOriginal}{currency}</div>}
+              <div className="text-right mt-auto truncate w-full">
+                <span className="text-[#dc2626]" style={{ fontSize: priceFontSize + 'px', fontWeight: boldWeight, lineHeight: 1.1 }}>{formattedDiscount}</span>
+                <span className="text-[#dc2626]" style={{ fontSize: currencyFontSize + 'px', fontWeight: semiBoldWeight, marginLeft: '2px' }}>{currency}</span>
+              </div>
+              {discountRate > 0 && <div className="absolute top-1 right-1 bg-black text-[#facc15] font-black rounded-md px-1.5 py-0.5 transform rotate-6 whitespace-nowrap" style={{ fontSize: Math.max(9, Math.round(11 * baseScale)) + 'px' }}>파격 -{discountRate}%</div>}
+            </div>
+          </div>
+        );
+      }
+
+      if (design === 'I') {
+        return (
+          <div onClick={onClick} className={`relative flex flex-col bg-[#e7d7c1] overflow-hidden transition-transform hover:brightness-95 ${showCutGuide ? 'cut-guide' : ''}`} style={{ ...containerStyle, border: `${Math.max(2, Math.round(2.5 * baseScale))}px dashed #78350f` }}>
+            <div className="flex items-center justify-center bg-[#78350f] text-[#fef3c7] px-1 overflow-hidden" style={{ height: bannerHeightPx + 'px' }}>
+              <span className="text-center truncate" style={{ fontSize: nameFontSize + 'px', lineHeight: 1.1, fontWeight: boldWeight }}>{productName || '\u00A0'}</span>
+            </div>
+            <div className="relative flex-1 p-2 flex flex-col justify-between overflow-hidden">
+              {showOriginal && <div className="text-[#92400e]/60 truncate" style={{ fontSize: Math.max(10, Math.round(13 * baseScale)) + 'px', textDecoration: 'line-through', fontWeight: semiBoldWeight }}>{formattedOriginal}{currency}</div>}
+              <div className="text-right mt-auto truncate w-full">
+                <span className="text-[#451a03]" style={{ fontSize: priceFontSize + 'px', fontWeight: boldWeight, lineHeight: 1.1 }}>{formattedDiscount}</span>
+                <span className="text-[#451a03]" style={{ fontSize: currencyFontSize + 'px', fontWeight: semiBoldWeight, marginLeft: '2px' }}>{currency}</span>
+              </div>
+              {discountRate > 0 && <div className="absolute top-2 right-2 bg-[#b45309] text-white rounded px-1.5 py-0.5 whitespace-nowrap" style={{ fontSize: Math.max(8, Math.round(9 * baseScale)) + 'px', fontWeight: boldWeight }}>{discountRate}% 할인</div>}
+            </div>
+          </div>
+        );
+      }
+
+      if (design === 'J') {
+        return (
+          <div onClick={onClick} className={`relative flex flex-col bg-white overflow-hidden transition-transform hover:brightness-95 ${showCutGuide ? 'cut-guide' : ''}`} style={{ ...containerStyle, border: `${Math.max(2, Math.round(2 * baseScale))}px solid #334155` }}>
+            <div className="flex items-center justify-between bg-slate-800 text-white px-2 overflow-hidden gap-1" style={{ height: bannerHeightPx + 'px' }}>
+              <span className="truncate" style={{ fontSize: nameFontSize + 'px', lineHeight: 1.1, fontWeight: boldWeight }}>{productName || '\u00A0'}</span>
+              <span className="text-[9px] opacity-75 flex-shrink-0">STORE</span>
+            </div>
+            <div className="relative flex-1 p-2 flex flex-col justify-between overflow-hidden">
+              {showOriginal && <div className="text-slate-400 truncate" style={{ fontSize: Math.max(10, Math.round(13 * baseScale)) + 'px', textDecoration: 'line-through', fontWeight: semiBoldWeight }}>{formattedOriginal}{currency}</div>}
+              <div className="flex items-end justify-between mt-auto">
+                <svg className="w-10 h-4 opacity-75 flex-shrink-0" viewBox="0 0 50 20">
+                  <rect x="0" y="0" width="3" height="20" fill="#000"/>
+                  <rect x="5" y="0" width="1" height="20" fill="#000"/>
+                  <rect x="8" y="0" width="4" height="20" fill="#000"/>
+                  <rect x="14" y="0" width="2" height="20" fill="#000"/>
+                  <rect x="18" y="0" width="1" height="20" fill="#000"/>
+                  <rect x="21" y="0" width="5" height="20" fill="#000"/>
+                  <rect x="28" y="0" width="2" height="20" fill="#000"/>
+                  <rect x="32" y="0" width="3" height="20" fill="#000"/>
+                  <rect x="37" y="0" width="1" height="20" fill="#000"/>
+                  <rect x="40" y="0" width="4" height="20" fill="#000"/>
+                </svg>
+                <div className="text-right truncate w-full pl-2">
+                  <span className="text-slate-900" style={{ fontSize: priceFontSize + 'px', fontWeight: boldWeight, lineHeight: 1.1 }}>{formattedDiscount}</span>
+                  <span className="text-slate-900" style={{ fontSize: currencyFontSize + 'px', fontWeight: semiBoldWeight, marginLeft: '2px' }}>{currency}</span>
+                </div>
+              </div>
+              {discountRate > 0 && <div className="absolute top-2 right-2 bg-blue-600 text-white px-1.5 py-0.5 rounded font-bold whitespace-nowrap" style={{ fontSize: Math.max(8, Math.round(9 * baseScale)) + 'px' }}>-{discountRate}%</div>}
+            </div>
+          </div>
+        );
+      }
+
+      if (design === 'K') {
+        return (
+          <div onClick={onClick} className={`relative flex flex-col bg-amber-50 overflow-hidden transition-transform hover:brightness-95 ${showCutGuide ? 'cut-guide' : ''}`} style={{ ...containerStyle, border: `${Math.max(3, Math.round(3 * baseScale))}px solid #000` }}>
+            <div className="flex items-center justify-center bg-yellow-400 border-b-2 border-black px-1 overflow-hidden" style={{ height: bannerHeightPx + 'px', backgroundImage: 'repeating-linear-gradient(-45deg, #facc15, #facc15 8px, #000 8px, #000 11px)' }}>
+              <span className="bg-black text-white px-2 py-0.5 rounded text-center truncate w-[90%]" style={{ fontSize: Math.max(9, nameFontSize - 2) + 'px', lineHeight: 1.1, fontWeight: boldWeight }}>{productName || '\u00A0'}</span>
+            </div>
+            <div className="relative flex-1 p-2 flex flex-col justify-between overflow-hidden">
+              {showOriginal && <div className="text-gray-500 font-bold truncate" style={{ fontSize: Math.max(10, Math.round(13 * baseScale)) + 'px', textDecoration: 'line-through', fontWeight: semiBoldWeight }}>{formattedOriginal}{currency}</div>}
+              <div className="text-right mt-auto truncate w-full">
+                <span className="text-black" style={{ fontSize: priceFontSize + 'px', fontWeight: boldWeight, lineHeight: 1.1 }}>{formattedDiscount}</span>
+                <span className="text-black" style={{ fontSize: currencyFontSize + 'px', fontWeight: semiBoldWeight, marginLeft: '2px' }}>{currency}</span>
+              </div>
+              {discountRate > 0 && <div className="absolute top-2 right-2 bg-red-500 text-white font-black border border-black rounded shadow-[2px_2px_0_0_#000] px-1 py-0.5 whitespace-nowrap" style={{ fontSize: Math.max(9, Math.round(10 * baseScale)) + 'px' }}>SALE {discountRate}%</div>}
+            </div>
+          </div>
+        );
+      }
+
+      if (design === 'L') {
+        return (
+          <div onClick={onClick} className={`relative flex flex-col bg-white overflow-hidden transition-transform hover:brightness-95 ${showCutGuide ? 'cut-guide' : ''}`} style={{ ...containerStyle, border: `${Math.max(2, Math.round(2.5 * baseScale))}px solid #1e3a8a` }}>
+            <div className="flex items-center justify-center bg-[#1e3a8a] text-[#fef08a] px-1 overflow-hidden" style={{ height: bannerHeightPx + 'px' }}>
+              <span className="text-center truncate" style={{ fontSize: nameFontSize + 'px', lineHeight: 1.1, fontWeight: boldWeight }}>{productName || '\u00A0'}</span>
+            </div>
+            <div className="relative flex-1 p-2 flex flex-col justify-between bg-blue-50/40 overflow-hidden">
+              {showOriginal && <div className="text-blue-400 truncate" style={{ fontSize: Math.max(10, Math.round(13 * baseScale)) + 'px', textDecoration: 'line-through', fontWeight: semiBoldWeight }}>{formattedOriginal}{currency}</div>}
+              <div className="text-right mt-auto truncate w-full">
+                <span className="text-[#1e3a8a]" style={{ fontSize: priceFontSize + 'px', fontWeight: boldWeight, lineHeight: 1.1 }}>{formattedDiscount}</span>
+                <span className="text-[#1e3a8a]" style={{ fontSize: currencyFontSize + 'px', fontWeight: semiBoldWeight, marginLeft: '2px' }}>{currency}</span>
+              </div>
+              {discountRate > 0 && <div className="absolute top-2 right-2 bg-[#facc15] text-[#1e3a8a] font-bold px-1.5 py-0.5 rounded border border-[#1e3a8a] whitespace-nowrap" style={{ fontSize: Math.max(8, Math.round(9 * baseScale)) + 'px' }}>{discountRate}% OFF</div>}
+            </div>
+          </div>
+        );
+      }
+
+      // 동적 테마 렌더링 (M ~ AX)
+      if (EXTENDED_THEMES[design]) {
+        const t = EXTENDED_THEMES[design];
+        return (
+          <div onClick={onClick} className={`relative flex flex-col overflow-hidden transition-transform hover:brightness-95 ${showCutGuide ? 'cut-guide' : ''}`} style={{ ...containerStyle, backgroundColor: t.bg, border: `${Math.max(2, Math.round(2.5 * baseScale))}px solid ${t.border}` }}>
+            {t.layout === 'top' && (
+              <div className="flex items-center justify-center gap-1 px-1 border-b-2 overflow-hidden" style={{ height: bannerHeightPx + 'px', backgroundColor: t.headerBg, borderColor: t.border }}>
+                <span style={{ fontSize: nameFontSize + 'px', lineHeight: 1.1, fontFamily: emojiFontFamily, flexShrink: 0, color: t.headerText }}>
+                  {t.emoji}
+                </span>
+                <span className="truncate text-center" style={{ fontSize: nameFontSize + 'px', lineHeight: 1.1, fontWeight: boldWeight, color: t.headerText }}>
+                  {productName || '\u00A0'}
+                </span>
+              </div>
+            )}
+            
+            <div className="relative flex-1 p-2 flex flex-col justify-between overflow-hidden">
+              {showOriginal && (
+                <div className="truncate" style={{ color: t.origText, fontSize: Math.max(10, Math.round(13 * baseScale)) + 'px', textDecoration: 'line-through', fontWeight: semiBoldWeight }}>
+                  {formattedOriginal}{currency}
+                </div>
+              )}
+              <div className="text-right mt-auto truncate w-full">
+                <span style={{ color: t.priceText, fontSize: priceFontSize + 'px', fontWeight: boldWeight, lineHeight: 1.1 }}>
+                  {formattedDiscount}
+                </span>
+                <span style={{ color: t.priceText, fontSize: currencyFontSize + 'px', fontWeight: semiBoldWeight, marginLeft: '2px' }}>
+                  {currency}
+                </span>
+              </div>
+              {discountRate > 0 && (
+                <div className="absolute top-2 right-2 flex items-center justify-center rounded px-1.5 py-0.5 shadow-sm whitespace-nowrap" style={{ backgroundColor: t.badgeBg, color: t.badgeText, fontSize: Math.max(9, Math.round(10 * baseScale)) + 'px', fontWeight: boldWeight }}>
+                  -{discountRate}%
+                </div>
+              )}
+            </div>
+
+            {t.layout === 'bottom' && (
+              <div className="flex items-center justify-center gap-1 px-1 border-t-2 overflow-hidden" style={{ height: bannerHeightPx + 'px', backgroundColor: t.headerBg, borderColor: t.border }}>
+                <span style={{ fontSize: nameFontSize + 'px', lineHeight: 1.1, fontFamily: emojiFontFamily, flexShrink: 0, color: t.headerText }}>
+                  {t.emoji}
+                </span>
+                <span className="truncate text-center" style={{ fontSize: nameFontSize + 'px', lineHeight: 1.1, fontWeight: boldWeight, color: t.headerText }}>
+                  {productName || '\u00A0'}
+                </span>
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      return null;
+    };
+
+    const DetailPreviewModal = ({ isOpen, onClose, tagData }) => {
+      if (!isOpen || !tagData) return null;
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-fade-in" onClick={onClose}>
+          <div className="bg-white border-4 border-black rounded-3xl p-6 max-w-lg w-full shadow-[12px_12px_0_0_#000] relative flex flex-col items-center gap-4" onClick={(e) => e.stopPropagation()}>
+            <div className="w-full flex items-center justify-between border-b-4 border-black pb-3">
+              <h3 className="text-xl font-black flex items-center gap-2">🔎 실시간 고화질 확대 미리보기</h3>
+              <button onClick={onClose} className="w-9 h-9 rounded-full border-2 border-black flex items-center justify-center font-black hover:bg-gray-100 text-lg">✕</button>
+            </div>
+            <div className="text-xs font-bold bg-yellow-100 text-yellow-900 border border-yellow-400 px-3 py-1 rounded-full">💡 실제 인쇄 출력본을 2.5배 확대하여 검토하는 화면입니다.</div>
+            <div className="p-4 bg-gray-100 rounded-2xl border-2 border-dashed border-gray-400 flex items-center justify-center shadow-inner my-2 w-full min-h-[250px] overflow-hidden">
+              <div className="transform scale-125 origin-center my-4"><PriceTag {...tagData} /></div>
+            </div>
+            <div className="w-full grid grid-cols-2 gap-2 text-xs font-bold bg-gray-50 p-3 rounded-xl border border-gray-200">
+              <div>📏 가로×세로: {tagData.widthMm} × {tagData.heightMm} mm</div>
+              <div>🎨 디자인 테마: {tagData.design}안</div>
+              <div>💰 할인가: {tagData.discountPrice}{tagData.currency}</div>
+              <div>🏷️ 상품명: {tagData.productName}</div>
+            </div>
+            <button onClick={onClose} className="w-full py-3 bg-black text-white font-black text-sm rounded-xl shadow-[3px_3px_0_0_#CCFF00] hover:translate-y-0.5">확인 완료 (창 닫기)</button>
+          </div>
+        </div>
+      );
+    };
+
+    function App() {
+      const [productName, setProductName] = useState('버터링');
+      const [originalPrice, setOriginalPrice] = useState('1700');
+      const [discountPrice, setDiscountPrice] = useState('1500');
+      
+      const [selectedFont, setSelectedFont] = useState(FONT_OPTIONS[1].value);
+
+      const [settings, setSettings] = useState({
+        design: 'A',
+        presetId: 'standard',
+        widthMm: 55,
+        heightMm: 40,
+        currency: '원',
+        showOriginal: true,
+        showCutGuide: true,
+      });
+
+      const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+      const [isSaving, setIsSaving] = useState(false);
+      const [isSharing, setIsSharing] = useState(false);
+      const [isCapturing, setIsCapturing] = useState(false);
+      const [tagsList, setTagsList] = useState([]);
+      const a4CanvasRef = useRef(null);
+
+      const [previewModalTag, setPreviewModalTag] = useState(null);
+      const [dialog, setDialog] = useState({ isOpen: false, title: '', message: '', isConfirm: false, onConfirm: null });
+
+      const showModalAlert = (msg, title = '알림') => {
+        setDialog({ isOpen: true, title, message: msg, isConfirm: false, onConfirm: null });
+      };
+
+      const showModalConfirm = (msg, onConfirm, title = '확인') => {
+        setDialog({ isOpen: true, title, message: msg, isConfirm: true, onConfirm });
+      };
+
+      // 💡 [개선 사항 1] 설정 변경 시 기존 태그 자동 동기화
+      useEffect(() => {
+        setTagsList(prev => {
+          if (prev.length === 0) return prev;
+          return prev.map(tag => ({
+            ...tag,
+            // 빈 칸일 경우를 방어하기 위해 최소값 20 적용
+            widthMm: settings.widthMm || 20,
+            heightMm: settings.heightMm || 20,
+            design: settings.design,
+            currency: settings.currency,
+            showOriginal: settings.showOriginal,
+            showCutGuide: settings.showCutGuide,
+            fontFamily: selectedFont
+          }));
+        });
+      }, [
+        settings.widthMm,
+        settings.heightMm,
+        settings.design,
+        settings.currency,
+        settings.showOriginal,
+        settings.showCutGuide,
+        selectedFont
+      ]);
+
+      const [previewScale, setPreviewScale] = useState(1);
+      const [autoFitScale, setAutoFitScale] = useState(1);
+
+      useEffect(() => {
+        const updateScale = () => {
+          if (window.innerWidth >= 1024) {
+            setAutoFitScale(1);
+            setPreviewScale(1);
+            return;
+          }
+          const available = window.innerWidth - 64;
+          const fit = Math.max(0.32, Math.min(1, available / A4_WIDTH_PX));
+          setAutoFitScale(fit);
+          setPreviewScale(fit);
+        };
+        updateScale();
+        window.addEventListener('resize', updateScale);
+        return () => window.removeEventListener('resize', updateScale);
+      }, []);
+
+      // 캡처를 위해 WebView 자체를 네이티브로 리사이즈했다가 되돌릴 때 'resize' 이벤트가
+      // 안정적으로 발생하지 않는 기기가 있어, previewScale이 캡처 당시(큰 화면 기준) 값에
+      // 고정된 채 남아 화면이 확대돼 보이는 문제가 있었다. 캡처가 끝나면 명시적으로 다시 계산한다.
+      useEffect(() => {
+        if (isCapturing) return;
+        const t = setTimeout(() => {
+          if (window.innerWidth >= 1024) {
+            setAutoFitScale(1);
+            setPreviewScale(1);
+            return;
+          }
+          const available = window.innerWidth - 64;
+          const fit = Math.max(0.32, Math.min(1, available / A4_WIDTH_PX));
+          setAutoFitScale(fit);
+          setPreviewScale(fit);
+        }, 300);
+        return () => clearTimeout(t);
+      }, [isCapturing]);
+
+      const tagCapacity = useMemo(() => {
+        // 이미 추가된 가격표는 추가 당시의 규격을 각자 저장하므로(handleAddTag),
+        // 설정 화면의 현재 규격이 아니라 실제로 배치된 첫 번째 가격표의 규격을
+        // 기준으로 열/행을 계산해야 설정 변경 후에도 그리드가 어긋나지 않는다.
+        const safeW = Number(tagsList[0]?.widthMm ?? settings.widthMm) || 20;
+        const safeH = Number(tagsList[0]?.heightMm ?? settings.heightMm) || 20;
+        const tagW = safeW * MM_TO_PX;
+        const tagH = safeH * MM_TO_PX;
+        const padding = 40 * 2;
+        const gap = 16;
+
+        const availableW = A4_WIDTH_PX - padding;
+        const availableH = A4_HEIGHT_PX - padding;
+
+        const cols = Math.max(1, Math.floor((availableW + gap) / (tagW + gap)));
+        const rows = Math.max(1, Math.floor((availableH + gap) / (tagH + gap)));
+
+        return { cols, rows, maxTags: cols * rows };
+      }, [settings.widthMm, settings.heightMm, tagsList[0]?.widthMm, tagsList[0]?.heightMm]);
+
+      // 💡 [초과 방지 경고] 사이즈가 커져서 갯수가 넘칠 때 경고 띄우기
+      useEffect(() => {
+        if (tagsList.length > tagCapacity.maxTags) {
+          setTimeout(() => {
+            showModalAlert(`⚠️ 사이즈 변경 안내\n\n라벨 크기가 커져서 A4 1장 최대 수량(${tagCapacity.maxTags}개)을 초과했습니다.\n출력 영역을 벗어난 가격표는 수동으로 일부를 삭제해주세요.`);
+          }, 100);
+        }
+      }, [tagCapacity.maxTags, tagsList.length]);
+
+      const calculateDiscount = useCallback((origPrice, discPrice) => {
+        const orig = parseInt(origPrice.replace(/,/g, ''), 10) || 0;
+        const disc = parseInt(discPrice.replace(/,/g, ''), 10) || 0;
+        if (orig <= 0 || disc >= orig) return 0;
+        return Math.round(((orig - disc) / orig) * 100);
+      }, []);
+
+      const currentDiscountRate = calculateDiscount(originalPrice, discountPrice);
+
+      const handlePriceChange = (setter) => (e) => {
+        const value = e.target.value.replace(/[^0-9]/g, '').slice(0, MAX_PRICE_DIGITS);
+        setter(value);
+      };
+
+      const handleNameChange = (e) => {
+        setProductName(e.target.value.slice(0, 14));
+      };
+
+      const genId = () => (window.crypto && window.crypto.randomUUID) ? window.crypto.randomUUID() : 'id_' + Date.now() + '_' + Math.random();
+
+      const handleAddTag = () => {
+        if (tagsList.length >= tagCapacity.maxTags) {
+          showModalAlert(`선택하신 규격(${settings.widthMm}×${settings.heightMm}mm)으로는 A4 1장에 최대 ${tagCapacity.maxTags}개까지 채울 수 있습니다.`);
+          return;
+        }
+        setTagsList([...tagsList, {
+          id: genId(),
+          productName,
+          originalPrice,
+          discountPrice,
+          discountRate: currentDiscountRate,
+          fontFamily: selectedFont,
+          design: settings.design,
+          widthMm: settings.widthMm || 20,
+          heightMm: settings.heightMm || 20,
+          currency: settings.currency,
+          showOriginal: settings.showOriginal,
+          showCutGuide: settings.showCutGuide,
+        }]);
+      };
+
+      const handleClearTags = () => {
+        showModalConfirm('A4 용지에 추가된 모든 가격표를 지우시겠습니까?', () => {
+          setTagsList([]);
+        });
+      };
+
+      const handleRemoveTag = (id) => {
+        setTagsList((prev) => prev.filter((t) => t.id !== id));
+      };
+
+      const captureA4Canvas = async () => {
+        const usedFonts = Array.from(new Set(tagsList.map((t) => t.fontFamily || selectedFont)));
+        await Promise.all(usedFonts.map((f) => document.fonts.load(`16px ${f}`).catch(() => {})));
+        if (document.fonts && document.fonts.ready) await document.fonts.ready;
+        await new Promise((r) => setTimeout(r, 200));
+        // 고정된 A4_WIDTH_PX/HEIGHT_PX로만 캡처하면 설정값-실제 태그 크기 불일치 등으로
+        // 실제 콘텐츠가 그보다 커질 때 잘릴 수 있어, 실제 렌더링된 크기를 재서 그 값을 쓴다.
+        const el = a4CanvasRef.current;
+        let captureWidth = A4_WIDTH_PX;
+        let captureHeight = A4_HEIGHT_PX;
+        if (el) {
+          const prevOverflow = el.style.overflow;
+          el.style.overflow = 'hidden';
+          const scrollW = el.scrollWidth;
+          const scrollH = el.scrollHeight;
+          el.style.overflow = prevOverflow;
+
+          const containerRect = el.getBoundingClientRect();
+          let maxRight = containerRect.left;
+          let maxBottom = containerRect.top;
+          Array.from(el.children).forEach((child) => {
+            const r = child.getBoundingClientRect();
+            if (r.right > maxRight) maxRight = r.right;
+            if (r.bottom > maxBottom) maxBottom = r.bottom;
+          });
+          const rectWidth = Math.ceil(maxRight - containerRect.left) + 40;
+          const rectHeight = Math.ceil(maxBottom - containerRect.top) + 40;
+
+          captureWidth = Math.max(scrollW, rectWidth, A4_WIDTH_PX);
+          captureHeight = Math.max(scrollH, rectHeight, A4_HEIGHT_PX);
+        }
+        return window.html2canvas(a4CanvasRef.current, {
+          scale: 2, useCORS: true, backgroundColor: '#FFFFFF', logging: false,
+          width: captureWidth, height: captureHeight, windowWidth: captureWidth, windowHeight: captureHeight,
+          letterRendering: true,
+        });
+      };
+
+      /** RN WebView 안에서 저장/공유를 누르면: html2canvas로 a4CanvasRef를 직접 캡처해
+       * base64 PNG를 만들어 postMessage로 RN에 전달한다.
+       * 예전엔 WebView 자체를 네이티브로 리사이즈한 뒤 react-native-view-shot으로 캡처했는데,
+       * 안드로이드 일부 기기에서 리사이즈가 내부 렌더링 서피스에 반영되지 않아(레이아웃 좌표는
+       * 새 크기인데 실제 그림은 예전 작은 크기로 고정) 이미지가 잘리거나 화면이 확대된 채 안
+       * 돌아오는 문제가 있었다. WebView 크기를 전혀 건드리지 않는 이 방식으로 그 문제를 피한다.
+       * (커스텀 폰트가 캔버스에 안 그려지던 예전 html2canvas 문제는 위 captureA4Canvas의
+       * document.fonts.ready 대기로 완화를 시도한다 — 기기에서 실제 확인 필요.) */
+      const captureAndSendToNative = async (kind) => {
+        setIsCapturing(true);
+        // 캡처 모드로 바뀌기 전 스크롤돼 있던 위치가 남아 position:fixed 콘텐츠가 위쪽이
+        // 잘려 보이는 문제가 있어, 캡처 시작 시 스크롤을 강제로 맨 위로 되돌린다.
+        window.scrollTo(0, 0);
+        await new Promise(requestAnimationFrame);
+        await new Promise(requestAnimationFrame);
+        try {
+          const canvas = await captureA4Canvas();
+          const dataUrl = canvas.toDataURL('image/png');
+          window.ReactNativeWebView.postMessage(JSON.stringify({ type: kind, dataUrl }));
+        } finally {
+          setIsCapturing(false);
+        }
+      };
+      const handleDownloadA4 = async () => {
+        if (tagsList.length === 0) { showModalAlert('A4 용지에 추가된 가격표가 없습니다.'); return; }
+
+        if (window.ReactNativeWebView) {
+          setIsSaving(true);
+          try {
+            await captureAndSendToNative('save');
+          } finally {
+            setIsSaving(false);
+          }
+          return;
+        }
+
+        // 일반 브라우저 폴백(앱 밖에서 열었을 때)
+        if (!window.html2canvas || !a4CanvasRef.current) { showModalAlert('라이브러리 로딩 중입니다. 잠시 후 시도해주세요.'); return; }
+        const iosFallbackWin = isIOSDevice() ? window.open('', '_blank') : null;
+        setIsSaving(true);
+        try {
+          const canvas = await captureA4Canvas();
+          const dataUrl = canvas.toDataURL('image/png');
+          if (iosFallbackWin) {
+            iosFallbackWin.document.write(
+              '<title>가격표 이미지</title><body style="margin:0;background:#111;display:flex;align-items:center;justify-content:center;min-height:100vh;"><img src="' + dataUrl + '" style="max-width:100%;height:auto;" /></body>'
+            );
+            iosFallbackWin.document.close();
+            showModalAlert('새 탭에 이미지가 열렸습니다. 이미지를 길게 눌러 "사진에 저장"을 선택해주세요.');
+          } else {
+            const link = document.createElement('a');
+            link.download = 'A4_PriceTags_' + Date.now() + '.png';
+            link.href = dataUrl;
+            link.click();
+          }
+        } catch (err) {
+          console.error('이미지 저장 실패:', err);
+          if (iosFallbackWin) iosFallbackWin.close();
+          showModalAlert('이미지 생성에 실패했습니다.');
+        } finally {
+          setIsSaving(false);
+        }
+      };
+
+      /** 카톡 전송: RN WebView 안이면 html2canvas 캡처(위 captureAndSendToNative)에 위임한다.
+       * 일반 브라우저에서 열렸을 때는 Web Share API로 대체한다. */
+      const handleKakaoShare = async () => {
+        if (tagsList.length === 0) { showModalAlert('A4 용지에 추가된 가격표가 없습니다.'); return; }
+
+        if (window.ReactNativeWebView) {
+          setIsSharing(true);
+          try {
+            await captureAndSendToNative('share');
+          } finally {
+            setIsSharing(false);
+          }
+          return;
+        }
+
+        if (!window.html2canvas || !a4CanvasRef.current) { showModalAlert('라이브러리 로딩 중입니다. 잠시 후 시도해주세요.'); return; }
+        setIsSharing(true);
+        try {
+          const canvas = await captureA4Canvas();
+          if (navigator.share) {
+            const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+            const file = new File([blob], 'A4_PriceTags_' + Date.now() + '.png', { type: 'image/png' });
+            await navigator.share({ files: [file], title: 'PRICE TAG MAKER', text: '가격표 A4 이미지' });
+            return;
+          }
+          showModalAlert('공유가 지원되지 않는 환경입니다. 저장 버튼을 이용해주세요.');
+        } catch (err) {
+          if (err && err.name === 'AbortError') return;
+          console.error('공유 실패:', err);
+          showModalAlert('공유에 실패했습니다. 저장 버튼을 이용해주세요.');
+        } finally {
+          setIsSharing(false);
+        }
+      };
+
+      const currentSampleTag = {
+        productName,
+        originalPrice,
+        discountPrice,
+        discountRate: currentDiscountRate,
+        fontFamily: selectedFont,
+        design: settings.design,
+        widthMm: settings.widthMm || 20,
+        heightMm: settings.heightMm || 20,
+        currency: settings.currency,
+        showOriginal: settings.showOriginal,
+        showCutGuide: settings.showCutGuide,
+      };
+
+      return (
+        <div className={`min-h-screen bg-[#CCFF00] font-sans flex flex-col items-center selection:bg-black selection:text-[#CCFF00] ${isCapturing ? '' : 'p-4 md:p-8'}`}>
+          <header className={`mb-6 text-center relative w-full max-w-7xl flex flex-col items-center ${isCapturing ? 'hidden' : ''}`}>
+            <div className="inline-flex items-center gap-3 border-b-8 border-black pb-2">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight">
+                PRICE TAG MAKER
+              </h1>
+              <button onClick={() => setIsSettingsOpen(true)} className="flex items-center gap-1.5 bg-black text-white px-3 py-2 rounded-2xl hover:scale-105 active:scale-95 transition-transform shadow-[3px_3px_0_0_#FFF] border-2 border-black text-xs sm:text-sm font-bold" title="환경 설정">
+                <span>⚙️</span>
+                <span>설정 (디자인·글꼴)</span>
+              </button>
+            </div>
+            <div className="flex items-center gap-2 mt-2">
+              <span className="bg-black text-[#CCFF00] font-black px-2 py-0.5 text-xs rounded">
+                {settings.widthMm || 20} × {settings.heightMm || 20} mm
+              </span>
+              <p className="text-sm font-bold text-black/80">
+                50가지 프리미엄 디자인 & 인쇄용 가격표 자동 생성기
+              </p>
+            </div>
+          </header>
+
+          <div className="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+            <div className={`lg:col-span-1 bg-white/40 backdrop-blur-xl border-4 border-black rounded-3xl p-6 shadow-[8px_8px_0_0_#000] relative z-10 lg:sticky lg:top-8 ${isCapturing ? 'hidden' : ''}`}>
+              <div className="mb-6 border-b-2 border-black/10 pb-4">
+                <h2 className="text-2xl font-black flex items-center gap-2">🏷️ 정보 입력</h2>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-bold mb-1">
+                    상품명 <span className="text-gray-500 font-normal">({productName.length}/14)</span>
+                  </label>
+                  <input type="text" value={productName} onChange={handleNameChange} className="w-full p-2.5 border-3 border-black rounded-xl font-bold shadow-[2px_2px_0_0_#000] bg-white focus:outline-none focus:ring-2 focus:ring-black" placeholder="상품명 입력" />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  {settings.showOriginal && (
+                    <div>
+                      <label className="block text-xs font-bold mb-1">정가 ({settings.currency})</label>
+                      <input type="text" inputMode="numeric" value={originalPrice} onChange={handlePriceChange(setOriginalPrice)} className="w-full p-2 border-3 border-black rounded-xl font-bold shadow-[2px_2px_0_0_#000] text-sm bg-white focus:outline-none focus:ring-2 focus:ring-black" />
+                    </div>
+                  )}
+                  <div className={settings.showOriginal ? '' : 'col-span-2'}>
+                    <label className="block text-xs font-bold mb-1">할인가 ({settings.currency})</label>
+                    <input type="text" inputMode="numeric" value={discountPrice} onChange={handlePriceChange(setDiscountPrice)} className="w-full p-2 text-red-600 border-3 border-black rounded-xl font-black shadow-[2px_2px_0_0_#000] text-sm bg-white focus:outline-none focus:ring-2 focus:ring-red-600" />
+                  </div>
+                </div>
+
+                <button onClick={handleAddTag} className="w-full flex items-center justify-center gap-2 bg-black text-white p-3 font-bold border-3 border-black rounded-xl shadow-[4px_4px_0_0_#FFF] hover:translate-y-[2px] transition-all text-base">
+                  ➕ A4 용지에 추가 ({tagsList.length}/{tagCapacity.maxTags})
+                </button>
+              </div>
+
+              <div className="mt-6 space-y-3">
+                <div className="flex flex-col items-center gap-2 py-3 border-t-2 border-b-2 border-black/10">
+                  <div className="flex items-center justify-between w-full px-1">
+                    <span className="text-xs font-black text-gray-700">👁️ 선택한 가격표 실시간 미리보기</span>
+                    <button onClick={() => setPreviewModalTag(currentSampleTag)} className="text-[10px] font-bold bg-black text-white px-2 py-0.5 rounded hover:bg-gray-800">
+                      🔍 큰 화면 확대
+                    </button>
+                  </div>
+                  <div className="p-1 bg-white rounded shadow-sm hover:scale-105 transition-transform">
+                    <PriceTag {...currentSampleTag} onClick={() => setPreviewModalTag(currentSampleTag)} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <button onClick={handleDownloadA4} disabled={isSaving} className="flex items-center justify-center gap-1 bg-blue-600 text-white p-2.5 font-bold border-3 border-black rounded-xl shadow-[3px_3px_0_0_#000] hover:translate-y-[2px] transition-all text-[11px] disabled:opacity-50">
+                    {isSaving ? '⏳' : '📥 저장'}
+                  </button>
+
+                  <button onClick={handleKakaoShare} disabled={isSharing} className="flex items-center justify-center gap-1 bg-[#FEE500] text-black p-2.5 font-bold border-3 border-black rounded-xl shadow-[3px_3px_0_0_#000] hover:translate-y-[2px] transition-all text-[11px] disabled:opacity-50">
+                    {isSharing ? '⏳' : '💬 카톡 전송'}
+                  </button>
+
+                  <button onClick={handleClearTags} className="flex items-center justify-center gap-1 bg-red-100 text-red-600 p-2.5 font-bold border-3 border-black rounded-xl shadow-[3px_3px_0_0_#000] hover:translate-y-[2px] transition-all text-[11px]">
+                    🗑️ 비우기
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className={isCapturing ? '' : 'lg:col-span-2 overflow-x-auto pb-10 flex flex-col items-center'}>
+              <div className={`w-full max-w-[794px] bg-black text-white p-3 rounded-2xl border-4 border-black shadow-[6px_6px_0_0_#000] mb-4 flex flex-wrap items-center justify-between gap-2 ${isCapturing ? 'hidden' : ''}`}>
+                <div className="flex items-center gap-2">
+                  <span className="font-black text-sm bg-[#CCFF00] text-black px-2 py-0.5 rounded">A4 미리보기</span>
+                  <span className="text-xs text-gray-300 font-bold hidden sm:inline">
+                    (배치: {tagsList.length} / 최대 {tagCapacity.maxTags}개)
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1.5 text-xs font-bold">
+                  <button onClick={() => setPreviewScale((s) => Math.max(0.3, s - 0.1))} className="w-7 h-7 bg-gray-800 hover:bg-gray-700 border border-gray-600 rounded flex items-center justify-center">-</button>
+                  <span className="w-12 text-center">{Math.round(previewScale * 100)}%</span>
+                  <button onClick={() => setPreviewScale((s) => Math.min(1.5, s + 0.1))} className="w-7 h-7 bg-gray-800 hover:bg-gray-700 border border-gray-600 rounded flex items-center justify-center">+</button>
+                  <button onClick={() => setPreviewScale(autoFitScale)} className="px-2 py-1 bg-gray-800 hover:bg-gray-700 border border-gray-600 rounded">화면맞춤</button>
+                  <button onClick={() => setPreviewScale(1)} className="px-2 py-1 bg-gray-800 hover:bg-gray-700 border border-gray-600 rounded">100%</button>
+                </div>
+              </div>
+
+              <div
+                className={isCapturing ? 'bg-white relative' : 'bg-gray-300 p-4 border-4 border-black shadow-[12px_12px_0_0_rgba(0,0,0,1)] rounded-xl relative'}
+                style={isCapturing
+                  ? {}
+                  : { width: A4_WIDTH_PX * previewScale + 40 + 'px', height: A4_HEIGHT_PX * previewScale + 40 + 'px', overflow: 'hidden' }}
+              >
+                <div
+                  ref={a4CanvasRef}
+                  className={`bg-white relative grid content-start justify-items-center ${isCapturing ? '' : 'transition-transform duration-200'}`}
+                  style={{
+                    width: A4_WIDTH_PX + 'px',
+                    minHeight: isCapturing ? undefined : A4_HEIGHT_PX + 'px',
+                    padding: '40px',
+                    gap: '16px',
+                    gridTemplateColumns: `repeat(${tagCapacity.cols}, minmax(0, 1fr))`,
+                    transform: isCapturing ? 'none' : `scale(${previewScale})`,
+                    transformOrigin: 'top left',
+                  }}
+                >
+                  {tagsList.length === 0 ? (
+                    <div className="col-span-full absolute inset-0 flex items-center justify-center text-gray-400 font-bold text-2xl flex-col gap-3 pointer-events-none">
+                      <span className="text-5xl">📄</span>
+                      <span>A4 용지가 비어 있습니다.</span>
+                      <span className="text-sm text-gray-400 font-normal">왼쪽에서 정보 입력 후 [A4 용지에 추가] 버튼을 눌러주세요.</span>
+                    </div>
+                  ) : (
+                    tagsList.map((tag) => (
+                      <div key={tag.id} className="relative group">
+                        <PriceTag {...tag} onClick={() => setPreviewModalTag(tag)} />
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleRemoveTag(tag.id); }}
+                          className={`absolute -top-3 -right-3 w-7 h-7 bg-red-600 text-white rounded-full font-bold text-base border-2 border-white shadow-md z-40 active:scale-90 transition-transform flex items-center justify-center ${isCapturing ? 'opacity-0 pointer-events-none' : 'opacity-0 group-hover:opacity-100 lg:opacity-100'}`}
+                          title="삭제"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} settings={settings} onUpdateSettings={setSettings} sampleProduct={currentSampleTag} selectedFont={selectedFont} setSelectedFont={setSelectedFont} />
+          <DetailPreviewModal isOpen={!!previewModalTag} onClose={() => setPreviewModalTag(null)} tagData={previewModalTag} />
+          <CustomDialog dialog={dialog} onClose={() => setDialog({ ...dialog, isOpen: false })} />
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>

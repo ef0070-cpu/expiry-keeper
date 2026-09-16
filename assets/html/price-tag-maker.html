@@ -1,0 +1,2405 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PRICE TAG MAKER V3</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Do+Hyeon&family=Gowun+Dodum&family=Jua&family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
+  
+  <!-- React & ReactDOM -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  
+  <!-- Babel -->
+  
+  <!-- html2canvas -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+  <!-- Tailwind CSS -->
+  <style>*,:after,:before{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgba(59,130,246,.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }::backdrop{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgba(59,130,246,.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }/*! tailwindcss v3.4.19 | MIT License | https://tailwindcss.com*/*,:after,:before{box-sizing:border-box;border:0 solid #e5e7eb}:after,:before{--tw-content:""}:host,html{line-height:1.5;-webkit-text-size-adjust:100%;-moz-tab-size:4;-o-tab-size:4;tab-size:4;font-family:ui-sans-serif,system-ui,sans-serif,Apple Color Emoji,Segoe UI Emoji,Segoe UI Symbol,Noto Color Emoji;font-feature-settings:normal;font-variation-settings:normal;-webkit-tap-highlight-color:transparent}body{margin:0;line-height:inherit}hr{height:0;color:inherit;border-top-width:1px}abbr:where([title]){-webkit-text-decoration:underline dotted;text-decoration:underline dotted}h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit}a{color:inherit;text-decoration:inherit}b,strong{font-weight:bolder}code,kbd,pre,samp{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,Liberation Mono,Courier New,monospace;font-feature-settings:normal;font-variation-settings:normal;font-size:1em}small{font-size:80%}sub,sup{font-size:75%;line-height:0;position:relative;vertical-align:baseline}sub{bottom:-.25em}sup{top:-.5em}table{text-indent:0;border-color:inherit;border-collapse:collapse}button,input,optgroup,select,textarea{font-family:inherit;font-feature-settings:inherit;font-variation-settings:inherit;font-size:100%;font-weight:inherit;line-height:inherit;letter-spacing:inherit;color:inherit;margin:0;padding:0}button,select{text-transform:none}button,input:where([type=button]),input:where([type=reset]),input:where([type=submit]){-webkit-appearance:button;background-color:transparent;background-image:none}:-moz-focusring{outline:auto}:-moz-ui-invalid{box-shadow:none}progress{vertical-align:baseline}::-webkit-inner-spin-button,::-webkit-outer-spin-button{height:auto}[type=search]{-webkit-appearance:textfield;outline-offset:-2px}::-webkit-search-decoration{-webkit-appearance:none}::-webkit-file-upload-button{-webkit-appearance:button;font:inherit}summary{display:list-item}blockquote,dd,dl,figure,h1,h2,h3,h4,h5,h6,hr,p,pre{margin:0}fieldset{margin:0}fieldset,legend{padding:0}menu,ol,ul{list-style:none;margin:0;padding:0}dialog{padding:0}textarea{resize:vertical}input::-moz-placeholder,textarea::-moz-placeholder{opacity:1;color:#9ca3af}input::placeholder,textarea::placeholder{opacity:1;color:#9ca3af}[role=button],button{cursor:pointer}:disabled{cursor:default}audio,canvas,embed,iframe,img,object,svg,video{display:block;vertical-align:middle}img,video{max-width:100%;height:auto}[hidden]:where(:not([hidden=until-found])){display:none}.pointer-events-none{pointer-events:none}.fixed{position:fixed}.absolute{position:absolute}.relative{position:relative}.inset-0{inset:0}.-right-3{right:-.75rem}.-top-3{top:-.75rem}.left-3{left:.75rem}.right-1{right:.25rem}.right-2{right:.5rem}.top-1{top:.25rem}.top-2{top:.5rem}.top-3{top:.75rem}.z-10{z-index:10}.z-40{z-index:40}.z-50{z-index:50}.z-\[100\]{z-index:100}.z-\[60\]{z-index:60}.col-span-2{grid-column:span 2/span 2}.col-span-full{grid-column:1/-1}.my-2{margin-top:.5rem;margin-bottom:.5rem}.my-4{margin-top:1rem;margin-bottom:1rem}.mb-1{margin-bottom:.25rem}.mb-1\.5{margin-bottom:.375rem}.mb-3{margin-bottom:.75rem}.mb-4{margin-bottom:1rem}.mb-6{margin-bottom:1.5rem}.mt-0\.5{margin-top:.125rem}.mt-2{margin-top:.5rem}.mt-4{margin-top:1rem}.mt-6{margin-top:1.5rem}.mt-8{margin-top:2rem}.mt-auto{margin-top:auto}.block{display:block}.inline-block{display:inline-block}.flex{display:flex}.inline-flex{display:inline-flex}.grid{display:grid}.hidden{display:none}.h-10{height:2.5rem}.h-4{height:1rem}.h-5{height:1.25rem}.h-7{height:1.75rem}.h-9{height:2.25rem}.max-h-56{max-height:14rem}.max-h-\[90vh\]{max-height:90vh}.min-h-\[250px\]{min-height:250px}.min-h-screen{min-height:100vh}.w-10{width:2.5rem}.w-12{width:3rem}.w-5{width:1.25rem}.w-7{width:1.75rem}.w-9{width:2.25rem}.w-\[90\%\]{width:90%}.w-full{width:100%}.max-w-4xl{max-width:56rem}.max-w-7xl{max-width:80rem}.max-w-\[794px\]{max-width:794px}.max-w-lg{max-width:32rem}.max-w-sm{max-width:24rem}.flex-1{flex:1 1 0%}.flex-shrink-0{flex-shrink:0}.origin-center{transform-origin:center}.rotate-6{--tw-rotate:6deg}.rotate-6,.scale-105{transform:translate(var(--tw-translate-x),var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))}.scale-105{--tw-scale-x:1.05;--tw-scale-y:1.05}.scale-125{--tw-scale-x:1.25;--tw-scale-y:1.25}.scale-125,.transform{transform:translate(var(--tw-translate-x),var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))}.cursor-pointer{cursor:pointer}.resize{resize:both}.grid-cols-1{grid-template-columns:repeat(1,minmax(0,1fr))}.grid-cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}.grid-cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}.flex-col{flex-direction:column}.flex-wrap{flex-wrap:wrap}.content-start{align-content:flex-start}.items-start{align-items:flex-start}.items-end{align-items:flex-end}.items-center{align-items:center}.justify-end{justify-content:flex-end}.justify-center{justify-content:center}.justify-between{justify-content:space-between}.justify-items-center{justify-items:center}.gap-1{gap:.25rem}.gap-1\.5{gap:.375rem}.gap-2{gap:.5rem}.gap-3{gap:.75rem}.gap-4{gap:1rem}.gap-8{gap:2rem}.space-y-3>:not([hidden])~:not([hidden]){--tw-space-y-reverse:0;margin-top:calc(.75rem*(1 - var(--tw-space-y-reverse)));margin-bottom:calc(.75rem*var(--tw-space-y-reverse))}.space-y-4>:not([hidden])~:not([hidden]){--tw-space-y-reverse:0;margin-top:calc(1rem*(1 - var(--tw-space-y-reverse)));margin-bottom:calc(1rem*var(--tw-space-y-reverse))}.space-y-6>:not([hidden])~:not([hidden]){--tw-space-y-reverse:0;margin-top:calc(1.5rem*(1 - var(--tw-space-y-reverse)));margin-bottom:calc(1.5rem*var(--tw-space-y-reverse))}.overflow-hidden{overflow:hidden}.overflow-x-auto{overflow-x:auto}.overflow-y-auto{overflow-y:auto}.overscroll-contain{overscroll-behavior:contain}.truncate{overflow:hidden;text-overflow:ellipsis}.truncate,.whitespace-nowrap{white-space:nowrap}.whitespace-pre-wrap{white-space:pre-wrap}.rounded{border-radius:.25rem}.rounded-2xl{border-radius:1rem}.rounded-3xl{border-radius:1.5rem}.rounded-full{border-radius:9999px}.rounded-lg{border-radius:.5rem}.rounded-md{border-radius:.375rem}.rounded-xl{border-radius:.75rem}.border{border-width:1px}.border-2{border-width:2px}.border-4{border-width:4px}.border-b{border-bottom-width:1px}.border-b-2{border-bottom-width:2px}.border-b-4{border-bottom-width:4px}.border-b-8{border-bottom-width:8px}.border-t-2{border-top-width:2px}.border-t-4{border-top-width:4px}.border-dashed{border-style:dashed}.border-\[\#00f0ff\]{--tw-border-opacity:1;border-color:rgb(0 240 255/var(--tw-border-opacity,1))}.border-\[\#1e3a8a\]{--tw-border-opacity:1;border-color:rgb(30 58 138/var(--tw-border-opacity,1))}.border-\[\#dc2626\]{--tw-border-opacity:1;border-color:rgb(220 38 38/var(--tw-border-opacity,1))}.border-\[\#eab308\]{--tw-border-opacity:1;border-color:rgb(234 179 8/var(--tw-border-opacity,1))}.border-\[\#f43f5e\]{--tw-border-opacity:1;border-color:rgb(244 63 94/var(--tw-border-opacity,1))}.border-black{--tw-border-opacity:1;border-color:rgb(0 0 0/var(--tw-border-opacity,1))}.border-black\/10{border-color:rgba(0,0,0,.1)}.border-blue-200{--tw-border-opacity:1;border-color:rgb(191 219 254/var(--tw-border-opacity,1))}.border-gray-200{--tw-border-opacity:1;border-color:rgb(229 231 235/var(--tw-border-opacity,1))}.border-gray-300{--tw-border-opacity:1;border-color:rgb(209 213 219/var(--tw-border-opacity,1))}.border-gray-400{--tw-border-opacity:1;border-color:rgb(156 163 175/var(--tw-border-opacity,1))}.border-gray-600{--tw-border-opacity:1;border-color:rgb(75 85 99/var(--tw-border-opacity,1))}.border-purple-200{--tw-border-opacity:1;border-color:rgb(233 213 255/var(--tw-border-opacity,1))}.border-white{--tw-border-opacity:1;border-color:rgb(255 255 255/var(--tw-border-opacity,1))}.border-yellow-400{--tw-border-opacity:1;border-color:rgb(250 204 21/var(--tw-border-opacity,1))}.bg-\[\#001c55\]{--tw-bg-opacity:1;background-color:rgb(0 28 85/var(--tw-bg-opacity,1))}.bg-\[\#1c1917\]{--tw-bg-opacity:1;background-color:rgb(28 25 23/var(--tw-bg-opacity,1))}.bg-\[\#1e3a8a\]{--tw-bg-opacity:1;background-color:rgb(30 58 138/var(--tw-bg-opacity,1))}.bg-\[\#292524\]{--tw-bg-opacity:1;background-color:rgb(41 37 36/var(--tw-bg-opacity,1))}.bg-\[\#2e5a36\]{--tw-bg-opacity:1;background-color:rgb(46 90 54/var(--tw-bg-opacity,1))}.bg-\[\#78350f\]{--tw-bg-opacity:1;background-color:rgb(120 53 15/var(--tw-bg-opacity,1))}.bg-\[\#CCFF00\]{--tw-bg-opacity:1;background-color:rgb(204 255 0/var(--tw-bg-opacity,1))}.bg-\[\#FEE500\]{--tw-bg-opacity:1;background-color:rgb(254 229 0/var(--tw-bg-opacity,1))}.bg-\[\#b45309\]{--tw-bg-opacity:1;background-color:rgb(180 83 9/var(--tw-bg-opacity,1))}.bg-\[\#d97706\]{--tw-bg-opacity:1;background-color:rgb(217 119 6/var(--tw-bg-opacity,1))}.bg-\[\#dc2626\]{--tw-bg-opacity:1;background-color:rgb(220 38 38/var(--tw-bg-opacity,1))}.bg-\[\#e7d7c1\]{--tw-bg-opacity:1;background-color:rgb(231 215 193/var(--tw-bg-opacity,1))}.bg-\[\#f43f5e\]{--tw-bg-opacity:1;background-color:rgb(244 63 94/var(--tw-bg-opacity,1))}.bg-\[\#f4f7f4\]{--tw-bg-opacity:1;background-color:rgb(244 247 244/var(--tw-bg-opacity,1))}.bg-\[\#facc15\]{--tw-bg-opacity:1;background-color:rgb(250 204 21/var(--tw-bg-opacity,1))}.bg-\[\#ff0055\]{--tw-bg-opacity:1;background-color:rgb(255 0 85/var(--tw-bg-opacity,1))}.bg-\[\#ffe4e6\]{--tw-bg-opacity:1;background-color:rgb(255 228 230/var(--tw-bg-opacity,1))}.bg-\[\#fffaf5\]{--tw-bg-opacity:1;background-color:rgb(255 250 245/var(--tw-bg-opacity,1))}.bg-amber-50{--tw-bg-opacity:1;background-color:rgb(255 251 235/var(--tw-bg-opacity,1))}.bg-black{--tw-bg-opacity:1;background-color:rgb(0 0 0/var(--tw-bg-opacity,1))}.bg-black\/60{background-color:rgba(0,0,0,.6)}.bg-black\/70{background-color:rgba(0,0,0,.7)}.bg-blue-50{--tw-bg-opacity:1;background-color:rgb(239 246 255/var(--tw-bg-opacity,1))}.bg-blue-50\/40{background-color:rgba(239,246,255,.4)}.bg-blue-600{--tw-bg-opacity:1;background-color:rgb(37 99 235/var(--tw-bg-opacity,1))}.bg-gray-100{--tw-bg-opacity:1;background-color:rgb(243 244 246/var(--tw-bg-opacity,1))}.bg-gray-200{--tw-bg-opacity:1;background-color:rgb(229 231 235/var(--tw-bg-opacity,1))}.bg-gray-300{--tw-bg-opacity:1;background-color:rgb(209 213 219/var(--tw-bg-opacity,1))}.bg-gray-50{--tw-bg-opacity:1;background-color:rgb(249 250 251/var(--tw-bg-opacity,1))}.bg-gray-800{--tw-bg-opacity:1;background-color:rgb(31 41 55/var(--tw-bg-opacity,1))}.bg-purple-50{--tw-bg-opacity:1;background-color:rgb(250 245 255/var(--tw-bg-opacity,1))}.bg-red-100{--tw-bg-opacity:1;background-color:rgb(254 226 226/var(--tw-bg-opacity,1))}.bg-red-500{--tw-bg-opacity:1;background-color:rgb(239 68 68/var(--tw-bg-opacity,1))}.bg-red-600{--tw-bg-opacity:1;background-color:rgb(220 38 38/var(--tw-bg-opacity,1))}.bg-slate-800{--tw-bg-opacity:1;background-color:rgb(30 41 59/var(--tw-bg-opacity,1))}.bg-slate-900{--tw-bg-opacity:1;background-color:rgb(15 23 42/var(--tw-bg-opacity,1))}.bg-slate-950{--tw-bg-opacity:1;background-color:rgb(2 6 23/var(--tw-bg-opacity,1))}.bg-white{--tw-bg-opacity:1;background-color:rgb(255 255 255/var(--tw-bg-opacity,1))}.bg-white\/40{background-color:hsla(0,0%,100%,.4)}.bg-white\/80{background-color:hsla(0,0%,100%,.8)}.bg-yellow-100{--tw-bg-opacity:1;background-color:rgb(254 249 195/var(--tw-bg-opacity,1))}.bg-yellow-400{--tw-bg-opacity:1;background-color:rgb(250 204 21/var(--tw-bg-opacity,1))}.p-1{padding:.25rem}.p-2{padding:.5rem}.p-2\.5{padding:.625rem}.p-3{padding:.75rem}.p-4{padding:1rem}.p-6{padding:1.5rem}.px-1{padding-left:.25rem;padding-right:.25rem}.px-1\.5{padding-left:.375rem;padding-right:.375rem}.px-10{padding-left:2.5rem;padding-right:2.5rem}.px-2{padding-left:.5rem;padding-right:.5rem}.px-3{padding-left:.75rem;padding-right:.75rem}.px-4{padding-left:1rem;padding-right:1rem}.px-5{padding-left:1.25rem;padding-right:1.25rem}.py-0\.5{padding-top:.125rem;padding-bottom:.125rem}.py-1{padding-top:.25rem;padding-bottom:.25rem}.py-2{padding-top:.5rem;padding-bottom:.5rem}.py-3{padding-top:.75rem;padding-bottom:.75rem}.py-4{padding-top:1rem;padding-bottom:1rem}.pb-10{padding-bottom:2.5rem}.pb-2{padding-bottom:.5rem}.pb-3{padding-bottom:.75rem}.pb-4{padding-bottom:1rem}.pl-2{padding-left:.5rem}.pt-5{padding-top:1.25rem}.text-center{text-align:center}.text-right{text-align:right}.font-sans{font-family:ui-sans-serif,system-ui,sans-serif,Apple Color Emoji,Segoe UI Emoji,Segoe UI Symbol,Noto Color Emoji}.text-2xl{font-size:1.5rem;line-height:2rem}.text-5xl{font-size:3rem;line-height:1}.text-\[10px\]{font-size:10px}.text-\[11px\]{font-size:11px}.text-\[9px\]{font-size:9px}.text-base{font-size:1rem;line-height:1.5rem}.text-lg{font-size:1.125rem;line-height:1.75rem}.text-sm{font-size:.875rem;line-height:1.25rem}.text-xl{font-size:1.25rem;line-height:1.75rem}.text-xs{font-size:.75rem;line-height:1rem}.font-black{font-weight:900}.font-bold{font-weight:700}.font-medium{font-weight:500}.font-normal{font-weight:400}.leading-relaxed{line-height:1.625}.tracking-tight{letter-spacing:-.025em}.tracking-wider{letter-spacing:.05em}.tracking-widest{letter-spacing:.1em}.text-\[\#00f0ff\]{--tw-text-opacity:1;color:rgb(0 240 255/var(--tw-text-opacity,1))}.text-\[\#1b4322\]{--tw-text-opacity:1;color:rgb(27 67 34/var(--tw-text-opacity,1))}.text-\[\#1e3a8a\]{--tw-text-opacity:1;color:rgb(30 58 138/var(--tw-text-opacity,1))}.text-\[\#451a03\]{--tw-text-opacity:1;color:rgb(69 26 3/var(--tw-text-opacity,1))}.text-\[\#92400e\]\/60{color:rgba(146,64,14,.6)}.text-\[\#991b1b\]{--tw-text-opacity:1;color:rgb(153 27 27/var(--tw-text-opacity,1))}.text-\[\#9f1239\]{--tw-text-opacity:1;color:rgb(159 18 57/var(--tw-text-opacity,1))}.text-\[\#CCFF00\]{--tw-text-opacity:1;color:rgb(204 255 0/var(--tw-text-opacity,1))}.text-\[\#be123c\]{--tw-text-opacity:1;color:rgb(190 18 60/var(--tw-text-opacity,1))}.text-\[\#dc2626\]{--tw-text-opacity:1;color:rgb(220 38 38/var(--tw-text-opacity,1))}.text-\[\#eab308\]{--tw-text-opacity:1;color:rgb(234 179 8/var(--tw-text-opacity,1))}.text-\[\#facc15\]{--tw-text-opacity:1;color:rgb(250 204 21/var(--tw-text-opacity,1))}.text-\[\#fef08a\]{--tw-text-opacity:1;color:rgb(254 240 138/var(--tw-text-opacity,1))}.text-\[\#fef3c7\]{--tw-text-opacity:1;color:rgb(254 243 199/var(--tw-text-opacity,1))}.text-\[\#ff0055\]{--tw-text-opacity:1;color:rgb(255 0 85/var(--tw-text-opacity,1))}.text-black{--tw-text-opacity:1;color:rgb(0 0 0/var(--tw-text-opacity,1))}.text-black\/80{color:rgba(0,0,0,.8)}.text-blue-400{--tw-text-opacity:1;color:rgb(96 165 250/var(--tw-text-opacity,1))}.text-blue-800{--tw-text-opacity:1;color:rgb(30 64 175/var(--tw-text-opacity,1))}.text-blue-900{--tw-text-opacity:1;color:rgb(30 58 138/var(--tw-text-opacity,1))}.text-gray-300{--tw-text-opacity:1;color:rgb(209 213 219/var(--tw-text-opacity,1))}.text-gray-400{--tw-text-opacity:1;color:rgb(156 163 175/var(--tw-text-opacity,1))}.text-gray-500{--tw-text-opacity:1;color:rgb(107 114 128/var(--tw-text-opacity,1))}.text-gray-700{--tw-text-opacity:1;color:rgb(55 65 81/var(--tw-text-opacity,1))}.text-gray-800{--tw-text-opacity:1;color:rgb(31 41 55/var(--tw-text-opacity,1))}.text-purple-900{--tw-text-opacity:1;color:rgb(88 28 135/var(--tw-text-opacity,1))}.text-red-600{--tw-text-opacity:1;color:rgb(220 38 38/var(--tw-text-opacity,1))}.text-red-900\/60{color:rgba(127,29,29,.6)}.text-rose-300{--tw-text-opacity:1;color:rgb(253 164 175/var(--tw-text-opacity,1))}.text-slate-400{--tw-text-opacity:1;color:rgb(148 163 184/var(--tw-text-opacity,1))}.text-slate-900{--tw-text-opacity:1;color:rgb(15 23 42/var(--tw-text-opacity,1))}.text-stone-400{--tw-text-opacity:1;color:rgb(168 162 158/var(--tw-text-opacity,1))}.text-stone-500{--tw-text-opacity:1;color:rgb(120 113 108/var(--tw-text-opacity,1))}.text-white{--tw-text-opacity:1;color:rgb(255 255 255/var(--tw-text-opacity,1))}.text-yellow-300{--tw-text-opacity:1;color:rgb(253 224 71/var(--tw-text-opacity,1))}.text-yellow-900{--tw-text-opacity:1;color:rgb(113 63 18/var(--tw-text-opacity,1))}.line-through{text-decoration-line:line-through}.antialiased{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}.accent-black{accent-color:#000}.opacity-0{opacity:0}.opacity-75{opacity:.75}.opacity-80{opacity:.8}.shadow-\[12px_12px_0_0_\#000\],.shadow-\[12px_12px_0_0_rgba\(0\2c 0\2c 0\2c 1\)\]{--tw-shadow:12px 12px 0 0 #000;--tw-shadow-colored:12px 12px 0 0 var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow,0 0 #0000),var(--tw-ring-shadow,0 0 #0000),var(--tw-shadow)}.shadow-\[2px_2px_0_0_\#000\]{--tw-shadow:2px 2px 0 0 #000;--tw-shadow-colored:2px 2px 0 0 var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow,0 0 #0000),var(--tw-ring-shadow,0 0 #0000),var(--tw-shadow)}.shadow-\[3px_3px_0_0_\#000\]{--tw-shadow:3px 3px 0 0 #000;--tw-shadow-colored:3px 3px 0 0 var(--tw-shadow-color)}.shadow-\[3px_3px_0_0_\#000\],.shadow-\[3px_3px_0_0_\#CCFF00\]{box-shadow:var(--tw-ring-offset-shadow,0 0 #0000),var(--tw-ring-shadow,0 0 #0000),var(--tw-shadow)}.shadow-\[3px_3px_0_0_\#CCFF00\]{--tw-shadow:3px 3px 0 0 #cf0;--tw-shadow-colored:3px 3px 0 0 var(--tw-shadow-color)}.shadow-\[3px_3px_0_0_\#FFF\]{--tw-shadow:3px 3px 0 0 #fff;--tw-shadow-colored:3px 3px 0 0 var(--tw-shadow-color)}.shadow-\[3px_3px_0_0_\#FFF\],.shadow-\[4px_4px_0_0_\#FFF\]{box-shadow:var(--tw-ring-offset-shadow,0 0 #0000),var(--tw-ring-shadow,0 0 #0000),var(--tw-shadow)}.shadow-\[4px_4px_0_0_\#FFF\]{--tw-shadow:4px 4px 0 0 #fff;--tw-shadow-colored:4px 4px 0 0 var(--tw-shadow-color)}.shadow-\[6px_6px_0_0_\#000\]{--tw-shadow:6px 6px 0 0 #000;--tw-shadow-colored:6px 6px 0 0 var(--tw-shadow-color)}.shadow-\[6px_6px_0_0_\#000\],.shadow-\[6px_6px_0_0_\#CCFF00\]{box-shadow:var(--tw-ring-offset-shadow,0 0 #0000),var(--tw-ring-shadow,0 0 #0000),var(--tw-shadow)}.shadow-\[6px_6px_0_0_\#CCFF00\]{--tw-shadow:6px 6px 0 0 #cf0;--tw-shadow-colored:6px 6px 0 0 var(--tw-shadow-color)}.shadow-\[8px_8px_0_0_\#000\]{--tw-shadow:8px 8px 0 0 #000;--tw-shadow-colored:8px 8px 0 0 var(--tw-shadow-color)}.shadow-\[8px_8px_0_0_\#000\],.shadow-inner{box-shadow:var(--tw-ring-offset-shadow,0 0 #0000),var(--tw-ring-shadow,0 0 #0000),var(--tw-shadow)}.shadow-inner{--tw-shadow:inset 0 2px 4px 0 rgba(0,0,0,.05);--tw-shadow-colored:inset 0 2px 4px 0 var(--tw-shadow-color)}.shadow-md{--tw-shadow:0 4px 6px -1px rgba(0,0,0,.1),0 2px 4px -2px rgba(0,0,0,.1);--tw-shadow-colored:0 4px 6px -1px var(--tw-shadow-color),0 2px 4px -2px var(--tw-shadow-color)}.shadow-md,.shadow-sm{box-shadow:var(--tw-ring-offset-shadow,0 0 #0000),var(--tw-ring-shadow,0 0 #0000),var(--tw-shadow)}.shadow-sm{--tw-shadow:0 1px 2px 0 rgba(0,0,0,.05);--tw-shadow-colored:0 1px 2px 0 var(--tw-shadow-color)}.outline{outline-style:solid}.grayscale{--tw-grayscale:grayscale(100%)}.filter,.grayscale{filter:var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)}.backdrop-blur-md{--tw-backdrop-blur:blur(12px)}.backdrop-blur-md,.backdrop-blur-sm{-webkit-backdrop-filter:var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia);backdrop-filter:var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)}.backdrop-blur-sm{--tw-backdrop-blur:blur(4px)}.backdrop-blur-xl{--tw-backdrop-blur:blur(24px);-webkit-backdrop-filter:var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia);backdrop-filter:var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)}.transition-all{transition-property:all;transition-timing-function:cubic-bezier(.4,0,.2,1);transition-duration:.15s}.transition-colors{transition-property:color,background-color,border-color,text-decoration-color,fill,stroke;transition-timing-function:cubic-bezier(.4,0,.2,1);transition-duration:.15s}.transition-transform{transition-property:transform;transition-timing-function:cubic-bezier(.4,0,.2,1);transition-duration:.15s}.duration-200{transition-duration:.2s}.selection\:bg-black ::-moz-selection{--tw-bg-opacity:1;background-color:rgb(0 0 0/var(--tw-bg-opacity,1))}.selection\:bg-black ::selection{--tw-bg-opacity:1;background-color:rgb(0 0 0/var(--tw-bg-opacity,1))}.selection\:text-\[\#CCFF00\] ::-moz-selection{--tw-text-opacity:1;color:rgb(204 255 0/var(--tw-text-opacity,1))}.selection\:text-\[\#CCFF00\] ::selection{--tw-text-opacity:1;color:rgb(204 255 0/var(--tw-text-opacity,1))}.selection\:bg-black::-moz-selection{--tw-bg-opacity:1;background-color:rgb(0 0 0/var(--tw-bg-opacity,1))}.selection\:bg-black::selection{--tw-bg-opacity:1;background-color:rgb(0 0 0/var(--tw-bg-opacity,1))}.selection\:text-\[\#CCFF00\]::-moz-selection{--tw-text-opacity:1;color:rgb(204 255 0/var(--tw-text-opacity,1))}.selection\:text-\[\#CCFF00\]::selection{--tw-text-opacity:1;color:rgb(204 255 0/var(--tw-text-opacity,1))}.hover\:translate-y-0\.5:hover{--tw-translate-y:0.125rem}.hover\:translate-y-0\.5:hover,.hover\:translate-y-\[2px\]:hover{transform:translate(var(--tw-translate-x),var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))}.hover\:translate-y-\[2px\]:hover{--tw-translate-y:2px}.hover\:scale-105:hover{--tw-scale-x:1.05;--tw-scale-y:1.05;transform:translate(var(--tw-translate-x),var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))}.hover\:border-black:hover{--tw-border-opacity:1;border-color:rgb(0 0 0/var(--tw-border-opacity,1))}.hover\:bg-gray-100:hover{--tw-bg-opacity:1;background-color:rgb(243 244 246/var(--tw-bg-opacity,1))}.hover\:bg-gray-700:hover{--tw-bg-opacity:1;background-color:rgb(55 65 81/var(--tw-bg-opacity,1))}.hover\:bg-gray-800:hover{--tw-bg-opacity:1;background-color:rgb(31 41 55/var(--tw-bg-opacity,1))}.hover\:brightness-110:hover{--tw-brightness:brightness(1.1)}.hover\:brightness-110:hover,.hover\:brightness-95:hover{filter:var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)}.hover\:brightness-95:hover{--tw-brightness:brightness(.95)}.focus\:outline-none:focus{outline:2px solid transparent;outline-offset:2px}.focus\:ring-2:focus{--tw-ring-offset-shadow:var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);--tw-ring-shadow:var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color);box-shadow:var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow,0 0 #0000)}.focus\:ring-black:focus{--tw-ring-opacity:1;--tw-ring-color:rgb(0 0 0/var(--tw-ring-opacity,1))}.focus\:ring-red-600:focus{--tw-ring-opacity:1;--tw-ring-color:rgb(220 38 38/var(--tw-ring-opacity,1))}.active\:scale-90:active{--tw-scale-x:.9;--tw-scale-y:.9}.active\:scale-90:active,.active\:scale-95:active{transform:translate(var(--tw-translate-x),var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))}.active\:scale-95:active{--tw-scale-x:.95;--tw-scale-y:.95}.disabled\:opacity-50:disabled{opacity:.5}.group:hover .group-hover\:opacity-100{opacity:1}@media (min-width:640px){.sm\:inline{display:inline}.sm\:grid-cols-4{grid-template-columns:repeat(4,minmax(0,1fr))}.sm\:text-2xl{font-size:1.5rem;line-height:2rem}.sm\:text-sm{font-size:.875rem;line-height:1.25rem}.sm\:text-xl{font-size:1.25rem;line-height:1.75rem}}@media (min-width:768px){.md\:p-8{padding:2rem}.md\:text-3xl{font-size:1.875rem;line-height:2.25rem}}@media (min-width:1024px){.lg\:sticky{position:sticky}.lg\:top-8{top:2rem}.lg\:col-span-1{grid-column:span 1/span 1}.lg\:col-span-2{grid-column:span 2/span 2}.lg\:w-auto{width:auto}.lg\:grid-cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}.lg\:opacity-100{opacity:1}}</style>
+
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* Custom scrollbar for better aesthetics */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.05);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(0, 0, 0, 0.4);
+    }
+
+    /* 재단선(Cut Guide) 스타일 */
+    .cut-guide {
+      outline: 1px dashed rgba(0, 0, 0, 0.3) !important;
+      outline-offset: 2px !important;
+    }
+
+    /* Animations */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    .animate-fade-in {
+      animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script>function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
+const {
+  useState,
+  useRef,
+  useCallback,
+  useEffect,
+  useMemo
+} = React;
+
+// 폰트 목록
+const FONT_OPTIONS = [{
+  name: '기본 깔끔한 체 (Noto Sans)',
+  value: "'Noto Sans KR', sans-serif"
+}, {
+  name: '가장 굵은 강렬한 체 (Black Han Sans)',
+  value: "'Black Han Sans', sans-serif"
+}, {
+  name: '레트로 포스터 체 (Do Hyeon)',
+  value: "'Do Hyeon', sans-serif"
+}, {
+  name: '귀여운 둥근 체 (Jua)',
+  value: "'Jua', sans-serif"
+}, {
+  name: '단정한 돋움 체 (Gowun Dodum)',
+  value: "'Gowun Dodum', sans-serif"
+}];
+
+// 13번 ~ 50번까지 동적으로 생성될 다채로운 컬러 및 레이아웃 테마 시스템 (총 38개)
+const EXTENDED_THEMES = {
+  M: {
+    id: 'M',
+    name: 'M안 (라일락 파스텔)',
+    tag: '파스텔',
+    layout: 'top',
+    bg: '#faf5ff',
+    border: '#d8b4fe',
+    headerBg: '#d8b4fe',
+    headerText: '#581c87',
+    priceText: '#7e22ce',
+    origText: '#c084fc',
+    badgeBg: '#a855f7',
+    badgeText: '#ffffff',
+    emoji: '🌸'
+  },
+  N: {
+    id: 'N',
+    name: 'N안 (네온 팝 핑크)',
+    tag: '네온',
+    layout: 'bottom',
+    bg: '#000000',
+    border: '#ff1493',
+    headerBg: '#ff1493',
+    headerText: '#ffffff',
+    priceText: '#ff1493',
+    origText: '#666666',
+    badgeBg: '#ffffff',
+    badgeText: '#ff1493',
+    emoji: '⚡'
+  },
+  O: {
+    id: 'O',
+    name: 'O안 (민트 초코)',
+    tag: '유니크',
+    layout: 'top',
+    bg: '#f0fdf4',
+    border: '#4ade80',
+    headerBg: '#4ade80',
+    headerText: '#064e3b',
+    priceText: '#065f46',
+    origText: '#86efac',
+    badgeBg: '#059669',
+    badgeText: '#ffffff',
+    emoji: '🍦'
+  },
+  P: {
+    id: 'P',
+    name: 'P안 (스카이 블루)',
+    tag: '청량',
+    layout: 'top',
+    bg: '#f0f9ff',
+    border: '#7dd3fc',
+    headerBg: '#7dd3fc',
+    headerText: '#0369a1',
+    priceText: '#0284c7',
+    origText: '#bae6fd',
+    badgeBg: '#0ea5e9',
+    badgeText: '#fff',
+    emoji: '☁️'
+  },
+  Q: {
+    id: 'Q',
+    name: 'Q안 (피치 코랄)',
+    tag: '화사함',
+    layout: 'bottom',
+    bg: '#fff5f5',
+    border: '#fc8181',
+    headerBg: '#fc8181',
+    headerText: '#fff',
+    priceText: '#c53030',
+    origText: '#feb2b2',
+    badgeBg: '#e53e3e',
+    badgeText: '#fff',
+    emoji: '🍑'
+  },
+  R: {
+    id: 'R',
+    name: 'R안 (다크 시크)',
+    tag: '시크',
+    layout: 'top',
+    bg: '#1a202c',
+    border: '#4a5568',
+    headerBg: '#4a5568',
+    headerText: '#f7fafc',
+    priceText: '#e2e8f0',
+    origText: '#718096',
+    badgeBg: '#f7fafc',
+    badgeText: '#1a202c',
+    emoji: '🕶️'
+  },
+  S: {
+    id: 'S',
+    name: 'S안 (인더스트리얼)',
+    tag: '빈티지',
+    layout: 'top',
+    bg: '#e2e8f0',
+    border: '#718096',
+    headerBg: '#718096',
+    headerText: '#1a202c',
+    priceText: '#2d3748',
+    origText: '#a0aec0',
+    badgeBg: '#1a202c',
+    badgeText: '#edf2f7',
+    emoji: '⚙️'
+  },
+  T: {
+    id: 'T',
+    name: 'T안 (로맨틱 핑크)',
+    tag: '로맨틱',
+    layout: 'top',
+    bg: '#fff0f6',
+    border: '#f687b3',
+    headerBg: '#f687b3',
+    headerText: '#702459',
+    priceText: '#97266d',
+    origText: '#fbb6ce',
+    badgeBg: '#d53f8c',
+    badgeText: '#fff',
+    emoji: '💝'
+  },
+  U: {
+    id: 'U',
+    name: 'U안 (썸머 비치)',
+    tag: '여름',
+    layout: 'bottom',
+    bg: '#e6fffa',
+    border: '#319795',
+    headerBg: '#319795',
+    headerText: '#fff',
+    priceText: '#234e52',
+    origText: '#81e6d9',
+    badgeBg: '#285e61',
+    badgeText: '#fff',
+    emoji: '🏖️'
+  },
+  V: {
+    id: 'V',
+    name: 'V안 (어텀 브라운)',
+    tag: '가을',
+    layout: 'top',
+    bg: '#fbf8f1',
+    border: '#8b4513',
+    headerBg: '#8b4513',
+    headerText: '#fff',
+    priceText: '#5c4033',
+    origText: '#cd853f',
+    badgeBg: '#a0522d',
+    badgeText: '#fff',
+    emoji: '🍂'
+  },
+  W: {
+    id: 'W',
+    name: 'W안 (윈터 스노우)',
+    tag: '겨울',
+    layout: 'top',
+    bg: '#f0f8ff',
+    border: '#87cefa',
+    headerBg: '#87cefa',
+    headerText: '#4682b4',
+    priceText: '#4169e1',
+    origText: '#b0c4de',
+    badgeBg: '#1e90ff',
+    badgeText: '#fff',
+    emoji: '⛄'
+  },
+  X: {
+    id: 'X',
+    name: 'X안 (할로윈 펌킨)',
+    tag: '시즌',
+    layout: 'top',
+    bg: '#1c1917',
+    border: '#f97316',
+    headerBg: '#f97316',
+    headerText: '#1c1917',
+    priceText: '#f97316',
+    origText: '#78716c',
+    badgeBg: '#ea580c',
+    badgeText: '#fff',
+    emoji: '🎃'
+  },
+  Y: {
+    id: 'Y',
+    name: 'Y안 (크리스마스)',
+    tag: '시즌',
+    layout: 'bottom',
+    bg: '#fdf2f8',
+    border: '#dc2626',
+    headerBg: '#dc2626',
+    headerText: '#fff',
+    priceText: '#166534',
+    origText: '#fca5a5',
+    badgeBg: '#166534',
+    badgeText: '#fff',
+    emoji: '🎄'
+  },
+  Z: {
+    id: 'Z',
+    name: 'Z안 (사이버 펑크)',
+    tag: '트렌디',
+    layout: 'top',
+    bg: '#000',
+    border: '#00ff00',
+    headerBg: '#00ff00',
+    headerText: '#000',
+    priceText: '#00ff00',
+    origText: '#333',
+    badgeBg: '#00ff00',
+    badgeText: '#000',
+    emoji: '🦾'
+  },
+  AA: {
+    id: 'AA',
+    name: 'AA안 (딥 퍼플)',
+    tag: '고급',
+    layout: 'top',
+    bg: '#faf5ff',
+    border: '#581c87',
+    headerBg: '#581c87',
+    headerText: '#fff',
+    priceText: '#4c1d95',
+    origText: '#a78bfa',
+    badgeBg: '#7c3aed',
+    badgeText: '#fff',
+    emoji: '🔮'
+  },
+  AB: {
+    id: 'AB',
+    name: 'AB안 (마린 네이비)',
+    tag: '깔끔',
+    layout: 'bottom',
+    bg: '#f0f9ff',
+    border: '#1e3a8a',
+    headerBg: '#1e3a8a',
+    headerText: '#fff',
+    priceText: '#1e40af',
+    origText: '#93c5fd',
+    badgeBg: '#2563eb',
+    badgeText: '#fff',
+    emoji: '⚓'
+  },
+  AC: {
+    id: 'AC',
+    name: 'AC안 (선셋 오렌지)',
+    tag: '강렬',
+    layout: 'top',
+    bg: '#fff7ed',
+    border: '#c2410c',
+    headerBg: '#c2410c',
+    headerText: '#fff',
+    priceText: '#9a3412',
+    origText: '#fdba74',
+    badgeBg: '#ea580c',
+    badgeText: '#fff',
+    emoji: '🌅'
+  },
+  AD: {
+    id: 'AD',
+    name: 'AD안 (체리 블라썸)',
+    tag: '화사함',
+    layout: 'top',
+    bg: '#fdf2f8',
+    border: '#db2777',
+    headerBg: '#db2777',
+    headerText: '#fff',
+    priceText: '#be185d',
+    origText: '#f472b6',
+    badgeBg: '#e11d48',
+    badgeText: '#fff',
+    emoji: '🌸'
+  },
+  AE: {
+    id: 'AE',
+    name: 'AE안 (포레스트)',
+    tag: '자연',
+    layout: 'bottom',
+    bg: '#f0fdf4',
+    border: '#14532d',
+    headerBg: '#14532d',
+    headerText: '#fff',
+    priceText: '#166534',
+    origText: '#86efac',
+    badgeBg: '#15803d',
+    badgeText: '#fff',
+    emoji: '🌲'
+  },
+  AF: {
+    id: 'AF',
+    name: 'AF안 (골든 아워)',
+    tag: '황금빛',
+    layout: 'top',
+    bg: '#fefce8',
+    border: '#a16207',
+    headerBg: '#a16207',
+    headerText: '#fff',
+    priceText: '#854d0e',
+    origText: '#fde047',
+    badgeBg: '#ca8a04',
+    badgeText: '#fff',
+    emoji: '🌞'
+  },
+  AG: {
+    id: 'AG',
+    name: 'AG안 (실버 스틸)',
+    tag: '모던',
+    layout: 'top',
+    bg: '#f8fafc',
+    border: '#64748b',
+    headerBg: '#64748b',
+    headerText: '#fff',
+    priceText: '#334155',
+    origText: '#cbd5e1',
+    badgeBg: '#475569',
+    badgeText: '#fff',
+    emoji: '⚙️'
+  },
+  AH: {
+    id: 'AH',
+    name: 'AH안 (로즈 골드)',
+    tag: '우아함',
+    layout: 'bottom',
+    bg: '#fff1f2',
+    border: '#9f1239',
+    headerBg: '#9f1239',
+    headerText: '#fff',
+    priceText: '#be123c',
+    origText: '#fda4af',
+    badgeBg: '#e11d48',
+    badgeText: '#fff',
+    emoji: '🌹'
+  },
+  AI: {
+    id: 'AI',
+    name: 'AI안 (블루베리)',
+    tag: '상큼',
+    layout: 'top',
+    bg: '#f5f3ff',
+    border: '#4c1d95',
+    headerBg: '#4c1d95',
+    headerText: '#fff',
+    priceText: '#5b21b6',
+    origText: '#c4b5fd',
+    badgeBg: '#6d28d9',
+    badgeText: '#fff',
+    emoji: '🫐'
+  },
+  AJ: {
+    id: 'AJ',
+    name: 'AJ안 (아쿠아 마린)',
+    tag: '시원함',
+    layout: 'top',
+    bg: '#f0fdfa',
+    border: '#0f766e',
+    headerBg: '#0f766e',
+    headerText: '#fff',
+    priceText: '#115e59',
+    origText: '#5eead4',
+    badgeBg: '#14b8a6',
+    badgeText: '#fff',
+    emoji: '💧'
+  },
+  AK: {
+    id: 'AK',
+    name: 'AK안 (해바라기)',
+    tag: '밝음',
+    layout: 'bottom',
+    bg: '#fefce8',
+    border: '#eab308',
+    headerBg: '#eab308',
+    headerText: '#fff',
+    priceText: '#ca8a04',
+    origText: '#fef08a',
+    badgeBg: '#facc15',
+    badgeText: '#713f12',
+    emoji: '🌻'
+  },
+  AL: {
+    id: 'AL',
+    name: 'AL안 (미드나잇)',
+    tag: '차분함',
+    layout: 'top',
+    bg: '#0f172a',
+    border: '#334155',
+    headerBg: '#334155',
+    headerText: '#f8fafc',
+    priceText: '#38bdf8',
+    origText: '#64748b',
+    badgeBg: '#0284c7',
+    badgeText: '#fff',
+    emoji: '🌙'
+  },
+  AM: {
+    id: 'AM',
+    name: 'AM안 (크라프트지)',
+    tag: '수제',
+    layout: 'top',
+    bg: '#f5deb3',
+    border: '#8b4513',
+    headerBg: '#8b4513',
+    headerText: '#f5deb3',
+    priceText: '#8b4513',
+    origText: '#deb887',
+    badgeBg: '#a0522d',
+    badgeText: '#fff',
+    emoji: '📜'
+  },
+  AN: {
+    id: 'AN',
+    name: 'AN안 (모노 화이트)',
+    tag: '심플',
+    layout: 'bottom',
+    bg: '#ffffff',
+    border: '#e5e7eb',
+    headerBg: '#f3f4f6',
+    headerText: '#111827',
+    priceText: '#111827',
+    origText: '#9ca3af',
+    badgeBg: '#111827',
+    badgeText: '#fff',
+    emoji: '⚪'
+  },
+  AO: {
+    id: 'AO',
+    name: 'AO안 (네온 오렌지)',
+    tag: '톡톡',
+    layout: 'top',
+    bg: '#fffaf0',
+    border: '#ff4500',
+    headerBg: '#ff4500',
+    headerText: '#fff',
+    priceText: '#ff4500',
+    origText: '#ffb347',
+    badgeBg: '#ff4500',
+    badgeText: '#fff',
+    emoji: '🔥'
+  },
+  AP: {
+    id: 'AP',
+    name: 'AP안 (블랙 앤 골드)',
+    tag: '럭셔리',
+    layout: 'top',
+    bg: '#000000',
+    border: '#ffd700',
+    headerBg: '#ffd700',
+    headerText: '#000',
+    priceText: '#ffd700',
+    origText: '#888',
+    badgeBg: '#b8860b',
+    badgeText: '#000',
+    emoji: '✨'
+  },
+  AQ: {
+    id: 'AQ',
+    name: 'AQ안 (화이트 앤 레드)',
+    tag: '세일',
+    layout: 'bottom',
+    bg: '#ffffff',
+    border: '#e53e3e',
+    headerBg: '#e53e3e',
+    headerText: '#fff',
+    priceText: '#e53e3e',
+    origText: '#fc8181',
+    badgeBg: '#c53030',
+    badgeText: '#fff',
+    emoji: '🚨'
+  },
+  AR: {
+    id: 'AR',
+    name: 'AR안 (코스믹 우주)',
+    tag: '신비',
+    layout: 'top',
+    bg: '#170b3b',
+    border: '#8b5cf6',
+    headerBg: '#8b5cf6',
+    headerText: '#fff',
+    priceText: '#c4b5fd',
+    origText: '#6d28d9',
+    badgeBg: '#a855f7',
+    badgeText: '#fff',
+    emoji: '🌌'
+  },
+  AS: {
+    id: 'AS',
+    name: 'AS안 (마카롱)',
+    tag: '귀여움',
+    layout: 'top',
+    bg: '#fef0f5',
+    border: '#fbb6ce',
+    headerBg: '#fbb6ce',
+    headerText: '#702459',
+    priceText: '#d53f8c',
+    origText: '#fed7e2',
+    badgeBg: '#ed64a6',
+    badgeText: '#fff',
+    emoji: '🍬'
+  },
+  AT: {
+    id: 'AT',
+    name: 'AT안 (말차 그린)',
+    tag: '차분함',
+    layout: 'bottom',
+    bg: '#f0f4f1',
+    border: '#4f6952',
+    headerBg: '#4f6952',
+    headerText: '#fff',
+    priceText: '#2d3b2f',
+    origText: '#a4b3a6',
+    badgeBg: '#3a4a3c',
+    badgeText: '#fff',
+    emoji: '🍵'
+  },
+  AU: {
+    id: 'AU',
+    name: 'AU안 (카모플라쥬)',
+    tag: '밀리터리',
+    layout: 'top',
+    bg: '#4b5320',
+    border: '#2e3b1f',
+    headerBg: '#2e3b1f',
+    headerText: '#a5b076',
+    priceText: '#a5b076',
+    origText: '#727d50',
+    badgeBg: '#667035',
+    badgeText: '#fff',
+    emoji: '🪖'
+  },
+  AV: {
+    id: 'AV',
+    name: 'AV안 (캔디 팝)',
+    tag: '통통',
+    layout: 'top',
+    bg: '#fff5f8',
+    border: '#ff66a3',
+    headerBg: '#ff66a3',
+    headerText: '#fff',
+    priceText: '#00d2ff',
+    origText: '#ffb3d1',
+    badgeBg: '#00d2ff',
+    badgeText: '#fff',
+    emoji: '🍭'
+  },
+  AW: {
+    id: 'AW',
+    name: 'AW안 (체스 보드)',
+    tag: '모던',
+    layout: 'bottom',
+    bg: '#ffffff',
+    border: '#000000',
+    headerBg: '#000000',
+    headerText: '#ffffff',
+    priceText: '#000000',
+    origText: '#999999',
+    badgeBg: '#000000',
+    badgeText: '#ffffff',
+    emoji: '♟️'
+  },
+  AX: {
+    id: 'AX',
+    name: 'AX안 (폴카 도트)',
+    tag: '발랄',
+    layout: 'top',
+    bg: '#ffebf0',
+    border: '#ff0055',
+    headerBg: '#ff0055',
+    headerText: '#ffffff',
+    priceText: '#ff0055',
+    origText: '#ffb3cc',
+    badgeBg: '#ff0055',
+    badgeText: '#ffffff',
+    emoji: '🔴'
+  }
+};
+
+// 디자인 안 (기본 12가지 + 동적 테마 38가지 = 총 50가지)
+const DESIGN_OPTIONS = [{
+  id: 'A',
+  name: 'A안 (기본 오리지널)',
+  tag: '인기'
+}, {
+  id: 'B',
+  name: 'B안 (모던 심플 블랙)',
+  tag: '깔끔'
+}, {
+  id: 'C',
+  name: 'C안 (마트 세일 강렬)',
+  tag: '강조'
+}, {
+  id: 'D',
+  name: 'D안 (네온 사이버 다크)',
+  tag: '트렌디'
+}, {
+  id: 'E',
+  name: 'E안 (에코 그린 내추럴)',
+  tag: '자연'
+}, {
+  id: 'F',
+  name: 'F안 (카페 베이커리 핑크)',
+  tag: '감성'
+}, {
+  id: 'G',
+  name: 'G안 (프리미엄 다크 골드)',
+  tag: '고급'
+}, {
+  id: 'H',
+  name: 'H안 (초특가 세일 폭탄)',
+  tag: '파격'
+}, {
+  id: 'I',
+  name: 'I안 (빈티지 크래프트)',
+  tag: '수제'
+}, {
+  id: 'J',
+  name: 'J안 (바코드 스마트 리테일)',
+  tag: '매장'
+}, {
+  id: 'K',
+  name: 'K안 (스트릿 팝아트)',
+  tag: '개성'
+}, {
+  id: 'L',
+  name: 'L안 (노르딕 클린 블루)',
+  tag: '세련'
+}, ...Object.values(EXTENDED_THEMES).map(t => ({
+  id: t.id,
+  name: t.name,
+  tag: t.tag
+}))];
+
+// 규격 프리셋 (단위: mm)
+const SIZE_PRESETS = [{
+  id: 'standard',
+  name: '표준 소형 (55 × 40 mm)',
+  widthMm: 55,
+  heightMm: 40
+}, {
+  id: 'medium',
+  name: '중형 라벨 (70 × 50 mm)',
+  widthMm: 70,
+  heightMm: 50
+}, {
+  id: 'large',
+  name: '대형 세일 (90 × 65 mm)',
+  widthMm: 90,
+  heightMm: 65
+}, {
+  id: 'long',
+  name: '슬림 롱 (80 × 35 mm)',
+  widthMm: 80,
+  heightMm: 35
+}, {
+  id: 'square',
+  name: '정사각형 (50 × 50 mm)',
+  widthMm: 50,
+  heightMm: 50
+}, {
+  id: 'custom',
+  name: '📐 사용자 직접 입력 (Custom)',
+  widthMm: 55,
+  heightMm: 40
+}];
+const MM_TO_PX = 3.7795275591; // 1mm ≈ 3.78px (96DPI)
+const MAX_PRICE_DIGITS = 7;
+const A4_WIDTH_PX = 794;
+const A4_HEIGHT_PX = 1123;
+const isIOSDevice = () => {
+  const ua = navigator.userAgent || '';
+  return /iPad|iPhone|iPod/.test(ua) || navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+};
+const CustomDialog = ({
+  dialog,
+  onClose
+}) => {
+  if (!dialog.isOpen) return null;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4",
+    onClick: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-white border-4 border-black rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0_0_#000] animate-fade-in",
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "text-xl font-black mb-3 border-b-2 border-black pb-2"
+  }, dialog.title), /*#__PURE__*/React.createElement("p", {
+    className: "text-sm font-bold text-gray-800 mb-6 leading-relaxed whitespace-pre-wrap"
+  }, dialog.message), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-3 justify-end mt-4"
+  }, dialog.isConfirm && /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    className: "px-4 py-2 bg-white border-2 border-black rounded-xl font-bold hover:bg-gray-100 transition-colors"
+  }, "\uCDE8\uC18C"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      if (dialog.onConfirm) dialog.onConfirm();
+      onClose();
+    },
+    className: "px-5 py-2 bg-black text-[#CCFF00] border-2 border-black rounded-xl font-black shadow-[3px_3px_0_0_#CCFF00] hover:translate-y-[2px] transition-transform"
+  }, "\uD655\uC778"))));
+};
+const SettingsModal = ({
+  isOpen,
+  onClose,
+  settings,
+  onUpdateSettings,
+  sampleProduct,
+  selectedFont,
+  setSelectedFont
+}) => {
+  // 팝업이 열려있는 동안 배경 페이지 스크롤을 잠근다 — 안 그러면 팝업 안에서 드래그할 때
+  // 뒤에 깔린 배경 화면까지 같이 스크롤/터치되는 문제가 있었다.
+  useEffect(() => {
+    if (!isOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isOpen]);
+  if (!isOpen) return null;
+  const handleChange = (key, value) => {
+    onUpdateSettings(prev => ({
+      ...prev,
+      [key]: value
+    }));
+  };
+  const handlePresetChange = presetId => {
+    const preset = SIZE_PRESETS.find(p => p.id === presetId);
+    if (preset) {
+      onUpdateSettings(prev => ({
+        ...prev,
+        presetId,
+        widthMm: preset.widthMm,
+        heightMm: preset.heightMm
+      }));
+    }
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4",
+    onClick: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-white border-4 border-black rounded-3xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto overscroll-contain shadow-[12px_12px_0_0_#000] animate-fade-in",
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex justify-between items-center border-b-4 border-black pb-4 mb-6"
+  }, /*#__PURE__*/React.createElement("h2", {
+    className: "text-base sm:text-xl font-black flex items-center gap-2 text-black"
+  }, "\u2699\uFE0F \uD658\uACBD \uC124\uC815 (\uB514\uC790\uC778 \uBC0F \uADDC\uACA9)"), /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    className: "w-10 h-10 border-2 border-black rounded-full flex items-center justify-center font-black text-xl hover:bg-gray-100 transition-colors"
+  }, "\u2715")), /*#__PURE__*/React.createElement("div", {
+    className: "space-y-6"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-purple-50 p-4 rounded-2xl border-2 border-purple-200 shadow-sm"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "block text-sm font-black mb-3 text-purple-900 flex items-center justify-between"
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83C\uDFA8 \uB514\uC790\uC778 \uD14C\uB9C8 \uC120\uD0DD"), /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] text-gray-500 font-normal"
+  }, "\uCD1D ", DESIGN_OPTIONS.length, "\uC885")), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-56 overflow-y-auto p-2 bg-white/80 rounded-xl border-2 border-black mb-4"
+  }, DESIGN_OPTIONS.map(d => /*#__PURE__*/React.createElement("button", {
+    key: d.id,
+    onClick: () => onUpdateSettings(prev => ({
+      ...prev,
+      design: d.id
+    })),
+    className: `p-2 rounded-lg border-2 text-center text-xs font-black transition-all flex flex-col items-center justify-center ${settings.design === d.id ? 'border-black bg-black text-[#CCFF00] shadow-[2px_2px_0_0_#000] scale-105' : 'border-gray-300 bg-white text-gray-800 hover:border-black'}`
+  }, /*#__PURE__*/React.createElement("span", null, d.id, "\uC548"), /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] font-normal opacity-80 mt-0.5"
+  }, d.tag)))), /*#__PURE__*/React.createElement("label", {
+    className: "block text-sm font-black mb-3 text-purple-900 mt-4"
+  }, "\u270D\uFE0F \uAE00\uAF34(\uD3F0\uD2B8) \uC120\uD0DD"), /*#__PURE__*/React.createElement("select", {
+    value: selectedFont,
+    onChange: e => setSelectedFont(e.target.value),
+    className: "w-full p-3 border-3 border-black rounded-xl font-bold shadow-[2px_2px_0_0_#000] bg-white cursor-pointer",
+    style: {
+      fontFamily: selectedFont
+    }
+  }, FONT_OPTIONS.map((font, idx) => /*#__PURE__*/React.createElement("option", {
+    key: idx,
+    value: font.value,
+    style: {
+      fontFamily: font.value
+    }
+  }, font.name)))), /*#__PURE__*/React.createElement("div", {
+    className: "bg-blue-50 p-4 rounded-2xl border-2 border-blue-200"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "block text-sm font-black mb-3 text-blue-900 flex items-center gap-2"
+  }, "\uD83D\uDCCF \uADDC\uACA9 \uD504\uB9AC\uC14B \uC120\uD0DD"), /*#__PURE__*/React.createElement("select", {
+    value: settings.presetId,
+    onChange: e => handlePresetChange(e.target.value),
+    className: "w-full p-3 border-3 border-black rounded-xl font-bold shadow-[2px_2px_0_0_#000] bg-white cursor-pointer"
+  }, SIZE_PRESETS.map(p => /*#__PURE__*/React.createElement("option", {
+    key: p.id,
+    value: p.id
+  }, p.name))), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-4 mt-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex-1"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "block text-xs font-bold mb-1.5 text-blue-800"
+  }, "\uAC00\uB85C (Width mm)"), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    value: settings.widthMm,
+    onChange: e => {
+      handleChange('presetId', 'custom');
+      const val = e.target.value;
+      // 입력 중에는 빈 칸 허용
+      handleChange('widthMm', val === '' ? '' : Number(val));
+    },
+    onBlur: () => {
+      // 입력을 마쳤을 때 빈 칸이거나 너무 작으면 20으로 자동 보정
+      let val = Number(settings.widthMm);
+      if (!val || val < 20) handleChange('widthMm', 20);
+      if (val > 200) handleChange('widthMm', 200);
+    },
+    className: "w-full p-2.5 border-2 border-black rounded-lg font-bold bg-white",
+    min: "20",
+    max: "200"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "flex-1"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "block text-xs font-bold mb-1.5 text-blue-800"
+  }, "\uC138\uB85C (Height mm)"), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    value: settings.heightMm,
+    onChange: e => {
+      handleChange('presetId', 'custom');
+      const val = e.target.value;
+      handleChange('heightMm', val === '' ? '' : Number(val));
+    },
+    onBlur: () => {
+      let val = Number(settings.heightMm);
+      if (!val || val < 20) handleChange('heightMm', 20);
+      if (val > 200) handleChange('heightMm', 200);
+    },
+    className: "w-full p-2.5 border-2 border-black rounded-lg font-bold bg-white",
+    min: "20",
+    max: "200"
+  })))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    className: "block text-sm font-black mb-3 text-black"
+  }, "\uD83D\uDC40 \uC124\uC815 \uBBF8\uB9AC\uBCF4\uAE30"), /*#__PURE__*/React.createElement("div", {
+    className: "bg-gray-200 rounded-2xl p-6 border-4 border-dashed border-gray-400 flex items-center justify-center relative"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "absolute top-3 left-3 text-xs font-bold text-gray-500 bg-white/80 px-2 py-1 rounded shadow-sm"
+  }, "\uC2E4\uC81C \uD06C\uAE30 \uBE44\uC728 \uBC18\uC601"), /*#__PURE__*/React.createElement(PriceTag, _extends({}, sampleProduct, {
+    widthMm: settings.widthMm || 20,
+    heightMm: settings.heightMm || 20,
+    currency: settings.currency,
+    showOriginal: settings.showOriginal,
+    showCutGuide: settings.showCutGuide,
+    fontFamily: selectedFont,
+    design: settings.design
+  })))), /*#__PURE__*/React.createElement("div", {
+    className: "bg-gray-50 p-4 rounded-2xl border-2 border-gray-200 space-y-3"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "flex items-center gap-3 cursor-pointer p-3 bg-white border-2 border-black rounded-xl hover:bg-gray-100 transition-colors shadow-sm"
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: settings.showOriginal,
+    onChange: e => handleChange('showOriginal', e.target.checked),
+    className: "w-5 h-5 accent-black"
+  }), /*#__PURE__*/React.createElement("span", {
+    className: "font-bold text-sm"
+  }, "\uC815\uAC00(\uCDE8\uC18C\uC120) \uD45C\uC2DC\uD558\uAE30")), /*#__PURE__*/React.createElement("label", {
+    className: "flex items-center gap-3 cursor-pointer p-3 bg-white border-2 border-black rounded-xl hover:bg-gray-100 transition-colors shadow-sm"
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: settings.showCutGuide,
+    onChange: e => handleChange('showCutGuide', e.target.checked),
+    className: "w-5 h-5 accent-black"
+  }), /*#__PURE__*/React.createElement("span", {
+    className: "font-bold text-sm"
+  }, "\uC7AC\uB2E8\uC120(\uAC00\uC774\uB4DC\uC120) \uD45C\uC2DC\uD558\uAE30")))), /*#__PURE__*/React.createElement("div", {
+    className: "mt-8 pt-5 border-t-4 border-black flex justify-end"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    className: "w-full lg:w-auto px-10 py-4 bg-black text-white text-lg font-black rounded-xl shadow-[6px_6px_0_0_#CCFF00] hover:translate-y-[2px] transition-transform"
+  }, "\uC124\uC815 \uC644\uB8CC \uBC0F \uB2EB\uAE30"))));
+};
+const PriceTag = ({
+  productName,
+  originalPrice,
+  discountPrice,
+  discountRate,
+  fontFamily,
+  design = 'A',
+  widthMm = 55,
+  heightMm = 40,
+  currency = '원',
+  showOriginal = true,
+  showCutGuide = true,
+  onClick
+}) => {
+  // 렌더링 방어 코드: 비어있을 땐 최소치로 계산
+  const safeWidth = Number(widthMm) || 20;
+  const safeHeight = Number(heightMm) || 20;
+  const widthPx = Math.round(safeWidth * MM_TO_PX);
+  const heightPx = Math.round(safeHeight * MM_TO_PX);
+  const baseScale = heightPx / 151;
+  const bannerHeightPx = Math.round(heightPx * 0.3);
+  const formatPrice = p => !p ? '0' : Number(p).toLocaleString();
+  const formattedOriginal = formatPrice(originalPrice);
+  const formattedDiscount = formatPrice(discountPrice);
+  const getNameFontSize = name => {
+    const len = (name || '').length;
+    let base = 28;
+    if (len <= 5) base = 28;else if (len <= 7) base = 22;else if (len <= 10) base = 18;else base = 15;
+    return Math.max(10, Math.round(base * baseScale));
+  };
+  const getPriceFontSize = priceStr => {
+    const len = (priceStr || '').length;
+    let base = 42;
+    if (len <= 5) base = 42;else if (len <= 7) base = 36;else base = 28; // 긴 텍스트 잘림 방지를 위해 30에서 28로 약간 축소
+    return Math.max(14, Math.round(base * baseScale));
+  };
+  const nameFontSize = getNameFontSize(productName);
+  const priceFontSize = getPriceFontSize(formattedDiscount);
+  const currencyFontSize = Math.max(10, Math.round(priceFontSize * 0.5));
+  const hasRealBoldWeight = fontFamily && fontFamily.includes('Noto Sans KR');
+  const boldWeight = hasRealBoldWeight ? 900 : 400;
+  const semiBoldWeight = hasRealBoldWeight ? 700 : 400;
+  const containerStyle = {
+    width: widthPx + 'px',
+    height: heightPx + 'px',
+    fontFamily: fontFamily,
+    boxSizing: 'border-box',
+    cursor: onClick ? 'pointer' : 'default'
+  };
+
+  // 💡 [핵심 보완] 이모지가 깨지거나 잘리지 않도록 시스템 기본 이모지 폰트 지정
+  const emojiFontFamily = '"Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji", sans-serif';
+  if (design === 'A') {
+    return /*#__PURE__*/React.createElement("div", {
+      onClick: onClick,
+      className: `relative flex flex-col bg-white overflow-hidden transition-transform hover:brightness-95 ${showCutGuide ? 'cut-guide' : ''}`,
+      style: {
+        ...containerStyle,
+        border: `${Math.max(2, Math.round(3 * baseScale))}px solid #000`
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "relative flex flex-col justify-between overflow-hidden",
+      style: {
+        height: heightPx - bannerHeightPx + 'px',
+        padding: `${Math.max(3, Math.round(6 * baseScale))}px`,
+        backgroundImage: "url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMiIgY3k9IjIiIHI9IjEiIGZpbGw9IiNlNWU3ZWIiLz48L3N2Zz4=')"
+      }
+    }, showOriginal && /*#__PURE__*/React.createElement("div", {
+      className: "relative inline-block",
+      style: {
+        marginLeft: '4px'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "text-gray-500",
+      style: {
+        fontSize: Math.max(10, Math.round(16 * baseScale)) + 'px',
+        zIndex: 10,
+        fontWeight: semiBoldWeight
+      }
+    }, formattedOriginal, currency), /*#__PURE__*/React.createElement("svg", {
+      style: {
+        position: 'absolute',
+        top: '1px',
+        left: '-4px',
+        width: 100 * baseScale + 'px',
+        height: 60 * baseScale + 'px',
+        pointerEvents: 'none',
+        zIndex: 20
+      },
+      viewBox: "0 0 110 70"
+    }, /*#__PURE__*/React.createElement("polyline", {
+      points: "0,13 68,13 90,60",
+      fill: "none",
+      stroke: "#dc2626",
+      strokeWidth: "4",
+      strokeLinejoin: "round"
+    }), /*#__PURE__*/React.createElement("polygon", {
+      points: "90,60 79,47 98,52",
+      fill: "#dc2626"
+    }))), /*#__PURE__*/React.createElement("div", {
+      className: "text-right truncate w-full mt-auto",
+      style: {
+        zIndex: 30
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "text-black truncate block",
+      style: {
+        fontSize: priceFontSize + 'px',
+        lineHeight: 1.1,
+        fontWeight: boldWeight
+      }
+    }, formattedDiscount, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: currencyFontSize + 'px',
+        marginLeft: '2px',
+        fontWeight: semiBoldWeight
+      }
+    }, currency))), discountRate > 0 && /*#__PURE__*/React.createElement("div", {
+      className: "flex flex-col items-center justify-center text-white whitespace-nowrap",
+      style: {
+        position: 'absolute',
+        top: '6px',
+        right: '6px',
+        width: Math.max(32, Math.round(50 * baseScale)) + 'px',
+        height: Math.max(32, Math.round(50 * baseScale)) + 'px',
+        backgroundColor: '#dc2626',
+        borderRadius: '9999px',
+        border: `${Math.max(1.5, Math.round(2.5 * baseScale))}px solid #000`,
+        zIndex: 10,
+        transform: 'rotate(12deg)'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: Math.max(8, Math.round(11 * baseScale)) + 'px',
+        fontWeight: boldWeight
+      }
+    }, "SALE"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: Math.max(8, Math.round(11 * baseScale)) + 'px',
+        lineHeight: 1.1,
+        fontWeight: semiBoldWeight
+      }
+    }, discountRate, "%"))), /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center justify-center bg-[#001c55] text-white px-1 overflow-hidden",
+      style: {
+        height: bannerHeightPx + 'px',
+        borderTop: `${Math.max(2, Math.round(3 * baseScale))}px solid #000`,
+        zIndex: 20
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "text-center truncate",
+      style: {
+        fontSize: nameFontSize + 'px',
+        lineHeight: 1.1,
+        fontWeight: boldWeight
+      }
+    }, productName || '\u00A0')));
+  }
+  if (design === 'B') {
+    return /*#__PURE__*/React.createElement("div", {
+      onClick: onClick,
+      className: `relative flex flex-col bg-white overflow-hidden transition-transform hover:brightness-95 ${showCutGuide ? 'cut-guide' : ''}`,
+      style: {
+        ...containerStyle,
+        border: `${Math.max(2, Math.round(3 * baseScale))}px solid #000`
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center justify-between bg-black text-white px-2 overflow-hidden gap-1",
+      style: {
+        height: bannerHeightPx + 'px'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "truncate font-bold",
+      style: {
+        fontSize: nameFontSize + 'px',
+        lineHeight: 1.1,
+        fontWeight: boldWeight
+      }
+    }, productName || '\u00A0'), discountRate > 0 && /*#__PURE__*/React.createElement("span", {
+      className: "bg-red-600 text-white font-black px-1.5 py-0.5 rounded text-[10px] whitespace-nowrap flex-shrink-0",
+      style: {
+        fontSize: Math.max(8, Math.round(10 * baseScale)) + 'px'
+      }
+    }, "-", discountRate, "%")), /*#__PURE__*/React.createElement("div", {
+      className: "relative flex-1 p-2 flex flex-col justify-between overflow-hidden"
+    }, showOriginal && /*#__PURE__*/React.createElement("div", {
+      className: "text-gray-400 font-medium truncate",
+      style: {
+        fontSize: Math.max(10, Math.round(14 * baseScale)) + 'px',
+        textDecoration: 'line-through',
+        fontWeight: semiBoldWeight
+      }
+    }, formattedOriginal, currency), /*#__PURE__*/React.createElement("div", {
+      className: "text-right mt-auto truncate w-full"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "text-black",
+      style: {
+        fontSize: priceFontSize + 'px',
+        fontWeight: boldWeight,
+        lineHeight: 1.1
+      }
+    }, formattedDiscount), /*#__PURE__*/React.createElement("span", {
+      className: "text-black",
+      style: {
+        fontSize: currencyFontSize + 'px',
+        fontWeight: semiBoldWeight,
+        marginLeft: '2px'
+      }
+    }, currency))));
+  }
+  if (design === 'C') {
+    return /*#__PURE__*/React.createElement("div", {
+      onClick: onClick,
+      className: `relative flex flex-col bg-white overflow-hidden transition-transform hover:brightness-95 ${showCutGuide ? 'cut-guide' : ''}`,
+      style: {
+        ...containerStyle,
+        border: `${Math.max(2, Math.round(3.5 * baseScale))}px solid #dc2626`
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center justify-center gap-1 bg-[#facc15] text-[#991b1b] px-1 border-b-2 border-[#dc2626] overflow-hidden",
+      style: {
+        height: bannerHeightPx + 'px'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: nameFontSize + 'px',
+        lineHeight: 1.1,
+        fontFamily: emojiFontFamily,
+        flexShrink: 0
+      }
+    }, "\uD83D\uDD25"), /*#__PURE__*/React.createElement("span", {
+      className: "text-center truncate font-black",
+      style: {
+        fontSize: nameFontSize + 'px',
+        lineHeight: 1.1,
+        fontWeight: boldWeight
+      }
+    }, productName || '\u00A0')), /*#__PURE__*/React.createElement("div", {
+      className: "relative flex-1 p-2 flex flex-col justify-between overflow-hidden"
+    }, showOriginal && /*#__PURE__*/React.createElement("div", {
+      className: "text-gray-400 font-bold truncate",
+      style: {
+        fontSize: Math.max(10, Math.round(14 * baseScale)) + 'px',
+        textDecoration: 'line-through',
+        fontWeight: semiBoldWeight
+      }
+    }, formattedOriginal, currency), /*#__PURE__*/React.createElement("div", {
+      className: "text-right mt-auto truncate w-full"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "text-[#dc2626]",
+      style: {
+        fontSize: priceFontSize + 'px',
+        fontWeight: boldWeight,
+        lineHeight: 1.1
+      }
+    }, formattedDiscount), /*#__PURE__*/React.createElement("span", {
+      className: "text-[#dc2626]",
+      style: {
+        fontSize: currencyFontSize + 'px',
+        fontWeight: semiBoldWeight,
+        marginLeft: '2px'
+      }
+    }, currency)), discountRate > 0 && /*#__PURE__*/React.createElement("div", {
+      className: "absolute top-2 right-2 bg-red-600 text-yellow-300 font-black rounded-full px-2 py-0.5 whitespace-nowrap",
+      style: {
+        fontSize: Math.max(9, Math.round(11 * baseScale)) + 'px'
+      }
+    }, discountRate, "% \uD2B9\uAC00")));
+  }
+  if (design === 'D') {
+    return /*#__PURE__*/React.createElement("div", {
+      onClick: onClick,
+      className: `relative flex flex-col bg-slate-950 text-white overflow-hidden transition-transform hover:brightness-110 ${showCutGuide ? 'cut-guide' : ''}`,
+      style: {
+        ...containerStyle,
+        border: `${Math.max(2, Math.round(2.5 * baseScale))}px solid #00f0ff`
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center justify-center bg-black border-b-2 border-[#00f0ff] px-1 overflow-hidden",
+      style: {
+        height: bannerHeightPx + 'px'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "text-[#00f0ff] text-center truncate tracking-wider",
+      style: {
+        fontSize: nameFontSize + 'px',
+        lineHeight: 1.1,
+        fontWeight: boldWeight
+      }
+    }, productName || '\u00A0')), /*#__PURE__*/React.createElement("div", {
+      className: "relative flex-1 p-2 flex flex-col justify-between bg-slate-900 overflow-hidden"
+    }, showOriginal && /*#__PURE__*/React.createElement("div", {
+      className: "text-slate-400 font-medium truncate",
+      style: {
+        fontSize: Math.max(10, Math.round(13 * baseScale)) + 'px',
+        textDecoration: 'line-through',
+        fontWeight: semiBoldWeight
+      }
+    }, formattedOriginal, currency), /*#__PURE__*/React.createElement("div", {
+      className: "text-right mt-auto truncate w-full"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "text-[#ff0055]",
+      style: {
+        fontSize: priceFontSize + 'px',
+        fontWeight: boldWeight,
+        lineHeight: 1.1,
+        textShadow: '0 0 6px rgba(255,0,85,0.6)'
+      }
+    }, formattedDiscount), /*#__PURE__*/React.createElement("span", {
+      className: "text-[#ff0055]",
+      style: {
+        fontSize: currencyFontSize + 'px',
+        fontWeight: semiBoldWeight,
+        marginLeft: '2px'
+      }
+    }, currency)), discountRate > 0 && /*#__PURE__*/React.createElement("div", {
+      className: "absolute top-2 right-2 bg-[#ff0055] text-white font-bold rounded whitespace-nowrap",
+      style: {
+        padding: '2px 5px',
+        fontSize: Math.max(9, Math.round(10 * baseScale)) + 'px',
+        fontWeight: boldWeight
+      }
+    }, "-", discountRate, "%")));
+  }
+  if (design === 'E') {
+    return /*#__PURE__*/React.createElement("div", {
+      onClick: onClick,
+      className: `relative flex flex-col bg-[#f4f7f4] overflow-hidden transition-transform hover:brightness-95 ${showCutGuide ? 'cut-guide' : ''}`,
+      style: {
+        ...containerStyle,
+        border: `${Math.max(2, Math.round(2.5 * baseScale))}px solid #2e5a36`
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center justify-center gap-1 bg-[#2e5a36] text-white px-1 overflow-hidden",
+      style: {
+        height: bannerHeightPx + 'px'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: nameFontSize + 'px',
+        lineHeight: 1.1,
+        fontFamily: emojiFontFamily,
+        flexShrink: 0
+      }
+    }, "\uD83C\uDF3F"), /*#__PURE__*/React.createElement("span", {
+      className: "text-center truncate",
+      style: {
+        fontSize: nameFontSize + 'px',
+        lineHeight: 1.1,
+        fontWeight: boldWeight
+      }
+    }, productName || '\u00A0')), /*#__PURE__*/React.createElement("div", {
+      className: "relative flex-1 p-2 flex flex-col justify-between overflow-hidden"
+    }, showOriginal && /*#__PURE__*/React.createElement("div", {
+      className: "text-stone-400 truncate",
+      style: {
+        fontSize: Math.max(10, Math.round(13 * baseScale)) + 'px',
+        textDecoration: 'line-through',
+        fontWeight: semiBoldWeight
+      }
+    }, formattedOriginal, currency), /*#__PURE__*/React.createElement("div", {
+      className: "text-right mt-auto truncate w-full"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "text-[#1b4322]",
+      style: {
+        fontSize: priceFontSize + 'px',
+        fontWeight: boldWeight,
+        lineHeight: 1.1
+      }
+    }, formattedDiscount), /*#__PURE__*/React.createElement("span", {
+      className: "text-[#1b4322]",
+      style: {
+        fontSize: currencyFontSize + 'px',
+        fontWeight: semiBoldWeight,
+        marginLeft: '2px'
+      }
+    }, currency)), discountRate > 0 && /*#__PURE__*/React.createElement("div", {
+      className: "absolute top-2 right-2 bg-[#d97706] text-white font-bold rounded-full flex items-center justify-center whitespace-nowrap",
+      style: {
+        width: Math.max(28, Math.round(34 * baseScale)) + 'px',
+        height: Math.max(28, Math.round(34 * baseScale)) + 'px',
+        fontSize: Math.max(9, Math.round(10 * baseScale)) + 'px'
+      }
+    }, discountRate, "%")));
+  }
+  if (design === 'F') {
+    return /*#__PURE__*/React.createElement("div", {
+      onClick: onClick,
+      className: `relative flex flex-col bg-[#fffaf5] overflow-hidden transition-transform hover:brightness-95 ${showCutGuide ? 'cut-guide' : ''}`,
+      style: {
+        ...containerStyle,
+        border: `${Math.max(2, Math.round(2.5 * baseScale))}px solid #f43f5e`,
+        borderRadius: '6px'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center justify-center bg-[#ffe4e6] text-[#9f1239] border-b border-[#f43f5e] px-1 overflow-hidden",
+      style: {
+        height: bannerHeightPx + 'px'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "text-center truncate",
+      style: {
+        fontSize: nameFontSize + 'px',
+        lineHeight: 1.1,
+        fontWeight: boldWeight
+      }
+    }, productName || '\u00A0')), /*#__PURE__*/React.createElement("div", {
+      className: "relative flex-1 p-2 flex flex-col justify-between overflow-hidden"
+    }, showOriginal && /*#__PURE__*/React.createElement("div", {
+      className: "text-rose-300 truncate",
+      style: {
+        fontSize: Math.max(10, Math.round(13 * baseScale)) + 'px',
+        textDecoration: 'line-through',
+        fontWeight: semiBoldWeight
+      }
+    }, formattedOriginal, currency), /*#__PURE__*/React.createElement("div", {
+      className: "text-right mt-auto truncate w-full"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "text-[#be123c]",
+      style: {
+        fontSize: priceFontSize + 'px',
+        fontWeight: boldWeight,
+        lineHeight: 1.1
+      }
+    }, formattedDiscount), /*#__PURE__*/React.createElement("span", {
+      className: "text-[#be123c]",
+      style: {
+        fontSize: currencyFontSize + 'px',
+        fontWeight: semiBoldWeight,
+        marginLeft: '2px'
+      }
+    }, currency)), discountRate > 0 && /*#__PURE__*/React.createElement("div", {
+      className: "absolute top-2 right-2 bg-[#f43f5e] text-white flex items-center justify-center rounded-lg px-1.5 py-0.5 whitespace-nowrap",
+      style: {
+        fontSize: Math.max(9, Math.round(10 * baseScale)) + 'px',
+        fontWeight: boldWeight
+      }
+    }, "\u2605 ", discountRate, "% OFF")));
+  }
+  if (design === 'G') {
+    return /*#__PURE__*/React.createElement("div", {
+      onClick: onClick,
+      className: `relative flex flex-col bg-[#1c1917] text-[#fef08a] overflow-hidden transition-transform hover:brightness-110 ${showCutGuide ? 'cut-guide' : ''}`,
+      style: {
+        ...containerStyle,
+        border: `${Math.max(2, Math.round(2.5 * baseScale))}px solid #eab308`
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center justify-center bg-[#292524] border-b border-[#eab308] px-1 overflow-hidden",
+      style: {
+        height: bannerHeightPx + 'px'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "text-[#fef08a] text-center truncate tracking-widest",
+      style: {
+        fontSize: nameFontSize + 'px',
+        lineHeight: 1.1,
+        fontWeight: boldWeight
+      }
+    }, productName || '\u00A0')), /*#__PURE__*/React.createElement("div", {
+      className: "relative flex-1 p-2 flex flex-col justify-between overflow-hidden"
+    }, showOriginal && /*#__PURE__*/React.createElement("div", {
+      className: "text-stone-500 truncate",
+      style: {
+        fontSize: Math.max(10, Math.round(13 * baseScale)) + 'px',
+        textDecoration: 'line-through',
+        fontWeight: semiBoldWeight
+      }
+    }, formattedOriginal, currency), /*#__PURE__*/React.createElement("div", {
+      className: "text-right mt-auto truncate w-full"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "text-[#eab308]",
+      style: {
+        fontSize: priceFontSize + 'px',
+        fontWeight: boldWeight,
+        lineHeight: 1.1
+      }
+    }, formattedDiscount), /*#__PURE__*/React.createElement("span", {
+      className: "text-[#eab308]",
+      style: {
+        fontSize: currencyFontSize + 'px',
+        fontWeight: semiBoldWeight,
+        marginLeft: '2px'
+      }
+    }, currency)), discountRate > 0 && /*#__PURE__*/React.createElement("div", {
+      className: "absolute top-2 right-2 border border-[#eab308] text-[#eab308] px-1.5 py-0.5 rounded whitespace-nowrap",
+      style: {
+        fontSize: Math.max(8, Math.round(9 * baseScale)) + 'px',
+        fontWeight: boldWeight
+      }
+    }, "SPECIAL ", discountRate, "%")));
+  }
+  if (design === 'H') {
+    return /*#__PURE__*/React.createElement("div", {
+      onClick: onClick,
+      className: `relative flex flex-col bg-[#facc15] overflow-hidden transition-transform hover:brightness-95 ${showCutGuide ? 'cut-guide' : ''}`,
+      style: {
+        ...containerStyle,
+        border: `${Math.max(3, Math.round(3.5 * baseScale))}px solid #dc2626`
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center justify-center gap-1 bg-[#dc2626] text-white px-1 overflow-hidden",
+      style: {
+        height: bannerHeightPx + 'px'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: nameFontSize + 'px',
+        lineHeight: 1.1,
+        fontFamily: emojiFontFamily,
+        flexShrink: 0
+      }
+    }, "\uD83D\uDCA5"), /*#__PURE__*/React.createElement("span", {
+      className: "text-center truncate font-black",
+      style: {
+        fontSize: nameFontSize + 'px',
+        lineHeight: 1.1,
+        fontWeight: boldWeight
+      }
+    }, productName || '\u00A0')), /*#__PURE__*/React.createElement("div", {
+      className: "relative flex-1 p-2 flex flex-col justify-between overflow-hidden"
+    }, showOriginal && /*#__PURE__*/React.createElement("div", {
+      className: "text-red-900/60 font-bold truncate",
+      style: {
+        fontSize: Math.max(10, Math.round(13 * baseScale)) + 'px',
+        textDecoration: 'line-through',
+        fontWeight: semiBoldWeight
+      }
+    }, formattedOriginal, currency), /*#__PURE__*/React.createElement("div", {
+      className: "text-right mt-auto truncate w-full"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "text-[#dc2626]",
+      style: {
+        fontSize: priceFontSize + 'px',
+        fontWeight: boldWeight,
+        lineHeight: 1.1
+      }
+    }, formattedDiscount), /*#__PURE__*/React.createElement("span", {
+      className: "text-[#dc2626]",
+      style: {
+        fontSize: currencyFontSize + 'px',
+        fontWeight: semiBoldWeight,
+        marginLeft: '2px'
+      }
+    }, currency)), discountRate > 0 && /*#__PURE__*/React.createElement("div", {
+      className: "absolute top-1 right-1 bg-black text-[#facc15] font-black rounded-md px-1.5 py-0.5 transform rotate-6 whitespace-nowrap",
+      style: {
+        fontSize: Math.max(9, Math.round(11 * baseScale)) + 'px'
+      }
+    }, "\uD30C\uACA9 -", discountRate, "%")));
+  }
+  if (design === 'I') {
+    return /*#__PURE__*/React.createElement("div", {
+      onClick: onClick,
+      className: `relative flex flex-col bg-[#e7d7c1] overflow-hidden transition-transform hover:brightness-95 ${showCutGuide ? 'cut-guide' : ''}`,
+      style: {
+        ...containerStyle,
+        border: `${Math.max(2, Math.round(2.5 * baseScale))}px dashed #78350f`
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center justify-center bg-[#78350f] text-[#fef3c7] px-1 overflow-hidden",
+      style: {
+        height: bannerHeightPx + 'px'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "text-center truncate",
+      style: {
+        fontSize: nameFontSize + 'px',
+        lineHeight: 1.1,
+        fontWeight: boldWeight
+      }
+    }, productName || '\u00A0')), /*#__PURE__*/React.createElement("div", {
+      className: "relative flex-1 p-2 flex flex-col justify-between overflow-hidden"
+    }, showOriginal && /*#__PURE__*/React.createElement("div", {
+      className: "text-[#92400e]/60 truncate",
+      style: {
+        fontSize: Math.max(10, Math.round(13 * baseScale)) + 'px',
+        textDecoration: 'line-through',
+        fontWeight: semiBoldWeight
+      }
+    }, formattedOriginal, currency), /*#__PURE__*/React.createElement("div", {
+      className: "text-right mt-auto truncate w-full"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "text-[#451a03]",
+      style: {
+        fontSize: priceFontSize + 'px',
+        fontWeight: boldWeight,
+        lineHeight: 1.1
+      }
+    }, formattedDiscount), /*#__PURE__*/React.createElement("span", {
+      className: "text-[#451a03]",
+      style: {
+        fontSize: currencyFontSize + 'px',
+        fontWeight: semiBoldWeight,
+        marginLeft: '2px'
+      }
+    }, currency)), discountRate > 0 && /*#__PURE__*/React.createElement("div", {
+      className: "absolute top-2 right-2 bg-[#b45309] text-white rounded px-1.5 py-0.5 whitespace-nowrap",
+      style: {
+        fontSize: Math.max(8, Math.round(9 * baseScale)) + 'px',
+        fontWeight: boldWeight
+      }
+    }, discountRate, "% \uD560\uC778")));
+  }
+  if (design === 'J') {
+    return /*#__PURE__*/React.createElement("div", {
+      onClick: onClick,
+      className: `relative flex flex-col bg-white overflow-hidden transition-transform hover:brightness-95 ${showCutGuide ? 'cut-guide' : ''}`,
+      style: {
+        ...containerStyle,
+        border: `${Math.max(2, Math.round(2 * baseScale))}px solid #334155`
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center justify-between bg-slate-800 text-white px-2 overflow-hidden gap-1",
+      style: {
+        height: bannerHeightPx + 'px'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "truncate",
+      style: {
+        fontSize: nameFontSize + 'px',
+        lineHeight: 1.1,
+        fontWeight: boldWeight
+      }
+    }, productName || '\u00A0'), /*#__PURE__*/React.createElement("span", {
+      className: "text-[9px] opacity-75 flex-shrink-0"
+    }, "STORE")), /*#__PURE__*/React.createElement("div", {
+      className: "relative flex-1 p-2 flex flex-col justify-between overflow-hidden"
+    }, showOriginal && /*#__PURE__*/React.createElement("div", {
+      className: "text-slate-400 truncate",
+      style: {
+        fontSize: Math.max(10, Math.round(13 * baseScale)) + 'px',
+        textDecoration: 'line-through',
+        fontWeight: semiBoldWeight
+      }
+    }, formattedOriginal, currency), /*#__PURE__*/React.createElement("div", {
+      className: "flex items-end justify-between mt-auto"
+    }, /*#__PURE__*/React.createElement("svg", {
+      className: "w-10 h-4 opacity-75 flex-shrink-0",
+      viewBox: "0 0 50 20"
+    }, /*#__PURE__*/React.createElement("rect", {
+      x: "0",
+      y: "0",
+      width: "3",
+      height: "20",
+      fill: "#000"
+    }), /*#__PURE__*/React.createElement("rect", {
+      x: "5",
+      y: "0",
+      width: "1",
+      height: "20",
+      fill: "#000"
+    }), /*#__PURE__*/React.createElement("rect", {
+      x: "8",
+      y: "0",
+      width: "4",
+      height: "20",
+      fill: "#000"
+    }), /*#__PURE__*/React.createElement("rect", {
+      x: "14",
+      y: "0",
+      width: "2",
+      height: "20",
+      fill: "#000"
+    }), /*#__PURE__*/React.createElement("rect", {
+      x: "18",
+      y: "0",
+      width: "1",
+      height: "20",
+      fill: "#000"
+    }), /*#__PURE__*/React.createElement("rect", {
+      x: "21",
+      y: "0",
+      width: "5",
+      height: "20",
+      fill: "#000"
+    }), /*#__PURE__*/React.createElement("rect", {
+      x: "28",
+      y: "0",
+      width: "2",
+      height: "20",
+      fill: "#000"
+    }), /*#__PURE__*/React.createElement("rect", {
+      x: "32",
+      y: "0",
+      width: "3",
+      height: "20",
+      fill: "#000"
+    }), /*#__PURE__*/React.createElement("rect", {
+      x: "37",
+      y: "0",
+      width: "1",
+      height: "20",
+      fill: "#000"
+    }), /*#__PURE__*/React.createElement("rect", {
+      x: "40",
+      y: "0",
+      width: "4",
+      height: "20",
+      fill: "#000"
+    })), /*#__PURE__*/React.createElement("div", {
+      className: "text-right truncate w-full pl-2"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "text-slate-900",
+      style: {
+        fontSize: priceFontSize + 'px',
+        fontWeight: boldWeight,
+        lineHeight: 1.1
+      }
+    }, formattedDiscount), /*#__PURE__*/React.createElement("span", {
+      className: "text-slate-900",
+      style: {
+        fontSize: currencyFontSize + 'px',
+        fontWeight: semiBoldWeight,
+        marginLeft: '2px'
+      }
+    }, currency))), discountRate > 0 && /*#__PURE__*/React.createElement("div", {
+      className: "absolute top-2 right-2 bg-blue-600 text-white px-1.5 py-0.5 rounded font-bold whitespace-nowrap",
+      style: {
+        fontSize: Math.max(8, Math.round(9 * baseScale)) + 'px'
+      }
+    }, "-", discountRate, "%")));
+  }
+  if (design === 'K') {
+    return /*#__PURE__*/React.createElement("div", {
+      onClick: onClick,
+      className: `relative flex flex-col bg-amber-50 overflow-hidden transition-transform hover:brightness-95 ${showCutGuide ? 'cut-guide' : ''}`,
+      style: {
+        ...containerStyle,
+        border: `${Math.max(3, Math.round(3 * baseScale))}px solid #000`
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center justify-center bg-yellow-400 border-b-2 border-black px-1 overflow-hidden",
+      style: {
+        height: bannerHeightPx + 'px',
+        backgroundImage: 'repeating-linear-gradient(-45deg, #facc15, #facc15 8px, #000 8px, #000 11px)'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "bg-black text-white px-2 py-0.5 rounded text-center truncate w-[90%]",
+      style: {
+        fontSize: Math.max(9, nameFontSize - 2) + 'px',
+        lineHeight: 1.1,
+        fontWeight: boldWeight
+      }
+    }, productName || '\u00A0')), /*#__PURE__*/React.createElement("div", {
+      className: "relative flex-1 p-2 flex flex-col justify-between overflow-hidden"
+    }, showOriginal && /*#__PURE__*/React.createElement("div", {
+      className: "text-gray-500 font-bold truncate",
+      style: {
+        fontSize: Math.max(10, Math.round(13 * baseScale)) + 'px',
+        textDecoration: 'line-through',
+        fontWeight: semiBoldWeight
+      }
+    }, formattedOriginal, currency), /*#__PURE__*/React.createElement("div", {
+      className: "text-right mt-auto truncate w-full"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "text-black",
+      style: {
+        fontSize: priceFontSize + 'px',
+        fontWeight: boldWeight,
+        lineHeight: 1.1
+      }
+    }, formattedDiscount), /*#__PURE__*/React.createElement("span", {
+      className: "text-black",
+      style: {
+        fontSize: currencyFontSize + 'px',
+        fontWeight: semiBoldWeight,
+        marginLeft: '2px'
+      }
+    }, currency)), discountRate > 0 && /*#__PURE__*/React.createElement("div", {
+      className: "absolute top-2 right-2 bg-red-500 text-white font-black border border-black rounded shadow-[2px_2px_0_0_#000] px-1 py-0.5 whitespace-nowrap",
+      style: {
+        fontSize: Math.max(9, Math.round(10 * baseScale)) + 'px'
+      }
+    }, "SALE ", discountRate, "%")));
+  }
+  if (design === 'L') {
+    return /*#__PURE__*/React.createElement("div", {
+      onClick: onClick,
+      className: `relative flex flex-col bg-white overflow-hidden transition-transform hover:brightness-95 ${showCutGuide ? 'cut-guide' : ''}`,
+      style: {
+        ...containerStyle,
+        border: `${Math.max(2, Math.round(2.5 * baseScale))}px solid #1e3a8a`
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center justify-center bg-[#1e3a8a] text-[#fef08a] px-1 overflow-hidden",
+      style: {
+        height: bannerHeightPx + 'px'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "text-center truncate",
+      style: {
+        fontSize: nameFontSize + 'px',
+        lineHeight: 1.1,
+        fontWeight: boldWeight
+      }
+    }, productName || '\u00A0')), /*#__PURE__*/React.createElement("div", {
+      className: "relative flex-1 p-2 flex flex-col justify-between bg-blue-50/40 overflow-hidden"
+    }, showOriginal && /*#__PURE__*/React.createElement("div", {
+      className: "text-blue-400 truncate",
+      style: {
+        fontSize: Math.max(10, Math.round(13 * baseScale)) + 'px',
+        textDecoration: 'line-through',
+        fontWeight: semiBoldWeight
+      }
+    }, formattedOriginal, currency), /*#__PURE__*/React.createElement("div", {
+      className: "text-right mt-auto truncate w-full"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "text-[#1e3a8a]",
+      style: {
+        fontSize: priceFontSize + 'px',
+        fontWeight: boldWeight,
+        lineHeight: 1.1
+      }
+    }, formattedDiscount), /*#__PURE__*/React.createElement("span", {
+      className: "text-[#1e3a8a]",
+      style: {
+        fontSize: currencyFontSize + 'px',
+        fontWeight: semiBoldWeight,
+        marginLeft: '2px'
+      }
+    }, currency)), discountRate > 0 && /*#__PURE__*/React.createElement("div", {
+      className: "absolute top-2 right-2 bg-[#facc15] text-[#1e3a8a] font-bold px-1.5 py-0.5 rounded border border-[#1e3a8a] whitespace-nowrap",
+      style: {
+        fontSize: Math.max(8, Math.round(9 * baseScale)) + 'px'
+      }
+    }, discountRate, "% OFF")));
+  }
+
+  // 동적 테마 렌더링 (M ~ AX)
+  if (EXTENDED_THEMES[design]) {
+    const t = EXTENDED_THEMES[design];
+    return /*#__PURE__*/React.createElement("div", {
+      onClick: onClick,
+      className: `relative flex flex-col overflow-hidden transition-transform hover:brightness-95 ${showCutGuide ? 'cut-guide' : ''}`,
+      style: {
+        ...containerStyle,
+        backgroundColor: t.bg,
+        border: `${Math.max(2, Math.round(2.5 * baseScale))}px solid ${t.border}`
+      }
+    }, t.layout === 'top' && /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center justify-center gap-1 px-1 border-b-2 overflow-hidden",
+      style: {
+        height: bannerHeightPx + 'px',
+        backgroundColor: t.headerBg,
+        borderColor: t.border
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: nameFontSize + 'px',
+        lineHeight: 1.1,
+        fontFamily: emojiFontFamily,
+        flexShrink: 0,
+        color: t.headerText
+      }
+    }, t.emoji), /*#__PURE__*/React.createElement("span", {
+      className: "truncate text-center",
+      style: {
+        fontSize: nameFontSize + 'px',
+        lineHeight: 1.1,
+        fontWeight: boldWeight,
+        color: t.headerText
+      }
+    }, productName || '\u00A0')), /*#__PURE__*/React.createElement("div", {
+      className: "relative flex-1 p-2 flex flex-col justify-between overflow-hidden"
+    }, showOriginal && /*#__PURE__*/React.createElement("div", {
+      className: "truncate",
+      style: {
+        color: t.origText,
+        fontSize: Math.max(10, Math.round(13 * baseScale)) + 'px',
+        textDecoration: 'line-through',
+        fontWeight: semiBoldWeight
+      }
+    }, formattedOriginal, currency), /*#__PURE__*/React.createElement("div", {
+      className: "text-right mt-auto truncate w-full"
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: t.priceText,
+        fontSize: priceFontSize + 'px',
+        fontWeight: boldWeight,
+        lineHeight: 1.1
+      }
+    }, formattedDiscount), /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: t.priceText,
+        fontSize: currencyFontSize + 'px',
+        fontWeight: semiBoldWeight,
+        marginLeft: '2px'
+      }
+    }, currency)), discountRate > 0 && /*#__PURE__*/React.createElement("div", {
+      className: "absolute top-2 right-2 flex items-center justify-center rounded px-1.5 py-0.5 shadow-sm whitespace-nowrap",
+      style: {
+        backgroundColor: t.badgeBg,
+        color: t.badgeText,
+        fontSize: Math.max(9, Math.round(10 * baseScale)) + 'px',
+        fontWeight: boldWeight
+      }
+    }, "-", discountRate, "%")), t.layout === 'bottom' && /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center justify-center gap-1 px-1 border-t-2 overflow-hidden",
+      style: {
+        height: bannerHeightPx + 'px',
+        backgroundColor: t.headerBg,
+        borderColor: t.border
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: nameFontSize + 'px',
+        lineHeight: 1.1,
+        fontFamily: emojiFontFamily,
+        flexShrink: 0,
+        color: t.headerText
+      }
+    }, t.emoji), /*#__PURE__*/React.createElement("span", {
+      className: "truncate text-center",
+      style: {
+        fontSize: nameFontSize + 'px',
+        lineHeight: 1.1,
+        fontWeight: boldWeight,
+        color: t.headerText
+      }
+    }, productName || '\u00A0')));
+  }
+  return null;
+};
+const DetailPreviewModal = ({
+  isOpen,
+  onClose,
+  tagData
+}) => {
+  if (!isOpen || !tagData) return null;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-fade-in",
+    onClick: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-white border-4 border-black rounded-3xl p-6 max-w-lg w-full shadow-[12px_12px_0_0_#000] relative flex flex-col items-center gap-4",
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "w-full flex items-center justify-between border-b-4 border-black pb-3"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "text-xl font-black flex items-center gap-2"
+  }, "\uD83D\uDD0E \uC2E4\uC2DC\uAC04 \uACE0\uD654\uC9C8 \uD655\uB300 \uBBF8\uB9AC\uBCF4\uAE30"), /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    className: "w-9 h-9 rounded-full border-2 border-black flex items-center justify-center font-black hover:bg-gray-100 text-lg"
+  }, "\u2715")), /*#__PURE__*/React.createElement("div", {
+    className: "text-xs font-bold bg-yellow-100 text-yellow-900 border border-yellow-400 px-3 py-1 rounded-full"
+  }, "\uD83D\uDCA1 \uC2E4\uC81C \uC778\uC1C4 \uCD9C\uB825\uBCF8\uC744 2.5\uBC30 \uD655\uB300\uD558\uC5EC \uAC80\uD1A0\uD558\uB294 \uD654\uBA74\uC785\uB2C8\uB2E4."), /*#__PURE__*/React.createElement("div", {
+    className: "p-4 bg-gray-100 rounded-2xl border-2 border-dashed border-gray-400 flex items-center justify-center shadow-inner my-2 w-full min-h-[250px] overflow-hidden"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "transform scale-125 origin-center my-4"
+  }, /*#__PURE__*/React.createElement(PriceTag, tagData))), /*#__PURE__*/React.createElement("div", {
+    className: "w-full grid grid-cols-2 gap-2 text-xs font-bold bg-gray-50 p-3 rounded-xl border border-gray-200"
+  }, /*#__PURE__*/React.createElement("div", null, "\uD83D\uDCCF \uAC00\uB85C\xD7\uC138\uB85C: ", tagData.widthMm, " \xD7 ", tagData.heightMm, " mm"), /*#__PURE__*/React.createElement("div", null, "\uD83C\uDFA8 \uB514\uC790\uC778 \uD14C\uB9C8: ", tagData.design, "\uC548"), /*#__PURE__*/React.createElement("div", null, "\uD83D\uDCB0 \uD560\uC778\uAC00: ", tagData.discountPrice, tagData.currency), /*#__PURE__*/React.createElement("div", null, "\uD83C\uDFF7\uFE0F \uC0C1\uD488\uBA85: ", tagData.productName)), /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    className: "w-full py-3 bg-black text-white font-black text-sm rounded-xl shadow-[3px_3px_0_0_#CCFF00] hover:translate-y-0.5"
+  }, "\uD655\uC778 \uC644\uB8CC (\uCC3D \uB2EB\uAE30)")));
+};
+function App() {
+  const [productName, setProductName] = useState('버터링');
+  const [originalPrice, setOriginalPrice] = useState('1700');
+  const [discountPrice, setDiscountPrice] = useState('1500');
+  const [selectedFont, setSelectedFont] = useState(FONT_OPTIONS[1].value);
+  const [settings, setSettings] = useState({
+    design: 'A',
+    presetId: 'standard',
+    widthMm: 55,
+    heightMm: 40,
+    currency: '원',
+    showOriginal: true,
+    showCutGuide: true
+  });
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
+  const [isCapturing, setIsCapturing] = useState(false);
+  const [tagsList, setTagsList] = useState([]);
+  const a4CanvasRef = useRef(null);
+  const [previewModalTag, setPreviewModalTag] = useState(null);
+  const [dialog, setDialog] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    isConfirm: false,
+    onConfirm: null
+  });
+  const showModalAlert = (msg, title = '알림') => {
+    setDialog({
+      isOpen: true,
+      title,
+      message: msg,
+      isConfirm: false,
+      onConfirm: null
+    });
+  };
+  const showModalConfirm = (msg, onConfirm, title = '확인') => {
+    setDialog({
+      isOpen: true,
+      title,
+      message: msg,
+      isConfirm: true,
+      onConfirm
+    });
+  };
+
+  // 💡 [개선 사항 1] 설정 변경 시 기존 태그 자동 동기화
+  useEffect(() => {
+    setTagsList(prev => {
+      if (prev.length === 0) return prev;
+      return prev.map(tag => ({
+        ...tag,
+        // 빈 칸일 경우를 방어하기 위해 최소값 20 적용
+        widthMm: settings.widthMm || 20,
+        heightMm: settings.heightMm || 20,
+        design: settings.design,
+        currency: settings.currency,
+        showOriginal: settings.showOriginal,
+        showCutGuide: settings.showCutGuide,
+        fontFamily: selectedFont
+      }));
+    });
+  }, [settings.widthMm, settings.heightMm, settings.design, settings.currency, settings.showOriginal, settings.showCutGuide, selectedFont]);
+  const [previewScale, setPreviewScale] = useState(1);
+  const [autoFitScale, setAutoFitScale] = useState(1);
+  useEffect(() => {
+    const updateScale = () => {
+      if (window.innerWidth >= 1024) {
+        setAutoFitScale(1);
+        setPreviewScale(1);
+        return;
+      }
+      const available = window.innerWidth - 64;
+      const fit = Math.max(0.32, Math.min(1, available / A4_WIDTH_PX));
+      setAutoFitScale(fit);
+      setPreviewScale(fit);
+    };
+    updateScale();
+    window.addEventListener('resize', updateScale);
+    return () => window.removeEventListener('resize', updateScale);
+  }, []);
+  const tagCapacity = useMemo(() => {
+    const safeW = Number(settings.widthMm) || 20;
+    const safeH = Number(settings.heightMm) || 20;
+    const tagW = safeW * MM_TO_PX;
+    const tagH = safeH * MM_TO_PX;
+    const padding = 40 * 2;
+    const gap = 16;
+    const availableW = A4_WIDTH_PX - padding;
+    const availableH = A4_HEIGHT_PX - padding;
+    const cols = Math.max(1, Math.floor((availableW + gap) / (tagW + gap)));
+    const rows = Math.max(1, Math.floor((availableH + gap) / (tagH + gap)));
+    return {
+      cols,
+      rows,
+      maxTags: cols * rows
+    };
+  }, [settings.widthMm, settings.heightMm]);
+
+  // 💡 [초과 방지 경고] 사이즈가 커져서 갯수가 넘칠 때 경고 띄우기
+  useEffect(() => {
+    if (tagsList.length > tagCapacity.maxTags) {
+      setTimeout(() => {
+        showModalAlert(`⚠️ 사이즈 변경 안내\n\n라벨 크기가 커져서 A4 1장 최대 수량(${tagCapacity.maxTags}개)을 초과했습니다.\n출력 영역을 벗어난 가격표는 수동으로 일부를 삭제해주세요.`);
+      }, 100);
+    }
+  }, [tagCapacity.maxTags, tagsList.length]);
+  const calculateDiscount = useCallback((origPrice, discPrice) => {
+    const orig = parseInt(origPrice.replace(/,/g, ''), 10) || 0;
+    const disc = parseInt(discPrice.replace(/,/g, ''), 10) || 0;
+    if (orig <= 0 || disc >= orig) return 0;
+    return Math.round((orig - disc) / orig * 100);
+  }, []);
+  const currentDiscountRate = calculateDiscount(originalPrice, discountPrice);
+  const handlePriceChange = setter => e => {
+    const value = e.target.value.replace(/[^0-9]/g, '').slice(0, MAX_PRICE_DIGITS);
+    setter(value);
+  };
+  const handleNameChange = e => {
+    setProductName(e.target.value.slice(0, 14));
+  };
+  const genId = () => window.crypto && window.crypto.randomUUID ? window.crypto.randomUUID() : 'id_' + Date.now() + '_' + Math.random();
+  const handleAddTag = () => {
+    if (tagsList.length >= tagCapacity.maxTags) {
+      showModalAlert(`선택하신 규격(${settings.widthMm}×${settings.heightMm}mm)으로는 A4 1장에 최대 ${tagCapacity.maxTags}개까지 채울 수 있습니다.`);
+      return;
+    }
+    setTagsList([...tagsList, {
+      id: genId(),
+      productName,
+      originalPrice,
+      discountPrice,
+      discountRate: currentDiscountRate,
+      fontFamily: selectedFont,
+      design: settings.design,
+      widthMm: settings.widthMm || 20,
+      heightMm: settings.heightMm || 20,
+      currency: settings.currency,
+      showOriginal: settings.showOriginal,
+      showCutGuide: settings.showCutGuide
+    }]);
+  };
+  const handleClearTags = () => {
+    showModalConfirm('A4 용지에 추가된 모든 가격표를 지우시겠습니까?', () => {
+      setTagsList([]);
+    });
+  };
+  const handleRemoveTag = id => {
+    setTagsList(prev => prev.filter(t => t.id !== id));
+  };
+  const captureA4Canvas = async () => {
+    const usedFonts = Array.from(new Set(tagsList.map(t => t.fontFamily || selectedFont)));
+    await Promise.all(usedFonts.map(f => document.fonts.load(`16px ${f}`).catch(() => {})));
+    if (document.fonts && document.fonts.ready) await document.fonts.ready;
+    await new Promise(r => setTimeout(r, 200));
+    return window.html2canvas(a4CanvasRef.current, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#FFFFFF',
+      logging: false,
+      width: A4_WIDTH_PX,
+      height: A4_HEIGHT_PX,
+      windowWidth: A4_WIDTH_PX,
+      windowHeight: A4_HEIGHT_PX,
+      letterRendering: true
+    });
+  };
+
+  /** RN WebView 안에서 저장/공유를 누르면: html2canvas(이 기기에서 커스텀 폰트를 캔버스에
+   * 못 그리는 문제 확인됨) 대신, 화면을 가격표만 깔끔하게 보이는 전체화면으로 잠깐 바꾸고
+   * RN에게 "지금 화면 그대로 캡처해줘"라고 신호만 보낸다. RN이 캡처를 마치면
+   * window.__onNativeCaptureDone()을 호출해 원래 화면으로 되돌린다. */
+  // CSS transform:scale()로 시트 전체를 화면 크기에 맞춰 축소하는 방식이 이 기기에서
+  // 텍스트가 옆 칸으로 번지는 캡처 버그를 유발해(여러 디자인에서 재현됨), 축소 없이
+  // 원본 해상도 그대로 캡처하도록 바꿨다 — RN이 WebView 자체를 이 크기로 맞춰준다.
+  const requestNativeCapture = kind => new Promise(resolve => {
+    window.__onNativeCaptureDone = () => {
+      setIsCapturing(false);
+      resolve();
+    };
+    setIsCapturing(true);
+    // 캡처 모드로 바뀌기 전 스크롤돼 있던 위치가 남아 position:fixed 콘텐츠가 위쪽이
+    // 잘려 보이는 문제가 있어, 캡처 시작 시 스크롤을 강제로 맨 위로 되돌린다.
+    window.scrollTo(0, 0);
+    const rows = Math.max(1, Math.ceil(tagsList.length / tagCapacity.cols));
+    const safeHeightMm = Number(tagsList[0]?.heightMm) || 20;
+    const tagHeightPx = Math.round(safeHeightMm * MM_TO_PX);
+    // 여유값(24px)을 더해 반올림/여백 오차로 가장자리가 잘리는 걸 방지한다.
+    const captureHeight = 80 + rows * tagHeightPx + Math.max(0, rows - 1) * 16 + 24;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: kind,
+          captureWidth: A4_WIDTH_PX,
+          captureHeight
+        }));
+      });
+    });
+  });
+  const handleDownloadA4 = async () => {
+    if (tagsList.length === 0) {
+      showModalAlert('A4 용지에 추가된 가격표가 없습니다.');
+      return;
+    }
+    if (window.ReactNativeWebView) {
+      setIsSaving(true);
+      try {
+        await requestNativeCapture('save');
+      } finally {
+        setIsSaving(false);
+      }
+      return;
+    }
+
+    // 일반 브라우저 폴백(앱 밖에서 열었을 때)
+    if (!window.html2canvas || !a4CanvasRef.current) {
+      showModalAlert('라이브러리 로딩 중입니다. 잠시 후 시도해주세요.');
+      return;
+    }
+    const iosFallbackWin = isIOSDevice() ? window.open('', '_blank') : null;
+    setIsSaving(true);
+    try {
+      const canvas = await captureA4Canvas();
+      const dataUrl = canvas.toDataURL('image/png');
+      if (iosFallbackWin) {
+        iosFallbackWin.document.write('<title>가격표 이미지</title><body style="margin:0;background:#111;display:flex;align-items:center;justify-content:center;min-height:100vh;"><img src="' + dataUrl + '" style="max-width:100%;height:auto;" /></body>');
+        iosFallbackWin.document.close();
+        showModalAlert('새 탭에 이미지가 열렸습니다. 이미지를 길게 눌러 "사진에 저장"을 선택해주세요.');
+      } else {
+        const link = document.createElement('a');
+        link.download = 'A4_PriceTags_' + Date.now() + '.png';
+        link.href = dataUrl;
+        link.click();
+      }
+    } catch (err) {
+      console.error('이미지 저장 실패:', err);
+      if (iosFallbackWin) iosFallbackWin.close();
+      showModalAlert('이미지 생성에 실패했습니다.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  /** 카톡 전송: RN WebView 안이면 네이티브 캡처(위 requestNativeCapture)에 위임한다.
+   * 일반 브라우저에서 열렸을 때는 Web Share API로 대체한다. */
+  const handleKakaoShare = async () => {
+    if (tagsList.length === 0) {
+      showModalAlert('A4 용지에 추가된 가격표가 없습니다.');
+      return;
+    }
+    if (window.ReactNativeWebView) {
+      setIsSharing(true);
+      try {
+        await requestNativeCapture('share');
+      } finally {
+        setIsSharing(false);
+      }
+      return;
+    }
+    if (!window.html2canvas || !a4CanvasRef.current) {
+      showModalAlert('라이브러리 로딩 중입니다. 잠시 후 시도해주세요.');
+      return;
+    }
+    setIsSharing(true);
+    try {
+      const canvas = await captureA4Canvas();
+      if (navigator.share) {
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+        const file = new File([blob], 'A4_PriceTags_' + Date.now() + '.png', {
+          type: 'image/png'
+        });
+        await navigator.share({
+          files: [file],
+          title: 'PRICE TAG MAKER',
+          text: '가격표 A4 이미지'
+        });
+        return;
+      }
+      showModalAlert('공유가 지원되지 않는 환경입니다. 저장 버튼을 이용해주세요.');
+    } catch (err) {
+      if (err && err.name === 'AbortError') return;
+      console.error('공유 실패:', err);
+      showModalAlert('공유에 실패했습니다. 저장 버튼을 이용해주세요.');
+    } finally {
+      setIsSharing(false);
+    }
+  };
+  const currentSampleTag = {
+    productName,
+    originalPrice,
+    discountPrice,
+    discountRate: currentDiscountRate,
+    fontFamily: selectedFont,
+    design: settings.design,
+    widthMm: settings.widthMm || 20,
+    heightMm: settings.heightMm || 20,
+    currency: settings.currency,
+    showOriginal: settings.showOriginal,
+    showCutGuide: settings.showCutGuide
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: `min-h-screen bg-[#CCFF00] font-sans flex flex-col items-center selection:bg-black selection:text-[#CCFF00] ${isCapturing ? '' : 'p-4 md:p-8'}`
+  }, /*#__PURE__*/React.createElement("header", {
+    className: `mb-6 text-center relative w-full max-w-7xl flex flex-col items-center ${isCapturing ? 'hidden' : ''}`
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "inline-flex items-center gap-3 border-b-8 border-black pb-2"
+  }, /*#__PURE__*/React.createElement("h1", {
+    className: "text-xl sm:text-2xl md:text-3xl font-black tracking-tight"
+  }, "PRICE TAG MAKER"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setIsSettingsOpen(true),
+    className: "flex items-center gap-1.5 bg-black text-white px-3 py-2 rounded-2xl hover:scale-105 active:scale-95 transition-transform shadow-[3px_3px_0_0_#FFF] border-2 border-black text-xs sm:text-sm font-bold",
+    title: "\uD658\uACBD \uC124\uC815"
+  }, /*#__PURE__*/React.createElement("span", null, "\u2699\uFE0F"), /*#__PURE__*/React.createElement("span", null, "\uC124\uC815 (\uB514\uC790\uC778\xB7\uAE00\uAF34)"))), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2 mt-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "bg-black text-[#CCFF00] font-black px-2 py-0.5 text-xs rounded"
+  }, settings.widthMm || 20, " \xD7 ", settings.heightMm || 20, " mm"), /*#__PURE__*/React.createElement("p", {
+    className: "text-sm font-bold text-black/80"
+  }, "50\uAC00\uC9C0 \uD504\uB9AC\uBBF8\uC5C4 \uB514\uC790\uC778 & \uC778\uC1C4\uC6A9 \uAC00\uACA9\uD45C \uC790\uB3D9 \uC0DD\uC131\uAE30"))), /*#__PURE__*/React.createElement("div", {
+    className: "w-full max-w-7xl grid grid-cols-1 lg:grid-cols-3 gap-8 items-start"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: `lg:col-span-1 bg-white/40 backdrop-blur-xl border-4 border-black rounded-3xl p-6 shadow-[8px_8px_0_0_#000] relative z-10 lg:sticky lg:top-8 ${isCapturing ? 'hidden' : ''}`
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "mb-6 border-b-2 border-black/10 pb-4"
+  }, /*#__PURE__*/React.createElement("h2", {
+    className: "text-2xl font-black flex items-center gap-2"
+  }, "\uD83C\uDFF7\uFE0F \uC815\uBCF4 \uC785\uB825")), /*#__PURE__*/React.createElement("div", {
+    className: "space-y-4"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    className: "block text-sm font-bold mb-1"
+  }, "\uC0C1\uD488\uBA85 ", /*#__PURE__*/React.createElement("span", {
+    className: "text-gray-500 font-normal"
+  }, "(", productName.length, "/14)")), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    value: productName,
+    onChange: handleNameChange,
+    className: "w-full p-2.5 border-3 border-black rounded-xl font-bold shadow-[2px_2px_0_0_#000] bg-white focus:outline-none focus:ring-2 focus:ring-black",
+    placeholder: "\uC0C1\uD488\uBA85 \uC785\uB825"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-2 gap-3"
+  }, settings.showOriginal && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    className: "block text-xs font-bold mb-1"
+  }, "\uC815\uAC00 (", settings.currency, ")"), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    inputMode: "numeric",
+    value: originalPrice,
+    onChange: handlePriceChange(setOriginalPrice),
+    className: "w-full p-2 border-3 border-black rounded-xl font-bold shadow-[2px_2px_0_0_#000] text-sm bg-white focus:outline-none focus:ring-2 focus:ring-black"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: settings.showOriginal ? '' : 'col-span-2'
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "block text-xs font-bold mb-1"
+  }, "\uD560\uC778\uAC00 (", settings.currency, ")"), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    inputMode: "numeric",
+    value: discountPrice,
+    onChange: handlePriceChange(setDiscountPrice),
+    className: "w-full p-2 text-red-600 border-3 border-black rounded-xl font-black shadow-[2px_2px_0_0_#000] text-sm bg-white focus:outline-none focus:ring-2 focus:ring-red-600"
+  }))), /*#__PURE__*/React.createElement("button", {
+    onClick: handleAddTag,
+    className: "w-full flex items-center justify-center gap-2 bg-black text-white p-3 font-bold border-3 border-black rounded-xl shadow-[4px_4px_0_0_#FFF] hover:translate-y-[2px] transition-all text-base"
+  }, "\u2795 A4 \uC6A9\uC9C0\uC5D0 \uCD94\uAC00 (", tagsList.length, "/", tagCapacity.maxTags, ")")), /*#__PURE__*/React.createElement("div", {
+    className: "mt-6 space-y-3"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col items-center gap-2 py-3 border-t-2 border-b-2 border-black/10"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between w-full px-1"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-xs font-black text-gray-700"
+  }, "\uD83D\uDC41\uFE0F \uC120\uD0DD\uD55C \uAC00\uACA9\uD45C \uC2E4\uC2DC\uAC04 \uBBF8\uB9AC\uBCF4\uAE30"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setPreviewModalTag(currentSampleTag),
+    className: "text-[10px] font-bold bg-black text-white px-2 py-0.5 rounded hover:bg-gray-800"
+  }, "\uD83D\uDD0D \uD070 \uD654\uBA74 \uD655\uB300")), /*#__PURE__*/React.createElement("div", {
+    className: "p-1 bg-white rounded shadow-sm hover:scale-105 transition-transform"
+  }, /*#__PURE__*/React.createElement(PriceTag, _extends({}, currentSampleTag, {
+    onClick: () => setPreviewModalTag(currentSampleTag)
+  })))), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-3 gap-2"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: handleDownloadA4,
+    disabled: isSaving,
+    className: "flex items-center justify-center gap-1 bg-blue-600 text-white p-2.5 font-bold border-3 border-black rounded-xl shadow-[3px_3px_0_0_#000] hover:translate-y-[2px] transition-all text-[11px] disabled:opacity-50"
+  }, isSaving ? '⏳' : '📥 저장'), /*#__PURE__*/React.createElement("button", {
+    onClick: handleKakaoShare,
+    disabled: isSharing,
+    className: "flex items-center justify-center gap-1 bg-[#FEE500] text-black p-2.5 font-bold border-3 border-black rounded-xl shadow-[3px_3px_0_0_#000] hover:translate-y-[2px] transition-all text-[11px] disabled:opacity-50"
+  }, isSharing ? '⏳' : '💬 카톡 전송'), /*#__PURE__*/React.createElement("button", {
+    onClick: handleClearTags,
+    className: "flex items-center justify-center gap-1 bg-red-100 text-red-600 p-2.5 font-bold border-3 border-black rounded-xl shadow-[3px_3px_0_0_#000] hover:translate-y-[2px] transition-all text-[11px]"
+  }, "\uD83D\uDDD1\uFE0F \uBE44\uC6B0\uAE30")))), /*#__PURE__*/React.createElement("div", {
+    className: isCapturing ? '' : 'lg:col-span-2 overflow-x-auto pb-10 flex flex-col items-center'
+  }, /*#__PURE__*/React.createElement("div", {
+    className: `w-full max-w-[794px] bg-black text-white p-3 rounded-2xl border-4 border-black shadow-[6px_6px_0_0_#000] mb-4 flex flex-wrap items-center justify-between gap-2 ${isCapturing ? 'hidden' : ''}`
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "font-black text-sm bg-[#CCFF00] text-black px-2 py-0.5 rounded"
+  }, "A4 \uBBF8\uB9AC\uBCF4\uAE30"), /*#__PURE__*/React.createElement("span", {
+    className: "text-xs text-gray-300 font-bold hidden sm:inline"
+  }, "(\uBC30\uCE58: ", tagsList.length, " / \uCD5C\uB300 ", tagCapacity.maxTags, "\uAC1C)")), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-1.5 text-xs font-bold"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setPreviewScale(s => Math.max(0.3, s - 0.1)),
+    className: "w-7 h-7 bg-gray-800 hover:bg-gray-700 border border-gray-600 rounded flex items-center justify-center"
+  }, "-"), /*#__PURE__*/React.createElement("span", {
+    className: "w-12 text-center"
+  }, Math.round(previewScale * 100), "%"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setPreviewScale(s => Math.min(1.5, s + 0.1)),
+    className: "w-7 h-7 bg-gray-800 hover:bg-gray-700 border border-gray-600 rounded flex items-center justify-center"
+  }, "+"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setPreviewScale(autoFitScale),
+    className: "px-2 py-1 bg-gray-800 hover:bg-gray-700 border border-gray-600 rounded"
+  }, "\uD654\uBA74\uB9DE\uCDA4"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setPreviewScale(1),
+    className: "px-2 py-1 bg-gray-800 hover:bg-gray-700 border border-gray-600 rounded"
+  }, "100%"))), /*#__PURE__*/React.createElement("div", {
+    className: isCapturing ? 'bg-white relative' : 'bg-gray-300 p-4 border-4 border-black shadow-[12px_12px_0_0_rgba(0,0,0,1)] rounded-xl relative',
+    style: isCapturing ? {} : {
+      width: A4_WIDTH_PX * previewScale + 40 + 'px',
+      height: A4_HEIGHT_PX * previewScale + 40 + 'px',
+      overflow: 'hidden'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    ref: a4CanvasRef,
+    className: `bg-white relative grid content-start justify-items-center ${isCapturing ? '' : 'transition-transform duration-200'}`,
+    style: {
+      width: A4_WIDTH_PX + 'px',
+      minHeight: isCapturing ? undefined : A4_HEIGHT_PX + 'px',
+      padding: '40px',
+      gap: '16px',
+      gridTemplateColumns: `repeat(${tagCapacity.cols}, minmax(0, 1fr))`,
+      transform: isCapturing ? 'none' : `scale(${previewScale})`,
+      transformOrigin: 'top left'
+    }
+  }, tagsList.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    className: "col-span-full absolute inset-0 flex items-center justify-center text-gray-400 font-bold text-2xl flex-col gap-3 pointer-events-none"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-5xl"
+  }, "\uD83D\uDCC4"), /*#__PURE__*/React.createElement("span", null, "A4 \uC6A9\uC9C0\uAC00 \uBE44\uC5B4 \uC788\uC2B5\uB2C8\uB2E4."), /*#__PURE__*/React.createElement("span", {
+    className: "text-sm text-gray-400 font-normal"
+  }, "\uC67C\uCABD\uC5D0\uC11C \uC815\uBCF4 \uC785\uB825 \uD6C4 [A4 \uC6A9\uC9C0\uC5D0 \uCD94\uAC00] \uBC84\uD2BC\uC744 \uB20C\uB7EC\uC8FC\uC138\uC694.")) : tagsList.map(tag => /*#__PURE__*/React.createElement("div", {
+    key: tag.id,
+    className: "relative group"
+  }, /*#__PURE__*/React.createElement(PriceTag, _extends({}, tag, {
+    onClick: () => setPreviewModalTag(tag)
+  })), /*#__PURE__*/React.createElement("button", {
+    onClick: e => {
+      e.stopPropagation();
+      handleRemoveTag(tag.id);
+    },
+    className: `absolute -top-3 -right-3 w-7 h-7 bg-red-600 text-white rounded-full font-bold text-base border-2 border-white shadow-md z-40 active:scale-90 transition-transform flex items-center justify-center ${isCapturing ? 'opacity-0 pointer-events-none' : 'opacity-0 group-hover:opacity-100 lg:opacity-100'}`,
+    title: "\uC0AD\uC81C"
+  }, "\xD7"))))))), /*#__PURE__*/React.createElement(SettingsModal, {
+    isOpen: isSettingsOpen,
+    onClose: () => setIsSettingsOpen(false),
+    settings: settings,
+    onUpdateSettings: setSettings,
+    sampleProduct: currentSampleTag,
+    selectedFont: selectedFont,
+    setSelectedFont: setSelectedFont
+  }), /*#__PURE__*/React.createElement(DetailPreviewModal, {
+    isOpen: !!previewModalTag,
+    onClose: () => setPreviewModalTag(null),
+    tagData: previewModalTag
+  }), /*#__PURE__*/React.createElement(CustomDialog, {
+    dialog: dialog,
+    onClose: () => setDialog({
+      ...dialog,
+      isOpen: false
+    })
+  }));
+}
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(/*#__PURE__*/React.createElement(App, null));</script>
+</body>
+</html>
