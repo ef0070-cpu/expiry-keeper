@@ -72,4 +72,23 @@ const products = [worldcone, melona, jaws];
   console.assert(r.length === 3 && r[0] === worldcone, '빈 검색어는 원래 목록을 그대로 반환해야 함');
 }
 
+// 9) 같은 초성 등급 안에서는 더 짧은(=query와 길이가 가까운) 이름이 앞에 와야 함
+// ("ㅂㅂㅂ" 검색 시 "비비빅 흑임자" 같은 긴 변형에 밀려 "비비빅"/"바밤바"가 뒤로 안 가야 함)
+{
+  const bibibig = p({ name: '비비빅' });
+  const bibibigBlackSesame = p({ name: '비비빅 흑임자' });
+  const bambamba = p({ name: '바밤바' });
+  const bambambaBiteMini = p({ name: '바밤바이트미니' });
+  const items = [bibibigBlackSesame, bibibig, bambambaBiteMini, bambamba];
+  const r = searchOrderProducts(items, 'ㅂㅂㅂ');
+  console.assert(
+    r.indexOf(bibibig) < r.indexOf(bibibigBlackSesame),
+    '"비비빅"이 "비비빅 흑임자"보다 앞에 와야 함',
+  );
+  console.assert(
+    r.indexOf(bambamba) < r.indexOf(bambambaBiteMini),
+    '"바밤바"가 "바밤바이트미니"보다 앞에 와야 함',
+  );
+}
+
 console.log('order-search selfcheck OK');

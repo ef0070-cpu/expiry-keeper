@@ -19,28 +19,30 @@ function candidatesOf(p: OrderProduct): string[] {
   return [p.name, p.brand, ...(p.aliases ?? [])].filter((s) => s.trim().length > 0);
 }
 
-/** 여러 후보 문자열(상품명/브랜드/별칭) 중 query와 가장 잘 맞는 등급을 찾는다.
+/** 여러 후보 문자열(상품명/브랜드/별칭) 중 query와 가장 잘 맞는 등급을 찾는다. 등급과 함께
+ * 그 등급에서 매칭된 문자열의 길이도 반환한다 — 같은 등급이면 짧은(=query에 더 가까운, 예:
+ * "ㅂㅂㅂ"에 대해 "비비빅"이 "비비빅 흑임자"보다) 문자열이 더 정확한 일치이기 때문이다.
  * 초성/자모 등급은 기존 matchesSearch(초성+완성형 혼합, target 맨 앞부터)에 더해,
  * 완전히 자모 단위로 풀어낸 문자열끼리의 부분일치(중성 포함)까지 본다. */
-function deterministicTier(candidates: string[], query: string): SearchTier | null {
+function deterministicTier(candidates: string[], query: string): { tier: SearchTier; len: number } | null {
   const q = normalize(query);
   if (!q) return null;
   const qJamo = disassemble(q);
-  let best: SearchTier | null = null;
+  let best: { tier: SearchTier; len: number } | null = null;
+
+  const consider = (tier: SearchTier, len: number) => {
+    if (best === null || tier < best.tier || (tier === best.tier && len < best.len)) {
+      best = { tier, len };
+    }
+  };
 
   for (const raw of candidates) {
     const t = normalize(raw);
     if (!t) continue;
-    if (t === q) return 0;
-    if (best === null || best > 1) {
-      if (t.startsWith(q)) best = 1;
-    }
-    if (best === null || best > 2) {
-      if (t.includes(q)) best = 2;
-    }
-    if (best === null || best > 3) {
-      if (matchesSearch(raw, query) || disassemble(t).includes(qJamo)) best = 3;
-    }
+    if (t === q) consider(0, t.length);
+    else if (t.startsWith(q)) consider(1, t.length);
+    else if (t.includes(q)) consider(2, t.length);
+    else if (matchesSearch(raw, query) || disassemble(t).includes(qJamo)) consider(3, t.length);
   }
   return best;
 }
@@ -55,16 +57,16 @@ export function searchOrderProducts(products: OrderProduct[], query: string): Or
   const q = query.trim();
   if (!q) return products;
 
-  const scored: { product: OrderProduct; tier: SearchTier }[] = [];
+  const scored: { product: OrderProduct; tier: SearchTier; len: number }[] = [];
   const unmatched: OrderProduct[] = [];
 
   for (const p of products) {
     if ((p.barcode ?? '').includes(q)) {
-      scored.push({ product: p, tier: 2 });
+      scored.push({ product: p, tier: 2, len: p.barcode!.length });
       continue;
     }
-    const tier = deterministicTier(candidatesOf(p), q);
-    if (tier !== null) scored.push({ product: p, tier });
+    const result = deterministicTier(candidatesOf(p), q);
+    if (result !== null) scored.push({ product: p, tier: result.tier, len: result.len });
     else unmatched.push(p);
   }
 
@@ -79,9 +81,11 @@ export function searchOrderProducts(products: OrderProduct[], query: string): Or
       ignoreLocation: true,
     });
     for (const result of fuse.search(q)) {
-      scored.push({ product: result.item, tier: 4 });
+      scored.push({ product: result.item, tier: 4, len: normalize(result.item.name).length });
     }
   }
 
-  return scored.sort((a, b) => a.tier - b.tier).map((s) => s.product);
+  // 등급(정확도)이 먼저, 같은 등급이면 짧은(=query에 더 가까운) 매칭이 앞에 온다. 그 안에서는
+  // 안정정렬로 원래 순서(호출부의 badgeSorted 우선순위)가 유지된다.
+  return scored.sort((a, b) => a.tier - b.tier || a.len - b.len).map((s) => s.product);
 }
