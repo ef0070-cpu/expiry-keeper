@@ -4,7 +4,7 @@ import * as Linking from 'expo-linking';
 import * as Notifications from 'expo-notifications';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, Switch, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, Switch, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ddayLabel } from '@/lib/dates';
 import { rescheduleAllExpiryAlerts } from '@/lib/notifications';
@@ -23,10 +23,13 @@ import {
   setDateInputMethod,
   setDateOcrOrder,
   setScanHapticEnabled,
+  unlockLabs,
+  lockLabs,
   useAlertSettings,
   useAppMode,
   useDateInputMethod,
   useDateOcrOrder,
+  useLabsUnlocked,
   useScanHapticEnabled,
 } from '@/lib/settings';
 import { isCloudMode, supabase } from '@/lib/supabase';
@@ -39,6 +42,9 @@ export default function Settings() {
   const scanHapticEnabled = useScanHapticEnabled();
   const [deleting, setDeleting] = useState(false);
   const [notifDenied, setNotifDenied] = useState(false);
+  const labsUnlocked = useLabsUnlocked();
+  const [labsModalVisible, setLabsModalVisible] = useState(false);
+  const [labsPasswordInput, setLabsPasswordInput] = useState('');
   const insets = useSafeAreaInsets();
 
   useFocusEffect(
@@ -284,9 +290,65 @@ export default function Settings() {
         </>
       ) : null}
 
+      <View className="mt-6 overflow-hidden rounded-2xl bg-paper">
+        {labsUnlocked ? (
+          <LinkRow
+            icon="flask-off-outline"
+            label="실험실 잠그기 (가격표 만들기 숨김)"
+            onPress={() =>
+              Alert.alert('실험실 잠그기', '실험실을 잠그면 가격표 만들기가 다시 숨겨집니다.', [
+                { text: '취소', style: 'cancel' },
+                { text: '잠그기', style: 'destructive', onPress: () => lockLabs() },
+              ])
+            }
+          />
+        ) : (
+          <LinkRow icon="flask-outline" label="실험실" onPress={() => setLabsModalVisible(true)} />
+        )}
+      </View>
+
       <Text className="text-muted mt-6 text-center text-xs">
         버전 {Constants.expoConfig?.version ?? '?'} ({Constants.platform?.android?.versionCode ?? '?'})
       </Text>
+
+      {/* 아직 실험 중인 기능(가격표 만들기)을 비밀번호를 아는 관리자만 켜서 계속 테스트할 수
+       * 있게 하는 진입점 — 일반 사용자 화면에는 아이콘 자체가 안 보이게 숨겨둔다. */}
+      <Modal visible={labsModalVisible} transparent animationType="fade" onRequestClose={() => setLabsModalVisible(false)}>
+        <Pressable
+          className="flex-1 items-center justify-center bg-black/50 px-8"
+          onPress={() => setLabsModalVisible(false)}
+        >
+          <Pressable className="w-full rounded-2xl bg-paper p-5" onPress={(e) => e.stopPropagation()}>
+            <Text className="text-ink mb-3 text-base font-bold">실험실 비밀번호</Text>
+            <TextInput
+              className="text-ink rounded-xl border border-line bg-bg px-3 py-2.5 text-base"
+              placeholder="비밀번호"
+              placeholderTextColor="#BBBBBB"
+              secureTextEntry
+              keyboardType="number-pad"
+              value={labsPasswordInput}
+              onChangeText={setLabsPasswordInput}
+              onSubmitEditing={async () => {
+                const ok = await unlockLabs(labsPasswordInput);
+                setLabsPasswordInput('');
+                setLabsModalVisible(false);
+                if (!ok) Alert.alert('실패', '비밀번호가 틀렸습니다.');
+              }}
+            />
+            <Pressable
+              className="bg-primary mt-3 items-center rounded-xl py-3"
+              onPress={async () => {
+                const ok = await unlockLabs(labsPasswordInput);
+                setLabsPasswordInput('');
+                setLabsModalVisible(false);
+                if (!ok) Alert.alert('실패', '비밀번호가 틀렸습니다.');
+              }}
+            >
+              <Text className="text-paper text-base font-bold">확인</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </ScrollView>
   );
 }

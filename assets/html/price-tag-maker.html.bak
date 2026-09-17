@@ -54,6 +54,14 @@
       outline-offset: 2px !important;
     }
 
+    /* flex 컨테이너 안의 텍스트는 기본적으로 min-width:auto라 자기 글자폭보다 못 줄어들어
+       truncate(overflow:hidden+ellipsis)가 안 먹힌다 — 라이브 화면에선 문제없이 보였지만
+       캡처 시에만 이 축소 계산이 다르게 재현돼 심하게 잘렸다. 디자인마다 개별로 고치는
+       대신 .truncate 클래스 전체에 전역으로 적용한다(50개 디자인 전부 공통 적용). */
+    .truncate {
+      min-width: 0;
+    }
+
     /* Animations */
     @keyframes fadeIn {
       from { opacity: 0; transform: scale(0.95); }
@@ -213,6 +221,23 @@
             </div>
 
             <div className="space-y-6">
+              <div>
+                <label className="block text-sm font-black mb-3 text-black">👀 설정 미리보기</label>
+                <div className="bg-gray-200 rounded-2xl p-6 border-4 border-dashed border-gray-400 flex items-center justify-center relative">
+                  <span className="absolute top-3 left-3 text-xs font-bold text-gray-500 bg-white/80 px-2 py-1 rounded shadow-sm">실제 크기 비율 반영</span>
+                  <PriceTag
+                    {...sampleProduct}
+                    widthMm={settings.widthMm || 20}
+                    heightMm={settings.heightMm || 20}
+                    currency={settings.currency}
+                    showOriginal={settings.showOriginal}
+                    showCutGuide={settings.showCutGuide}
+                    fontFamily={selectedFont}
+                    design={settings.design}
+                  />
+                </div>
+              </div>
+
               <div className="bg-purple-50 p-4 rounded-2xl border-2 border-purple-200 shadow-sm">
                 <label className="block text-sm font-black mb-3 text-purple-900 flex items-center justify-between">
                   <span>🎨 디자인 테마 선택</span>
@@ -308,23 +333,6 @@
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-black mb-3 text-black">👀 설정 미리보기</label>
-                <div className="bg-gray-200 rounded-2xl p-6 border-4 border-dashed border-gray-400 flex items-center justify-center relative">
-                  <span className="absolute top-3 left-3 text-xs font-bold text-gray-500 bg-white/80 px-2 py-1 rounded shadow-sm">실제 크기 비율 반영</span>
-                  <PriceTag
-                    {...sampleProduct}
-                    widthMm={settings.widthMm || 20}
-                    heightMm={settings.heightMm || 20}
-                    currency={settings.currency}
-                    showOriginal={settings.showOriginal}
-                    showCutGuide={settings.showCutGuide}
-                    fontFamily={selectedFont}
-                    design={settings.design}
-                  />
-                </div>
-              </div>
-
               <div className="bg-gray-50 p-4 rounded-2xl border-2 border-gray-200 space-y-3">
                 <label className="flex items-center gap-3 cursor-pointer p-3 bg-white border-2 border-black rounded-xl hover:bg-gray-100 transition-colors shadow-sm">
                   <input type="checkbox" checked={settings.showOriginal} onChange={e => handleChange('showOriginal', e.target.checked)} className="w-5 h-5 accent-black" />
@@ -332,7 +340,7 @@
                 </label>
                 <label className="flex items-center gap-3 cursor-pointer p-3 bg-white border-2 border-black rounded-xl hover:bg-gray-100 transition-colors shadow-sm">
                   <input type="checkbox" checked={settings.showCutGuide} onChange={e => handleChange('showCutGuide', e.target.checked)} className="w-5 h-5 accent-black" />
-                  <span className="font-bold text-sm">재단선(가이드선) 표시하기</span>
+                  <span className="font-bold text-sm">재단선 표시하기</span>
                 </label>
               </div>
             </div>
@@ -347,7 +355,25 @@
       );
     };
 
-    const PriceTag = ({
+    // 상품명 등 텍스트가 실제로 폰트에 들어맞는 크기인지 재기 위한 오프스크린 캔버스(모듈당 1개 재사용).
+    const measureCanvas = typeof document !== 'undefined' ? document.createElement('canvas') : null;
+    const measureCtx = measureCanvas ? measureCanvas.getContext('2d') : null;
+
+    /** text가 maxWidthPx 안에 들어가는 가장 큰 폰트 크기를 실제로 측정해서 찾는다(1px씩 축소).
+     * startSize보다 커지지는 않는다 — 기존 글자수 기반 어림값을 상한으로 쓰고, 폰트가 넓어서
+     * 실제로 안 들어갈 때만 더 줄이는 용도. */
+    function fitFontSizeToWidth(text, fontFamily, fontWeight, maxWidthPx, startSize, minSize = 9) {
+      if (!measureCtx || !text) return startSize;
+      let size = startSize;
+      while (size > minSize) {
+        measureCtx.font = `${fontWeight} ${size}px ${fontFamily}`;
+        if (measureCtx.measureText(text).width <= maxWidthPx) break;
+        size -= 1;
+      }
+      return size;
+    }
+
+    const PriceTag = React.memo(({
       productName,
       originalPrice,
       discountPrice,
@@ -393,13 +419,42 @@
         return Math.max(14, Math.round(base * baseScale));
       };
 
-      const nameFontSize = getNameFontSize(productName);
       const priceFontSize = getPriceFontSize(formattedDiscount);
       const currencyFontSize = Math.max(10, Math.round(priceFontSize * 0.5));
 
       const hasRealBoldWeight = fontFamily && fontFamily.includes('Noto Sans KR');
       const boldWeight = hasRealBoldWeight ? 900 : 400;
       const semiBoldWeight = hasRealBoldWeight ? 700 : 400;
+
+      // 커스텀 웹폰트가 아직 안 불러와진 상태에서 캔버스로 글자 폭을 재면(fitFontSizeToWidth)
+      // 브라우저가 대체 폰트로 측정해버려 실제보다 좁게 나온다 — 그러면 "충분히 작다"고
+      // 잘못 판단해 폰트가 로드된 뒤 실제로는 잘리는 문제가 생긴다(글자 수 어림값과 똑같이
+      // 틀린 결과). 이 폰트가 실제로 로드 완료된 뒤에만 측정값을 믿고, 그전엔 안전하게
+      // 더 작은 값(글자 수 어림값과 실제 측정값 중 작은 쪽)을 쓴다.
+      const [fontReady, setFontReady] = useState(false);
+      useEffect(() => {
+        let cancelled = false;
+        setFontReady(false);
+        Promise.all([
+          document.fonts.load(`400 16px ${fontFamily}`),
+          document.fonts.load(`700 16px ${fontFamily}`),
+          document.fonts.load(`900 16px ${fontFamily}`),
+        ]).catch(() => {}).then(() => document.fonts.ready).catch(() => {}).then(() => {
+          if (!cancelled) setFontReady(true);
+        });
+        return () => {
+          cancelled = true;
+        };
+      }, [fontFamily]);
+
+      // 글자 수만 보고 폰트 크기를 정하면(getNameFontSize) 굵고 넓은 장식용 한글 폰트(예:
+      // Black Han Sans, Do Hyeon)에서 같은 글자 수라도 실제 폭이 훨씬 넓어 하단 배너에서
+      // 상품명이 심하게 잘려 보이는 문제가 있었다("버..."). 실제 캔버스로 폭을 재서, 길이
+      // 어림값을 상한으로 두고 실제로 안 들어가면 더 줄인다.
+      const nameMaxWidthPx = Math.max(20, widthPx - Math.round(16 * baseScale));
+      const nameFontSize = fontReady
+        ? fitFontSizeToWidth(productName, fontFamily, boldWeight, nameMaxWidthPx, getNameFontSize(productName))
+        : getNameFontSize(productName);
 
       const containerStyle = {
         width: widthPx + 'px',
@@ -710,7 +765,7 @@
       }
 
       return null;
-    };
+    });
 
     const DetailPreviewModal = ({ isOpen, onClose, tagData }) => {
       if (!isOpen || !tagData) return null;
@@ -760,6 +815,35 @@
       const [isCapturing, setIsCapturing] = useState(false);
       const [tagsList, setTagsList] = useState([]);
       const a4CanvasRef = useRef(null);
+
+      // RN이 캡처 전용(숨겨진, 최종 크기로 한 번만 만들어지는) WebView를 새로 띄운 뒤,
+      // 로드가 끝나면 이 함수를 호출해 태그 목록을 그대로 재현시킨다. 폰트 로딩까지 끝나면
+      // 'hydratedReady'를 RN에 알려 그제서야 react-native-view-shot으로 찍게 한다 — 이러면
+      // 사용자가 보고 있는 원래 WebView는 전혀 건드리지 않는다.
+      useEffect(() => {
+        window.__hydrateForCapture = async (tagsListJson) => {
+          try {
+            const list = JSON.parse(tagsListJson);
+            setIsCapturing(true);
+            setTagsList(list);
+            await new Promise(requestAnimationFrame);
+            await new Promise(requestAnimationFrame);
+            const usedFonts = Array.from(new Set(list.map((t) => t.fontFamily).filter(Boolean)));
+            const weightsToPreload = ['400', '700', '900'];
+            await Promise.all(
+              usedFonts.flatMap((f) => weightsToPreload.map((w) => document.fonts.load(`${w} 16px ${f}`).catch(() => {})))
+            );
+            if (document.fonts && document.fonts.ready) await document.fonts.ready;
+            await new Promise((r) => setTimeout(r, 300));
+            window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'hydratedReady' }));
+          } catch (e) {
+            window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'hydrateError', message: String(e && e.message || e) }));
+          }
+        };
+        return () => {
+          delete window.__hydrateForCapture;
+        };
+      }, []);
 
       const [previewModalTag, setPreviewModalTag] = useState(null);
       const [dialog, setDialog] = useState({ isOpen: false, title: '', message: '', isConfirm: false, onConfirm: null });
@@ -919,6 +1003,9 @@
 
       const captureA4Canvas = async () => {
         const usedFonts = Array.from(new Set(tagsList.map((t) => t.fontFamily || selectedFont)));
+        const usedFamilyNames = Array.from(
+          new Set(usedFonts.map((f) => f.split(',')[0].replace(/['"]/g, '').trim()))
+        );
         await Promise.all(usedFonts.map((f) => document.fonts.load(`16px ${f}`).catch(() => {})));
         if (document.fonts && document.fonts.ready) await document.fonts.ready;
         await new Promise((r) => setTimeout(r, 200));
@@ -952,39 +1039,60 @@
           scale: 2, useCORS: true, backgroundColor: '#FFFFFF', logging: false,
           width: captureWidth, height: captureHeight, windowWidth: captureWidth, windowHeight: captureHeight,
           letterRendering: true,
+          // [근본 원인] html2canvas는 캡처 대상 DOM을 숨겨진 iframe에 통째로 복제해 그 안에서
+          // 그리는데, 이 복제 문서(documentClone)는 메인 문서와 완전히 분리된 자신만의
+          // document.fonts(FontFaceSet)를 가진다. 그래서 위에서 메인 문서 기준으로 미리
+          // 로드해둔 구글 폰트는 복제 문서엔 아무 효과가 없고, 복제 문서는 처음부터 다시
+          // 폰트를 로드해야 한다. html2canvas 내부적으로 documentClone.fonts.ready만
+          // 기다리는데, 레이아웃이 아직 해당 @font-face 로드를 요청하기 전에 .ready가
+          // 먼저(빈 상태로) resolve돼버리는 경합이 있어(html2canvas 알려진 이슈) 그 사이에
+          // 캡처되면 폴백 폰트로 그려지며 글자가 깨졌다 — "버터링"이 "씨디린"처럼 엉뚱한
+          // 글자로 나온 게 이 경합의 증상. onclone에서 복제 문서 기준으로 실제 쓰인 폰트를
+          // 명시적으로 다시 로드해 기다리면, 그 폰트가 진짜 쓸 수 있게 된 뒤에야 html2canvas가
+          // 그리기 시작한다.
+          onclone: async (clonedDoc) => {
+            const weights = [400, 700, 900];
+            await Promise.all(
+              usedFamilyNames.flatMap((name) =>
+                weights.map((w) => clonedDoc.fonts.load(`${w} 16px "${name}"`).catch(() => {}))
+              )
+            );
+            if (clonedDoc.fonts && clonedDoc.fonts.ready) await clonedDoc.fonts.ready;
+          },
         });
       };
 
-      /** RN WebView 안에서 저장/공유를 누르면: html2canvas로 a4CanvasRef를 직접 캡처해
-       * base64 PNG를 만들어 postMessage로 RN에 전달한다.
-       * 예전엔 WebView 자체를 네이티브로 리사이즈한 뒤 react-native-view-shot으로 캡처했는데,
-       * 안드로이드 일부 기기에서 리사이즈가 내부 렌더링 서피스에 반영되지 않아(레이아웃 좌표는
-       * 새 크기인데 실제 그림은 예전 작은 크기로 고정) 이미지가 잘리거나 화면이 확대된 채 안
-       * 돌아오는 문제가 있었다. WebView 크기를 전혀 건드리지 않는 이 방식으로 그 문제를 피한다.
-       * (커스텀 폰트가 캔버스에 안 그려지던 예전 html2canvas 문제는 위 captureA4Canvas의
-       * document.fonts.ready 대기로 완화를 시도한다 — 기기에서 실제 확인 필요.) */
-      const captureAndSendToNative = async (kind) => {
-        setIsCapturing(true);
-        // 캡처 모드로 바뀌기 전 스크롤돼 있던 위치가 남아 position:fixed 콘텐츠가 위쪽이
-        // 잘려 보이는 문제가 있어, 캡처 시작 시 스크롤을 강제로 맨 위로 되돌린다.
-        window.scrollTo(0, 0);
-        await new Promise(requestAnimationFrame);
-        await new Promise(requestAnimationFrame);
-        try {
-          const canvas = await captureA4Canvas();
-          const dataUrl = canvas.toDataURL('image/png');
-          window.ReactNativeWebView.postMessage(JSON.stringify({ type: kind, dataUrl }));
-        } finally {
-          setIsCapturing(false);
-        }
-      };
+      /** RN WebView 안에서 저장/공유를 누르면: html2canvas(위 captureA4Canvas)는 자체 CSS
+       * 레이아웃 엔진으로 DOM을 다시 그려서 캡처하는데, 이 재현이 실제 화면과 어긋나는
+       * 문제가 반복적으로 확인됐다(커스텀 한글 웹폰트가 기본체로 나오거나 깨짐, flex 자식
+       * 축소 계산이 달라 글자가 잘림) — html2canvas 자체의 근본적 한계로 판단했다. 대신
+       * 지금 보고 있는 이 WebView는 전혀 건드리지 않고, RN에게 "이 태그 목록 그대로 캡처
+       * 전용 WebView를 하나 새로 만들어서 실제 화면을 찍어달라"고 요청만 보낸다 — 실제
+       * 화면을 그대로 찍으므로 라이브 화면과 다르게 나올 수가 없다.
+       * (예전엔 이 WebView 자체를 네이티브로 리사이즈한 뒤 react-native-view-shot으로
+       * 찍었는데, 안드로이드 일부 기기에서 리사이즈가 내부 렌더링 서피스에 반영되지 않아
+       * 잘리거나 확대된 채 캡처되는 문제가 있었다. 그래서 이번엔 기존 WebView를 리사이즈하는
+       * 대신, 캡처 전용 WebView를 처음부터 최종 크기로 새로 만들어 한 번도 리사이즈하지
+       * 않는 방식으로 바꿨다 — price-tag-maker.tsx의 requestNativeCapture 처리 참고.)
+       * RN이 캡처를 끝내면 window.__onNativeCaptureDone(ok, message)를 호출해준다. */
+      const captureAndSendToNative = (kind) => new Promise((resolve, reject) => {
+        window.__onNativeCaptureDone = (ok, message) => {
+          delete window.__onNativeCaptureDone;
+          if (ok) resolve();
+          else reject(new Error(message || '캡처 실패'));
+        };
+        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'requestNativeCapture', kind, tagsList }));
+      });
       const handleDownloadA4 = async () => {
         if (tagsList.length === 0) { showModalAlert('A4 용지에 추가된 가격표가 없습니다.'); return; }
+        if (isSaving || isSharing) return;
 
         if (window.ReactNativeWebView) {
           setIsSaving(true);
           try {
             await captureAndSendToNative('save');
+          } catch (err) {
+            showModalAlert(err instanceof Error ? err.message : '이미지 저장에 실패했습니다.');
           } finally {
             setIsSaving(false);
           }
@@ -1023,11 +1131,14 @@
        * 일반 브라우저에서 열렸을 때는 Web Share API로 대체한다. */
       const handleKakaoShare = async () => {
         if (tagsList.length === 0) { showModalAlert('A4 용지에 추가된 가격표가 없습니다.'); return; }
+        if (isSaving || isSharing) return;
 
         if (window.ReactNativeWebView) {
           setIsSharing(true);
           try {
             await captureAndSendToNative('share');
+          } catch (err) {
+            showModalAlert(err instanceof Error ? err.message : '카톡 전송에 실패했습니다.');
           } finally {
             setIsSharing(false);
           }
@@ -1068,8 +1179,11 @@
         showCutGuide: settings.showCutGuide,
       };
 
+      // 캡처 모드에서는 배경을 흰색으로 바꾼다 — 캡처 전용 WebView는 실제 콘텐츠보다 여유 있게
+      // 고정 크기로 만들어서(리사이즈 방지), 콘텐츠가 그 크기를 다 못 채우면 남는 영역에 앱
+      // 브랜드색(연두색) 배경이 그대로 찍혀 나왔다.
       return (
-        <div className={`min-h-screen bg-[#CCFF00] font-sans flex flex-col items-center selection:bg-black selection:text-[#CCFF00] ${isCapturing ? '' : 'p-4 md:p-8'}`}>
+        <div className={`min-h-screen font-sans flex flex-col items-center selection:bg-black selection:text-[#CCFF00] ${isCapturing ? 'bg-white' : 'bg-[#CCFF00] p-4 md:p-8'}`}>
           <header className={`mb-6 text-center relative w-full max-w-7xl flex flex-col items-center ${isCapturing ? 'hidden' : ''}`}>
             <div className="inline-flex items-center gap-3 border-b-8 border-black pb-2">
               <h1 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight">
@@ -1077,7 +1191,7 @@
               </h1>
               <button onClick={() => setIsSettingsOpen(true)} className="flex items-center gap-1.5 bg-black text-white px-3 py-2 rounded-2xl hover:scale-105 active:scale-95 transition-transform shadow-[3px_3px_0_0_#FFF] border-2 border-black text-xs sm:text-sm font-bold" title="환경 설정">
                 <span>⚙️</span>
-                <span>설정 (디자인·글꼴)</span>
+                <span className="text-center leading-tight">설정<br/>(디자인·글꼴)</span>
               </button>
             </div>
             <div className="flex items-center gap-2 mt-2">
@@ -1126,8 +1240,8 @@
                 <div className="flex flex-col items-center gap-2 py-3 border-t-2 border-b-2 border-black/10">
                   <div className="flex items-center justify-between w-full px-1">
                     <span className="text-xs font-black text-gray-700">👁️ 선택한 가격표 실시간 미리보기</span>
-                    <button onClick={() => setPreviewModalTag(currentSampleTag)} className="text-[10px] font-bold bg-black text-white px-2 py-0.5 rounded hover:bg-gray-800">
-                      🔍 큰 화면 확대
+                    <button onClick={() => setPreviewModalTag(currentSampleTag)} className="text-[10px] font-bold bg-black text-white px-2 py-1 rounded hover:bg-gray-800 text-center leading-tight">
+                      🔍 확대
                     </button>
                   </div>
                   <div className="p-1 bg-white rounded shadow-sm hover:scale-105 transition-transform">
@@ -1136,11 +1250,11 @@
                 </div>
 
                 <div className="grid grid-cols-3 gap-2">
-                  <button onClick={handleDownloadA4} disabled={isSaving} className="flex items-center justify-center gap-1 bg-blue-600 text-white p-2.5 font-bold border-3 border-black rounded-xl shadow-[3px_3px_0_0_#000] hover:translate-y-[2px] transition-all text-[11px] disabled:opacity-50">
+                  <button onClick={handleDownloadA4} disabled={isSaving || isSharing} className="flex items-center justify-center gap-1 bg-blue-600 text-white p-2.5 font-bold border-3 border-black rounded-xl shadow-[3px_3px_0_0_#000] hover:translate-y-[2px] transition-all text-[11px] disabled:opacity-50">
                     {isSaving ? '⏳' : '📥 저장'}
                   </button>
 
-                  <button onClick={handleKakaoShare} disabled={isSharing} className="flex items-center justify-center gap-1 bg-[#FEE500] text-black p-2.5 font-bold border-3 border-black rounded-xl shadow-[3px_3px_0_0_#000] hover:translate-y-[2px] transition-all text-[11px] disabled:opacity-50">
+                  <button onClick={handleKakaoShare} disabled={isSaving || isSharing} className="flex items-center justify-center gap-1 bg-[#FEE500] text-black p-2.5 font-bold border-3 border-black rounded-xl shadow-[3px_3px_0_0_#000] hover:translate-y-[2px] transition-all text-[11px] disabled:opacity-50">
                     {isSharing ? '⏳' : '💬 카톡 전송'}
                   </button>
 

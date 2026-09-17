@@ -11,12 +11,14 @@
       "icon": "./assets/expo.icon",
       "supportsTablet": false,
       "bundleIdentifier": "com.expirykeeper.app",
+      "buildNumber": "1",
       "infoPlist": {
         "NSCameraUsageDescription": "바코드 스캔과 상품 사진 촬영을 위해 카메라를 사용합니다."
       }
     },
     "android": {
       "package": "com.shlab.expirykeeper",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#FFF7EB",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

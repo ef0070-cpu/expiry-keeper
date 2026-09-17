@@ -246,6 +246,10 @@ export default function Order() {
   const [syncing, setSyncing] = useState(false);
 
   const load = useCallback(async () => {
+    // 로컬 데이터를 먼저 즉시 보여주고, 서버 동기화는 그 뒤에 돌려서 끝나면 조용히 한 번 더
+    // 갱신한다 — 동기화가 끝날 때까지 화면을 막으면 이미 로컬에 있는 데이터인데도 열 때마다
+    // 서버 왕복 시간만큼 딜레이가 보였다.
+    await loadCatalog();
     setSyncing(true);
     try {
       await syncOrderCatalog();

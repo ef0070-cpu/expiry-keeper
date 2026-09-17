@@ -243,3 +243,48 @@ export function useScanHapticEnabled(): boolean {
   }, []);
   return enabled;
 }
+
+// ---------- 실험실(비공개 기능) ----------
+// 아직 실험 중인 기능(가격표 만들기)을 일반 사용자에게 안 보이게 숨기고, 비밀번호를 아는
+// 관리자만 계속 켜서 테스트할 수 있게 한다. 실제 로그인/권한 체계가 아니라 화면 노출을
+// 막는 용도라 비밀번호를 코드에 그대로 둔다(민감 정보 없음, 낮은 위험).
+const LABS_UNLOCKED_KEY = 'labsUnlocked:v1';
+const LABS_PASSWORD = '2580';
+
+let labsCache: boolean | undefined;
+const labsListeners = new Set<() => void>();
+
+async function loadLabsUnlocked(): Promise<void> {
+  if (labsCache !== undefined) return;
+  labsCache = (await AsyncStorage.getItem(LABS_UNLOCKED_KEY)) === '1';
+}
+
+/** 비밀번호가 맞으면 실험실을 켜고 true, 틀리면 false를 돌려준다. */
+export async function unlockLabs(password: string): Promise<boolean> {
+  if (password !== LABS_PASSWORD) return false;
+  labsCache = true;
+  labsListeners.forEach((fn) => fn());
+  await AsyncStorage.setItem(LABS_UNLOCKED_KEY, '1');
+  return true;
+}
+
+export async function lockLabs(): Promise<void> {
+  labsCache = false;
+  labsListeners.forEach((fn) => fn());
+  await AsyncStorage.removeItem(LABS_UNLOCKED_KEY);
+}
+
+/** 로딩 중엔 false(숨김)로 시작 — 실험 기능이라 잘못 노출되는 쪽보다 안전하게. */
+export function useLabsUnlocked(): boolean {
+  const [unlocked, setUnlocked] = useState<boolean>(labsCache ?? false);
+  useEffect(() => {
+    const update = () => setUnlocked(labsCache ?? false);
+    labsListeners.add(update);
+    if (labsCache === undefined) loadLabsUnlocked().then(update);
+    else update();
+    return () => {
+      labsListeners.delete(update);
+    };
+  }, []);
+  return unlocked;
+}

@@ -218,9 +218,9 @@ export default function MarginCalculator() {
               ))}
             </ScrollView>
 
-            <View className="gap-2 p-4" style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
+            <View className="gap-3 p-4" style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
               {COST_KEYPAD_ROWS.map((row, i) => (
-                <View key={i} className="flex-row gap-2">
+                <View key={i} className="flex-row gap-3">
                   {row.map((key) => (
                     <Pressable
                       key={key}
@@ -229,12 +229,15 @@ export default function MarginCalculator() {
                       accessibilityLabel={
                         key === 'C' ? '지우기' : key === '⌫' ? '한 글자 지우기' : `숫자 ${key}`
                       }
-                      className="flex-1 items-center justify-center rounded-xl border border-line bg-paper py-4 active:opacity-70"
+                      style={{ minHeight: 72 }}
+                      className="flex-1 items-center justify-center rounded-xl border border-line bg-paper active:opacity-70"
                     >
                       {key === '⌫' ? (
-                        <MaterialCommunityIcons name="backspace-outline" size={20} color="#1A1A1A" />
+                        <MaterialCommunityIcons name="backspace-outline" size={28} color="#1A1A1A" />
                       ) : (
-                        <Text className="text-ink text-xl font-bold">{key}</Text>
+                        <Text className="text-ink font-bold" style={{ fontSize: 30 }}>
+                          {key}
+                        </Text>
                       )}
                     </Pressable>
                   ))}
