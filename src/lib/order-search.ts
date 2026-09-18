@@ -47,18 +47,43 @@ function deterministicTier(candidates: string[], query: string): { tier: SearchT
   return best;
 }
 
+const FUSE_OPTIONS = {
+  keys: [
+    { name: 'name', weight: 2 },
+    { name: 'aliases', weight: 1.5 },
+    { name: 'brand', weight: 1 },
+  ],
+  threshold: 0.35,
+  ignoreLocation: true,
+};
+
+/** 오타 허용(fuzzy) 검색용 색인. 색인 구축 자체가 비용이 커서(388종 기준) 매 키 입력마다
+ * 새로 만들면 저사양 기기에서 입력이 눈에 띄게 밀린다 — 상품 목록이 바뀔 때 한 번만 만들어
+ * (예: useMemo([products])) searchOrderProducts에 넘겨 재사용해야 한다. 넘기지 않으면
+ * 이전처럼 호출마다 새로 만든다(느리지만 항상 동작은 함). */
+export function buildProductSearchIndex(products: OrderProduct[]): Fuse<OrderProduct> {
+  return new Fuse(products, FUSE_OPTIONS);
+}
+
 /**
  * 발주 상품 검색 + 랭킹. query와 매칭되는 상품만, 우선순위(완전일치 > 시작일치 > 부분일치 >
  * 초성/자모일치)로 정렬해 반환한다. 위 어디에도 안 걸리면 마지막 안전망으로 오타 허용
  * (fuzzy) 검색을 한 번 더 시도한다 — "매로나"처럼 한 글자 틀려도 "메로나"를 찾아준다.
  * 입력이 비어 있으면 products를 그대로 돌려준다(정렬 없이 원래 순서 유지).
+ *
+ * fuseIndex를 넘기면 그 색인으로 fuzzy 검색하고 결과를 products에 남은(결정적 등급에 안 걸린)
+ * 상품으로만 걸러 쓴다 — buildProductSearchIndex로 미리 만든 색인을 재사용하기 위함.
  */
-export function searchOrderProducts(products: OrderProduct[], query: string): OrderProduct[] {
+export function searchOrderProducts(
+  products: OrderProduct[],
+  query: string,
+  fuseIndex?: Fuse<OrderProduct>,
+): OrderProduct[] {
   const q = query.trim();
   if (!q) return products;
 
   const scored: { product: OrderProduct; tier: SearchTier; len: number }[] = [];
-  const unmatched: OrderProduct[] = [];
+  const unmatchedIds = new Set<string>();
 
   for (const p of products) {
     if ((p.barcode ?? '').includes(q)) {
@@ -67,20 +92,13 @@ export function searchOrderProducts(products: OrderProduct[], query: string): Or
     }
     const result = deterministicTier(candidatesOf(p), q);
     if (result !== null) scored.push({ product: p, tier: result.tier, len: result.len });
-    else unmatched.push(p);
+    else unmatchedIds.add(p.id);
   }
 
-  if (unmatched.length > 0) {
-    const fuse = new Fuse(unmatched, {
-      keys: [
-        { name: 'name', weight: 2 },
-        { name: 'aliases', weight: 1.5 },
-        { name: 'brand', weight: 1 },
-      ],
-      threshold: 0.35,
-      ignoreLocation: true,
-    });
+  if (unmatchedIds.size > 0) {
+    const fuse = fuseIndex ?? new Fuse(products.filter((p) => unmatchedIds.has(p.id)), FUSE_OPTIONS);
     for (const result of fuse.search(q)) {
+      if (!unmatchedIds.has(result.item.id)) continue;
       scored.push({ product: result.item, tier: 4, len: normalize(result.item.name).length });
     }
   }

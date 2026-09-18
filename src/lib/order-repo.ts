@@ -241,6 +241,32 @@ export async function deleteOrderProduct(id: string): Promise<void> {
     .catch(() => {});
 }
 
+/**
+ * 등록된 발주 상품을 전부 삭제한다("초기화"). deleteOrderProduct와 같은 tombstone 방식(삭제된
+ * 바코드/id 기록)을 쓰지만, 상품마다 반복 호출하면 매번 전체 목록을 다시 읽고 쓰게 되어(388종
+ * 기준 O(n²)) 한 번의 읽기/쓰기로 처리한다. 장바구니는 방금 삭제된 상품만 참조하고 있었으므로
+ * 통째로 비운다.
+ */
+export async function clearAllOrderProducts(): Promise<void> {
+  const items = await listOrderProducts();
+  if (items.length === 0) return;
+  await writeOrderProducts([]);
+  await writeOrderCart({});
+  const removed = await getRemovedBarcodes();
+  const deletedIds = await getDeletedOrderProductIds();
+  for (const p of items) {
+    if (p.barcode) removed.add(p.barcode);
+    deletedIds.add(p.id);
+  }
+  await AsyncStorage.setItem(REMOVED_BARCODES_KEY, JSON.stringify([...removed]));
+  await AsyncStorage.setItem(DELETED_ORDER_PRODUCT_IDS_KEY, JSON.stringify([...deletedIds]));
+  for (const p of items) {
+    deleteOrderProductCloud(p.id)
+      .then(() => clearDeletedOrderProductId(p.id))
+      .catch(() => {});
+  }
+}
+
 /** 사진 후보에 좋아요를 눌러 그 사진을 내 상품 사진으로 즉시 반영한다. saveOrderProduct를
  * 쓰지 않는 이유: saveOrderProduct는 imageUri가 바뀌면 submitPhotoCandidateIfChanged로 "새
  * 후보 제출"까지 같이 하는데, 여기 photoUri는 이미 등록된 후보라 그러면 중복 후보 행이 생긴다.

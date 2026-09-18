@@ -25,6 +25,7 @@ import {
   assignToFridgeSection,
   CatalogUpdateBadge,
   clearAllCatalogUpdateBadges,
+  clearAllOrderProducts,
   clearCatalogUpdateBadge,
   deleteFridgeSection,
   deleteOrderCategory,
@@ -54,7 +55,7 @@ import {
   writeOrderCart,
 } from '@/lib/order-repo';
 import { FridgeAssignment, FridgeSection, OrderCart, OrderProduct, OrderStatus, Store } from '@/lib/order-types';
-import { searchOrderProducts } from '@/lib/order-search';
+import { buildProductSearchIndex, searchOrderProducts } from '@/lib/order-search';
 
 const STATUS_META: Record<OrderStatus, { label: string; color: string }> = {
   active: { label: '시판중', color: '#2E7D32' },
@@ -98,6 +99,8 @@ export default function Order() {
   const lastAddTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [suggestionsCollapsed, setSuggestionsCollapsed] = useState(false);
   const [showQuickHelp, setShowQuickHelp] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scanParams = useLocalSearchParams<{ scannedBarcode?: string; nonce?: string }>();
 
@@ -292,25 +295,34 @@ export default function Order() {
     [updateBadges],
   );
 
-  const filtered = useMemo(() => {
-    const byCategory = products.filter(
-      (p) => selectedCategory === '전체' || p.category === selectedCategory,
-    );
-    const badgeSorted = [...byCategory].sort((a, b) => Number(hasBadge(b)) - Number(hasBadge(a)));
+  // 오타 허용(fuzzy) 검색용 색인은 상품 목록이 바뀔 때만 다시 만든다 — 매 키 입력마다 새로
+  // 만들면(388종 카탈로그 기준 색인 구축 자체가 무거움) 그게 입력 지연의 주된 원인이었다.
+  const fuseIndex = useMemo(() => buildProductSearchIndex(products), [products]);
+
+  const badgeSorted = useMemo(
+    () => [...products].sort((a, b) => Number(hasBadge(b)) - Number(hasBadge(a))),
+    [products, hasBadge],
+  );
+
+  // 검색은 카테고리와 무관하게 전체 카탈로그를 대상으로 한 번만 수행한다 — 아래 filtered(카테고리
+  // 필터 적용)와 suggestions(카테고리 무관 상위 5개)가 이 결과를 나눠 쓴다. 예전에는 같은 검색을
+  // filtered용/suggestions용으로 각각 한 번씩 총 두 번 돌려서 입력 지연이 두 배로 커졌다.
+  const searched = useMemo(() => {
     const q = deferredQuery.trim();
-    if (!q) return badgeSorted;
+    if (!q) return null;
     // 검색 중엔 관련도(완전일치>시작일치>부분일치>초성/자모>오타허용)가 우선, 같은 등급 안에서는
     // 신규/수정 뱃지가 있는 상품이 위로 온다(searchOrderProducts의 등급 정렬은 안정정렬).
-    return searchOrderProducts(badgeSorted, q);
-  }, [products, deferredQuery, selectedCategory, hasBadge]);
+    return searchOrderProducts(badgeSorted, q, fuseIndex);
+  }, [badgeSorted, deferredQuery, fuseIndex]);
+
+  const filtered = useMemo(() => {
+    const base = searched ?? badgeSorted;
+    return selectedCategory === '전체' ? base : base.filter((p) => p.category === selectedCategory);
+  }, [searched, badgeSorted, selectedCategory]);
 
   // 카테고리 탭과 무관하게 전체 상품에서 찾는 자동완성 제안 — 검색창 바로 아래 드롭다운으로
   // 뜨는 용도라 5개로 제한한다 (스크롤 없는 빠른 담기 목적, 전체 목록은 아래에 그대로 있음).
-  const suggestions = useMemo(() => {
-    const q = deferredQuery.trim();
-    if (!q) return [];
-    return searchOrderProducts(products, q).slice(0, 5);
-  }, [products, deferredQuery]);
+  const suggestions = useMemo(() => (searched ? searched.slice(0, 5) : []), [searched]);
 
   // 빠른발주: 현재 구역에 배정되고 상태가 시판중인 상품만 그리드에 보여준다(단종/일시중지는
   // 자동 숨김 — 다시 active로 바꾸면 배정 정보가 남아 있어 별도 조작 없이 재노출됨).
@@ -331,9 +343,9 @@ export default function Order() {
 
   const activeColumns = 3;
   // JS에서 픽셀을 직접 계산하는 방식은 기기별 실측 오차로 카드 크기가 어긋나는 문제가 있었다.
-  // flex:1 + aspectRatio:1은 Yoga(RN의 레이아웃 엔진)가 네이티브로 균등 분할과 정사각형을
-  // 보장해줘서 훨씬 안정적이다 — maxWidth는 마지막 줄에 항목이 3개 미만일 때 늘어나지 않게 하는
-  // 상한선.
+  // 대신 3칸 기준 고정 퍼센트 너비(FridgeTile의 width)를 줘서, 마지막 줄에 항목이 3개보다
+  // 적게 남아도(예: 1개) 항상 같은 크기로 보이게 한다. -2는 tile 사이 gap(10px)이 들어갈
+  // 자리를 남기기 위한 여유분.
   const tileMaxWidthPercent: `${number}%` = `${Math.max(14, Math.floor(100 / activeColumns) - 2)}%`;
 
   const activeDividerIds = useMemo(
@@ -706,12 +718,44 @@ export default function Order() {
     }
   };
 
+  const onConfirmResetProducts = useCallback(async () => {
+    setResetting(true);
+    try {
+      await clearAllOrderProducts();
+      await load();
+      setShowResetConfirm(false);
+      setToastMessage('상품을 모두 초기화했어요');
+      if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+      toastTimeoutRef.current = setTimeout(() => setToastMessage(null), 1500);
+    } finally {
+      setResetting(false);
+    }
+  }, [load]);
+
   return (
     <View className="flex-1 bg-bg">
       <Stack.Screen
         options={{
           headerRight: () => (
             <View className="flex-row items-center" style={{ gap: 16 }}>
+              {products.length > 0 ? (
+                <Pressable
+                  onPress={() => setShowResetConfirm(true)}
+                  hitSlop={11}
+                  accessibilityRole="button"
+                  accessibilityLabel="상품 초기화"
+                >
+                  <MaterialCommunityIcons name="delete-sweep-outline" size={22} color="#1A1A1A" />
+                </Pressable>
+              ) : null}
+              <Pressable
+                onPress={() => router.push('/order-csv-import')}
+                hitSlop={11}
+                accessibilityRole="button"
+                accessibilityLabel="CSV로 가져오기"
+              >
+                <MaterialCommunityIcons name="file-delimited-outline" size={22} color="#1A1A1A" />
+              </Pressable>
               <Pressable
                 onPress={() => router.push('/scan?mode=order')}
                 hitSlop={11}
@@ -798,6 +842,14 @@ export default function Order() {
         onRename={onRenameStore}
         onDelete={onDeleteStore}
         onClose={() => setShowStoreModal(false)}
+      />
+
+      <ResetProductsModal
+        visible={showResetConfirm}
+        productCount={products.length}
+        resetting={resetting}
+        onConfirm={onConfirmResetProducts}
+        onClose={() => setShowResetConfirm(false)}
       />
 
       <View className="mx-4 mt-3 flex-row gap-2">
@@ -1196,9 +1248,13 @@ const FridgeTile = memo(function FridgeTile({
       delayLongPress={300}
       accessibilityRole="button"
       accessibilityLabel={isPending ? `${product.name} 이동 취소` : product.name}
-      className="mb-3 flex-1 items-center rounded-xl border border-line bg-paper p-2"
+      className="mb-3 items-center rounded-xl border border-line bg-paper p-2"
       style={({ pressed }) => [
-        { maxWidth: maxWidthPercent },
+        // flex-1(성장형) + maxWidth 상한 조합은 3칸이 다 안 찬 마지막 줄(예: 1개만 남았을 때)에
+        // flex-grow가 먼저 100%로 늘어난 뒤 퍼센트 maxWidth로 눌러야 하는데, 기기에 따라 이 클램프가
+        // 제대로 안 먹어 타일 하나가 줄 전체 너비로 커지는 문제가 있었다. 고정 width로 바꾸면
+        // 형제 개수와 무관하게 항상 3칸 기준 크기(예: 31%)로 고정된다.
+        { width: maxWidthPercent },
         isPending
           ? { borderColor: '#CC2222', borderWidth: 2, backgroundColor: '#FDECEC' }
           : pressed
@@ -1316,6 +1372,74 @@ const QuickOrderHelpModal = memo(function QuickOrderHelpModal({
               <MaterialCommunityIcons name="gesture-tap-hold" size={18} color="#1A1A1A" />
               <Text className="text-ink flex-1 text-sm">구역 탭을 꾹 누르면 이름 변경 · 삭제 · 순서 변경</Text>
             </View>
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+});
+
+const RESET_CONFIRM_WORD = '초기화';
+
+// 파괴적이고 되돌릴 수 없는 동작이라 일반적인 예/아니오 확인창보다 강한 확인을 요구한다 —
+// "초기화"를 정확히 입력해야 버튼이 활성화된다(실수로 알림창 버튼을 누르는 것만으로는 안 지워짐).
+const ResetProductsModal = memo(function ResetProductsModal({
+  visible,
+  productCount,
+  resetting,
+  onConfirm,
+  onClose,
+}: {
+  visible: boolean;
+  productCount: number;
+  resetting: boolean;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  const [text, setText] = useState('');
+
+  useEffect(() => {
+    if (visible) setText('');
+  }, [visible]);
+
+  const canConfirm = text.trim() === RESET_CONFIRM_WORD && !resetting;
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable className="flex-1 items-center justify-center bg-ink/40 px-6" onPress={onClose}>
+        <Pressable onPress={(e) => e.stopPropagation()} className="w-full rounded-2xl bg-paper p-4">
+          <View className="mb-2 flex-row items-center" style={{ gap: 8 }}>
+            <MaterialCommunityIcons name="alert-circle-outline" size={20} color="#C62828" />
+            <Text className="text-ink text-base font-bold">상품 초기화</Text>
+          </View>
+          <Text className="text-ink text-sm">
+            등록된 발주 상품 {productCount}건이 모두 삭제됩니다. 되돌릴 수 없어요.
+          </Text>
+          <Text className="text-muted mb-2 mt-2 text-xs">
+            계속하려면 아래에 '{RESET_CONFIRM_WORD}'를 입력하세요.
+          </Text>
+          <TextInput
+            className="text-ink rounded-xl border border-line bg-paper px-3 py-2 text-sm"
+            placeholder={RESET_CONFIRM_WORD}
+            placeholderTextColor="#BBBBBB"
+            value={text}
+            onChangeText={setText}
+            autoFocus
+          />
+          <View className="mt-4 flex-row justify-end" style={{ gap: 12 }}>
+            <Pressable onPress={onClose} className="px-2 py-2">
+              <Text className="text-muted text-sm">취소</Text>
+            </Pressable>
+            <Pressable
+              onPress={onConfirm}
+              disabled={!canConfirm}
+              className="rounded-xl px-4 py-2 active:opacity-80"
+              style={{ backgroundColor: canConfirm ? '#C62828' : '#E0B4B4' }}
+            >
+              <Text className="text-sm font-bold" style={{ color: '#FFFFFF' }}>
+                {resetting ? '초기화 중...' : '초기화'}
+              </Text>
+            </Pressable>
           </View>
         </Pressable>
       </Pressable>

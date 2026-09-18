@@ -86,6 +86,7 @@ export default function RootLayout() {
         <Stack.Protected guard={authed && mode === 'retail'}>
           <Stack.Screen name="order" options={{ title: '발주 관리' }} />
           <Stack.Screen name="order-product-form" options={{ title: '발주 상품' }} />
+          <Stack.Screen name="order-csv-import" options={{ title: '발주 상품 CSV로 가져오기' }} />
           <Stack.Screen name="margin-calculator" options={{ title: '원가 계산기' }} />
           <Stack.Screen
             name="order-cart"

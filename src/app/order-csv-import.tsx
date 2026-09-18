@@ -6,38 +6,36 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ParsedProductRow, parseProductCsv } from '@/lib/csv-import';
-import { scheduleExpiryAlerts } from '@/lib/notifications';
-import { newId, saveProduct } from '@/lib/repo';
-import { getCachedAppMode } from '@/lib/settings';
-import { Product } from '@/lib/types';
+import { ParsedOrderProductRow, parseOrderProductCsv } from '@/lib/order-csv-import';
+import { addOrderCategory, listOrderCategories, newId, saveOrderProduct } from '@/lib/order-repo';
+import { OrderProduct } from '@/lib/order-types';
 
 const TEMPLATE_CSV =
-  '﻿상품명,유통기한,바코드,수량,카테고리,메모\n' +
-  '딸기우유,2026-12-31,8801234567890,3,냉장;유제품,예시 행입니다. 지우고 사용하세요\n';
+  '﻿상품명,브랜드,가격,카테고리,바코드,별칭\n' +
+  '메로나,빙그레,1000,바,8801234567890,메론바;멜론바\n';
 
 type ImportState =
   | { step: 'idle' }
-  | { step: 'parsed'; rows: ParsedProductRow[]; errors: { line: number; reason: string }[] }
+  | { step: 'parsed'; rows: ParsedOrderProductRow[]; errors: { line: number; reason: string }[] }
   | { step: 'importing'; total: number; done: number }
   | { step: 'done'; success: number; failed: number; firstError?: string };
 
-export default function CsvImportScreen() {
+export default function OrderCsvImportScreen() {
   const insets = useSafeAreaInsets();
   const [state, setState] = useState<ImportState>({ step: 'idle' });
 
   const shareTemplate = async () => {
     try {
       // Android는 expo-sharing이 다른 앱으로 "보내기"만 할 뿐이라, 고른 앱이 저장을 지원
-      // 안 하면(예: 채팅 앱) 공유 시트는 뜨는데 실제로는 아무 파일도 안 남는다 — SAF로
-      // 사용자가 고른 폴더(기본으로 다운로드 폴더를 먼저 보여줌)에 직접 써서 확실히 남긴다.
+      // 안 하면 공유 시트는 뜨는데 실제로는 아무 파일도 안 남는다(csv-import.tsx의 템플릿
+      // 받기와 같은 이유로 같은 방식을 씀) — SAF로 사용자가 고른 폴더에 직접 써서 확실히 남긴다.
       if (Platform.OS === 'android') {
         const downloadsHint = StorageAccessFramework.getUriForDirectoryInRoot('Download');
         const perm = await StorageAccessFramework.requestDirectoryPermissionsAsync(downloadsHint);
         if (!perm.granted) return;
         const fileUri = await StorageAccessFramework.createFileAsync(
           perm.directoryUri,
-          'expiry-keeper-template',
+          'order-product-template',
           'text/csv',
         );
         await StorageAccessFramework.writeAsStringAsync(fileUri, TEMPLATE_CSV);
@@ -45,7 +43,7 @@ export default function CsvImportScreen() {
         return;
       }
 
-      const file = new File(Paths.cache, 'expiry-keeper-template.csv');
+      const file = new File(Paths.cache, 'order-product-template.csv');
       if (file.exists) file.delete();
       file.create();
       file.write(TEMPLATE_CSV);
@@ -69,36 +67,42 @@ export default function CsvImportScreen() {
       if (result.canceled || !result.assets?.[0]) return;
       const picked = new File(result.assets[0].uri);
       const text = await picked.text();
-      const { rows, errors } = parseProductCsv(text);
+      const { rows, errors } = parseOrderProductCsv(text);
       setState({ step: 'parsed', rows, errors });
     } catch (e) {
       Alert.alert('오류', e instanceof Error ? e.message : '파일을 읽지 못했어요.');
     }
   };
 
-  const runImport = async (rows: ParsedProductRow[]) => {
+  const runImport = async (rows: ParsedOrderProductRow[]) => {
     setState({ step: 'importing', total: rows.length, done: 0 });
+    // CSV에만 있고 기존 카테고리 목록에 없는 카테고리는 상품 등록 화면에서 수동으로 "+"로
+    // 추가하는 것과 동일하게 미리 등록해둔다 — 그래야 가져온 상품이 바로 필터 칩에 보인다.
+    const existingCategories = new Set(await listOrderCategories());
+    const newCategories = [
+      ...new Set(rows.map((r) => r.category).filter((c) => c && !existingCategories.has(c))),
+    ];
+    for (const c of newCategories) {
+      await addOrderCategory(c).catch(() => {});
+    }
+
     let success = 0;
     let failed = 0;
     let firstError: string | undefined;
     for (const row of rows) {
       try {
-        const product: Product = {
+        const product: OrderProduct = {
           id: newId(),
-          barcode: row.barcode,
           name: row.name,
+          brand: row.brand,
+          price: row.price,
+          category: row.category,
+          barcode: row.barcode,
           imageUri: null,
-          expiryDate: row.expiryDate,
-          categories: row.categories,
-          memo: row.memo,
-          quantity: row.quantity,
           status: 'active',
-          resolvedAt: null,
-          createdAt: new Date().toISOString(),
-          mode: getCachedAppMode() ?? 'retail',
+          aliases: row.aliases,
         };
-        await saveProduct(product);
-        await scheduleExpiryAlerts(product);
+        await saveOrderProduct(product);
         success++;
       } catch (e) {
         failed++;
@@ -109,8 +113,8 @@ export default function CsvImportScreen() {
     setState({ step: 'done', success, failed, firstError });
   };
 
-  const confirmImport = (rows: ParsedProductRow[]) => {
-    Alert.alert('가져오기', `${rows.length}개 상품을 등록할까요?`, [
+  const confirmImport = (rows: ParsedOrderProductRow[]) => {
+    Alert.alert('가져오기', `${rows.length}개 발주 상품을 등록할까요?`, [
       { text: '취소', style: 'cancel' },
       { text: '가져오기', onPress: () => runImport(rows) },
     ]);
@@ -121,10 +125,10 @@ export default function CsvImportScreen() {
       className="flex-1 bg-bg"
       contentContainerStyle={{ padding: 16, paddingBottom: Math.max(insets.bottom, 16) + 16 }}
     >
-      <Text className="text-ink text-2xl font-bold">CSV로 가져오기</Text>
+      <Text className="text-ink text-2xl font-bold">발주 상품 CSV로 가져오기</Text>
       <Text className="text-muted mt-2 text-sm leading-5">
-        엑셀 등에서 저장한 CSV 파일로 상품을 한 번에 등록해요.{'\n'}
-        사진은 CSV로 옮길 수 없어 등록 후 사진 없이 저장돼요.
+        엑셀 등에서 저장한 CSV 파일로 발주 상품을 한 번에 등록해요.{'\n'}
+        템플릿의 예시 행은 지우고 실제 상품으로 바꿔서 사용하세요.
       </Text>
 
       <Pressable

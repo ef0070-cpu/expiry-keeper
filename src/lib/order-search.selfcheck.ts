@@ -1,4 +1,4 @@
-import { searchOrderProducts } from './order-search';
+import { buildProductSearchIndex, searchOrderProducts } from './order-search';
 import type { OrderProduct } from './order-types';
 
 function p(overrides: Partial<OrderProduct>): OrderProduct {
@@ -88,6 +88,18 @@ const products = [worldcone, melona, jaws];
   console.assert(
     r.indexOf(bambamba) < r.indexOf(bambambaBiteMini),
     '"바밤바"가 "바밤바이트미니"보다 앞에 와야 함',
+  );
+}
+
+// 10) 미리 만든 색인(buildProductSearchIndex)을 넘겨도 매번 새로 만들 때와 결과가 같아야 함
+// (searchOrderProducts가 색인을 unmatchedIds로 걸러 쓰는 로직이 맞는지 확인).
+{
+  const withoutIndex = searchOrderProducts(products, '매로나');
+  const index = buildProductSearchIndex(products);
+  const withIndex = searchOrderProducts(products, '매로나', index);
+  console.assert(
+    JSON.stringify(withoutIndex) === JSON.stringify(withIndex),
+    '재사용 색인을 넘겨도 결과가 동일해야 함',
   );
 }
 
