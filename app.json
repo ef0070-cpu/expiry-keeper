@@ -71,7 +71,8 @@
         "expo-media-library",
         {
           "photosPermission": "가격표 이미지를 갤러리에 저장하기 위해 접근 권한이 필요합니다.",
-          "savePhotosPermission": "가격표 이미지를 갤러리에 저장하기 위해 접근 권한이 필요합니다."
+          "savePhotosPermission": "가격표 이미지를 갤러리에 저장하기 위해 접근 권한이 필요합니다.",
+          "granularPermissions": []
         }
       ]
     ],

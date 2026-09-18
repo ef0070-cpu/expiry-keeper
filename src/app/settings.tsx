@@ -256,6 +256,21 @@ export default function Settings() {
             />
           </>
         ) : null}
+        <View className="h-px bg-line" />
+        {labsUnlocked ? (
+          <LinkRow
+            icon="flask-off-outline"
+            label="실험실"
+            onPress={() =>
+              Alert.alert('실험실 잠그기', '실험실을 잠그면 가격표 만들기가 다시 숨겨집니다.', [
+                { text: '취소', style: 'cancel' },
+                { text: '잠그기', style: 'destructive', onPress: () => lockLabs() },
+              ])
+            }
+          />
+        ) : (
+          <LinkRow icon="flask-outline" label="실험실" onPress={() => setLabsModalVisible(true)} />
+        )}
       </View>
 
       {isCloudMode ? (
@@ -289,23 +304,6 @@ export default function Settings() {
           </View>
         </>
       ) : null}
-
-      <View className="mt-6 overflow-hidden rounded-2xl bg-paper">
-        {labsUnlocked ? (
-          <LinkRow
-            icon="flask-off-outline"
-            label="실험실 잠그기 (가격표 만들기 숨김)"
-            onPress={() =>
-              Alert.alert('실험실 잠그기', '실험실을 잠그면 가격표 만들기가 다시 숨겨집니다.', [
-                { text: '취소', style: 'cancel' },
-                { text: '잠그기', style: 'destructive', onPress: () => lockLabs() },
-              ])
-            }
-          />
-        ) : (
-          <LinkRow icon="flask-outline" label="실험실" onPress={() => setLabsModalVisible(true)} />
-        )}
-      </View>
 
       <Text className="text-muted mt-6 text-center text-xs">
         버전 {Constants.expoConfig?.version ?? '?'} ({Constants.platform?.android?.versionCode ?? '?'})
