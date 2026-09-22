@@ -69,7 +69,7 @@ export default function RootLayout() {
         }}
       >
         <Stack.Protected guard={authed && mode !== null}>
-          <Stack.Screen name="index" options={{ title: '유통기한 지킴이' }} />
+          <Stack.Screen name="index" options={{ title: '유통기한 매니저' }} />
           <Stack.Screen name="calendar" options={{ title: '유통기한 달력' }} />
           <Stack.Screen name="team" options={{ title: '팀 설정' }} />
           <Stack.Screen name="team-invite" options={{ title: '멤버 초대' }} />

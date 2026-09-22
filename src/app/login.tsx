@@ -159,7 +159,7 @@ export default function Login() {
           source={require('@/assets/images/icon.png')}
           style={{ width: 96, height: 96, borderRadius: 22 }}
         />
-        <Text className="text-ink mt-4 text-3xl font-bold">유통기한 지킴이</Text>
+        <Text className="text-ink mt-4 text-3xl font-bold">유통기한 매니저</Text>
         <Text className="text-muted mt-2 text-base">
           로그인하면 어느 기기에서든 재고를 확인할 수 있습니다.
         </Text>

@@ -54,7 +54,7 @@ export async function scheduleExpiryAlerts(p: Product): Promise<void> {
       if (date.getTime() <= Date.now()) continue;
       await Notifications.scheduleNotificationAsync({
         identifier: `${p.id}-o${offset}`,
-        content: { title: '유통기한 지킴이', body: alertBody(p.name, offset) },
+        content: { title: '유통기한 매니저', body: alertBody(p.name, offset) },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DATE,
           date,
