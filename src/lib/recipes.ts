@@ -1,5 +1,6 @@
 import { Product } from './types';
 import { daysUntil } from './dates';
+import { ingredientMatches, normalizeName } from './ingredient-match';
 
 // 가정용 모드 전용 레시피 추천.
 // 임박 상품명에 keywords 중 하나라도 포함되면 그 레시피를 추천한다.
@@ -180,6 +181,126 @@ export const RECIPES: Recipe[] = [
     ingredients: '양상추, 토마토, 오이, 치즈, 드레싱',
     tip: '채소를 찬물에 10분 담갔다 물기를 털면 훨씬 아삭해요.',
   },
+  {
+    name: '고구마맛탕',
+    keywords: ['고구마'],
+    ingredients: '고구마, 설탕(또는 물엿), 식용유, 깨',
+    tip: '튀긴 고구마에 설탕물을 졸여 버무리면 끝. 에어프라이어로도 충분해요.',
+  },
+  {
+    name: '양배추볶음',
+    keywords: ['양배추'],
+    ingredients: '양배추, 양파, 베이컨(선택), 소금, 후추',
+    tip: '센 불에 짧게 볶아야 아삭함이 남아요. 소금은 마지막에.',
+  },
+  {
+    name: '브로콜리무침',
+    keywords: ['브로콜리'],
+    ingredients: '브로콜리, 초고추장(또는 참기름·소금), 마늘',
+    tip: '끓는 물에 30초 데치고 바로 찬물에 헹구면 색이 살아요.',
+  },
+  {
+    name: '가지볶음',
+    keywords: ['가지'],
+    ingredients: '가지, 대파, 간장, 마늘, 참기름',
+    tip: '가지는 기름을 많이 먹으니, 팬을 먼저 달군 뒤 짧게 볶아야 눅눅하지 않아요.',
+  },
+  {
+    name: '떡볶이',
+    keywords: ['떡볶이떡', '가래떡', '밀떡', '쌀떡', '어묵'],
+    ingredients: '떡, 어묵, 고추장, 설탕, 대파, 삶은계란',
+    tip: '떡이 굳었으면 따뜻한 물에 10분 불렸다 넣으면 부드러워져요.',
+  },
+  {
+    name: '잔치국수',
+    keywords: ['소면', '국수'],
+    ingredients: '소면, 멸치육수, 애호박, 계란지단, 김가루',
+    tip: '면은 삶자마자 찬물에 박박 헹궈 전분을 빼야 국물이 안 탁해져요.',
+  },
+  {
+    name: '비빔국수',
+    keywords: ['소면', '국수', '열무'],
+    ingredients: '소면, 고추장, 식초, 설탕, 오이, 김치',
+    tip: '양념에 식초를 넉넉히 넣어야 새콤하게 당겨요. 면은 찬물에 꽉 짜서.',
+  },
+  {
+    name: '콩나물라면',
+    keywords: ['라면'],
+    ingredients: '라면, 콩나물, 대파, 계란',
+    tip: '콩나물을 먼저 넣고 끓이다 면을 넣으면 국물이 시원해져요.',
+  },
+  {
+    name: '참치김치찌개',
+    keywords: ['참치', '김치'],
+    ingredients: '참치캔, 김치, 두부, 대파, 고춧가루',
+    tip: '참치는 기름째 넣으면 고소하고, 마지막에 넣어야 살이 안 부서져요.',
+  },
+  {
+    name: '참치마요덮밥',
+    keywords: ['참치'],
+    ingredients: '밥, 참치캔, 마요네즈, 간장, 계란, 김가루',
+    tip: '참치 기름을 빼고 마요네즈와 간장 한 스푼만 섞으면 완성.',
+  },
+  {
+    name: '오징어볶음',
+    keywords: ['오징어'],
+    ingredients: '오징어, 양파, 대파, 고추장 양념',
+    tip: '오징어는 센 불에 2~3분만. 오래 볶으면 질겨져요.',
+  },
+  {
+    name: '부추전',
+    keywords: ['부추'],
+    ingredients: '부추, 부침가루, 물, 고추',
+    tip: '반죽을 묽게 하고 얇게 부쳐야 바삭해요. 부추는 썰어 바로 부치기.',
+  },
+  {
+    name: '멸치볶음',
+    keywords: ['멸치'],
+    ingredients: '잔멸치, 간장, 올리고당, 견과, 참기름',
+    tip: '멸치를 기름 없이 먼저 볶아 비린내를 날린 뒤 양념을 넣으세요.',
+  },
+  {
+    name: '김밥',
+    keywords: ['김밥김', '조미김', '구운김', '맛살', '단무지'],
+    ingredients: '김, 밥, 단무지, 맛살, 계란, 시금치, 당근',
+    tip: '밥은 한 김 식혀 참기름·소금만 간하면 속재료 맛이 살아요.',
+  },
+  {
+    name: '유부초밥',
+    keywords: ['유부'],
+    ingredients: '유부, 밥, 단촛물, 깨, 당근',
+    tip: '유부 물기를 꼭 짜야 밥이 질척해지지 않아요.',
+  },
+  {
+    name: '콘치즈',
+    keywords: ['옥수수', '치즈'],
+    ingredients: '옥수수, 마요네즈, 설탕, 모짜렐라 치즈',
+    tip: '옥수수 물기를 뺀 뒤 마요네즈와 섞고 치즈 올려 약불에 뚜껑 덮기.',
+  },
+  {
+    name: '순두부찌개',
+    keywords: ['순두부'],
+    ingredients: '순두부, 계란, 고춧가루, 대파, 마늘',
+    tip: '고춧가루를 기름에 먼저 볶아 고추기름을 내면 국물 색과 맛이 확 달라져요.',
+  },
+  {
+    name: '배추된장국',
+    keywords: ['배추', '얼갈이'],
+    ingredients: '알배추(또는 얼갈이), 된장, 마늘, 대파',
+    tip: '배추 겉잎까지 넣고 푹 끓이면 단맛이 우러나요.',
+  },
+  {
+    name: '무생채',
+    keywords: ['무'],
+    ingredients: '무, 고춧가루, 식초, 설탕, 마늘',
+    tip: '채 썬 무에 고춧가루를 먼저 비벼 색을 입힌 뒤 나머지 양념을 넣으세요.',
+  },
+  {
+    name: '버섯버터구이',
+    keywords: ['버섯', '버터'],
+    ingredients: '버섯, 버터, 소금, 후추, 마늘',
+    tip: '버섯은 씻지 말고 털어서 굽고, 버터는 마지막에 넣어야 안 타요.',
+  },
 ];
 
 export interface RecipeMatch {
@@ -199,10 +320,12 @@ export function urgentProducts(products: Product[]): Product[] {
 
 /** 임박 상품과 재료 키워드가 겹치는 레시피를 많이 겹치는 순으로 돌려준다. */
 export function matchRecipes(urgent: Product[]): RecipeMatch[] {
+  // 상품명 정규화는 상품당 한 번만.
+  const normalized = urgent.map((p) => ({ product: p, name: normalizeName(p.name) }));
   return RECIPES.map((recipe) => {
-    const matched = urgent.filter((p) =>
-      recipe.keywords.some((k) => p.name.includes(k)),
-    );
+    const matched = normalized
+      .filter((n) => recipe.keywords.some((k) => ingredientMatches(n.name, k)))
+      .map((n) => n.product);
     return { recipe, matchedProducts: matched };
   })
     .filter((m) => m.matchedProducts.length > 0)

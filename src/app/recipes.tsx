@@ -13,6 +13,7 @@ function openVideoSearch(query: string) {
 
 export default function Recipes() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     try {
@@ -29,11 +30,23 @@ export default function Recipes() {
   );
 
   const urgent = useMemo(() => urgentProducts(products), [products]);
-  const matches = useMemo(() => matchRecipes(urgent), [urgent]);
+  // 선택한 재료만 추천 대상으로. 선택이 없거나 목록에서 사라진 재료뿐이면 전체 임박 재료 사용.
+  const picked = useMemo(() => urgent.filter((p) => selectedIds.has(p.id)), [urgent, selectedIds]);
+  const target = picked.length > 0 ? picked : urgent;
+  const matches = useMemo(() => matchRecipes(target), [target]);
   const unmatched = useMemo(() => {
     const matchedIds = new Set(matches.flatMap((m) => m.matchedProducts.map((p) => p.id)));
-    return urgent.filter((p) => !matchedIds.has(p.id));
-  }, [urgent, matches]);
+    return target.filter((p) => !matchedIds.has(p.id));
+  }, [target, matches]);
+
+  const toggle = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
 
   return (
     <FlatList
@@ -66,21 +79,47 @@ export default function Recipes() {
       ListHeaderComponent={
         urgent.length > 0 ? (
           <View className="mb-4 rounded-xl border border-line bg-paper p-4">
-            <Text className="text-ink text-sm font-bold">
-              7일 이내 소진해야 할 재료 {urgent.length}개
-            </Text>
-            <View className="mt-2.5 flex-row flex-wrap gap-2">
-              {urgent.map((p) => (
-                <View
-                  key={p.id}
-                  className="flex-row items-center rounded-full border border-line bg-bg px-3 py-1.5"
+            <View className="flex-row items-center justify-between">
+              <Text className="text-ink flex-1 text-sm font-bold">
+                {picked.length > 0
+                  ? `선택한 재료 ${picked.length}개로 추천 중`
+                  : `7일 이내 소진해야 할 재료 ${urgent.length}개`}
+              </Text>
+              {picked.length > 0 ? (
+                <Pressable
+                  onPress={() => setSelectedIds(new Set())}
+                  hitSlop={8}
+                  className="ml-2 active:opacity-70"
                 >
-                  <Text className="text-ink text-sm">{p.name}</Text>
-                  <Text className="text-primary ml-1.5 text-xs font-bold">
-                    {ddayLabel(daysUntil(p.expiryDate))}
-                  </Text>
-                </View>
-              ))}
+                  <Text className="text-primary text-xs font-medium">전체 보기</Text>
+                </Pressable>
+              ) : null}
+            </View>
+            <Text className="text-muted mt-1 text-xs">재료를 눌러 원하는 것만 골라보세요</Text>
+            <View className="mt-2.5 flex-row flex-wrap gap-2">
+              {urgent.map((p) => {
+                const on = selectedIds.has(p.id);
+                return (
+                  <Pressable
+                    key={p.id}
+                    onPress={() => toggle(p.id)}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: on }}
+                    className={`flex-row items-center rounded-full border px-3 py-1.5 active:opacity-70 ${
+                      on ? 'border-primary bg-primary' : 'border-line bg-bg'
+                    }`}
+                  >
+                    <Text className={`text-sm ${on ? 'text-paper font-bold' : 'text-ink'}`}>
+                      {p.name}
+                    </Text>
+                    <Text
+                      className={`ml-1.5 text-xs font-bold ${on ? 'text-paper' : 'text-primary'}`}
+                    >
+                      {ddayLabel(daysUntil(p.expiryDate))}
+                    </Text>
+                  </Pressable>
+                );
+              })}
             </View>
           </View>
         ) : null
