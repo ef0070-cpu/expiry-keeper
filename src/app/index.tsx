@@ -218,11 +218,13 @@ export default function Dashboard() {
                   onPress={() => router.push('/recipes')}
                 />
               ) : null}
-              <HeaderIcon
-                icon="tag-outline"
-                label="가격표"
-                onPress={() => router.push('/price-tag-maker')}
-              />
+              {mode === 'retail' ? (
+                <HeaderIcon
+                  icon="tag-outline"
+                  label="가격표"
+                  onPress={() => router.push('/price-tag-maker')}
+                />
+              ) : null}
               <HeaderIcon
                 icon="calendar-month-outline"
                 label="캘린더"
