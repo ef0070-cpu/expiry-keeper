@@ -309,6 +309,18 @@ export default function Settings() {
         버전 {Constants.expoConfig?.version ?? '?'} ({Constants.platform?.android?.versionCode ?? '?'})
       </Text>
 
+      {/* Open Food Facts 이미지는 CC BY-SA 3.0이라 출처 표시가 라이선스 조건이다. */}
+      <Text className="text-muted mt-3 px-6 text-center text-[11px] leading-4">
+        일부 상품 이미지 제공:{' '}
+        <Text
+          className="underline"
+          onPress={() => Linking.openURL('https://openfoodfacts.org')}
+        >
+          Open Food Facts
+        </Text>{' '}
+        contributors (CC BY-SA 3.0)
+      </Text>
+
       {/* 아직 실험 중인 기능(가격표 만들기)을 비밀번호를 아는 관리자만 켜서 계속 테스트할 수
        * 있게 하는 진입점 — 일반 사용자 화면에는 아이콘 자체가 안 보이게 숨겨둔다. */}
       <Modal visible={labsModalVisible} transparent animationType="fade" onRequestClose={() => setLabsModalVisible(false)}>
