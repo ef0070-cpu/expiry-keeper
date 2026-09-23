@@ -30,14 +30,9 @@ import {
   saveOrderProduct,
 } from '@/lib/order-repo';
 import { deletePhotoCandidate, reportOrderProductIssue } from '@/lib/order-report';
+import { errorMessage } from '@/lib/errors';
 import { clearSubmittedPhotoCandidate } from '@/lib/photo-candidates';
 import { OrderProduct, OrderStatus } from '@/lib/order-types';
-
-function errorMessage(e: unknown): string {
-  if (e instanceof Error) return e.message;
-  if (e && typeof e === 'object' && 'message' in e) return String((e as { message: unknown }).message);
-  return '알 수 없는 오류';
-}
 
 export default function OrderProductForm() {
   const params = useLocalSearchParams<{

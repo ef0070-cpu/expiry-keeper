@@ -2,13 +2,9 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { errorMessage } from '@/lib/errors';
 import { applyOrderProductPhoto } from '@/lib/order-repo';
 import { deletePhotoCandidate, listPhotoCandidates, voteOnPhoto, type PhotoCandidate } from '@/lib/order-report';
-
-function errorMessage(e: unknown): string {
-  if (e instanceof Error) return e.message;
-  return '알 수 없는 오류';
-}
 
 /**
  * 이 바코드에 다른 사용자들이 올린 사진 중 하나를 골라 내 상품 사진으로 바로 적용한다.

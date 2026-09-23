@@ -21,6 +21,7 @@ import CandidatesModal from '@/components/CandidatesModal';
 import ImageCandidatesModal from '@/components/ImageCandidatesModal';
 import { hasImageSearchKeys, lookupBarcode, searchProductImageCandidates } from '@/lib/barcode-lookup';
 import { extractExpiryDateFromText } from '@/lib/date-ocr';
+import { errorMessage } from '@/lib/errors';
 import { deleteLocalPhotoIfOwned, persistLocalPhoto } from '@/lib/local-photo';
 import { uploadPhotoToBucket } from '@/lib/storage';
 import { addMonths, autoFormatDate, formatDate, isValidDateStr } from '@/lib/dates';
@@ -164,7 +165,17 @@ export default function ProductForm() {
     return false;
   };
 
+  // Alert 버튼의 onPress나 Pressable의 onPress는 await/catch 없이 호출되므로, 여기서 못 잡은
+  // 예외는 사용자에게 아무 표시도 없이 사라진다 — "눌러도 반응이 없다"로 보이는 원인.
   const launchPicker = async (source: 'camera' | 'library') => {
+    try {
+      await launchPickerUnsafe(source);
+    } catch (e) {
+      Alert.alert('사진 선택 실패', errorMessage(e));
+    }
+  };
+
+  const launchPickerUnsafe = async (source: 'camera' | 'library') => {
     const options: ImagePicker.ImagePickerOptions = {
       mediaTypes: ['images'],
       allowsEditing: true,
@@ -185,12 +196,14 @@ export default function ProductForm() {
   };
 
   const scanExpiryDatePhoto = async () => {
-    if (!(await ensureCameraPermission())) return;
-    const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 1 });
-    if (result.canceled || !result.assets[0]) return;
-
+    // 권한 요청·카메라 실행까지 전부 try 안에 둔다. 예전엔 이 두 단계가 밖에 있어서,
+    // 여기서 예외가 나면 화면에 아무 변화가 없어 "터치해도 무반응"으로 보였다.
     setOcrBusy(true);
     try {
+      if (!(await ensureCameraPermission())) return;
+      const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 1 });
+      if (result.canceled || !result.assets[0]) return;
+
       const { recognizeText } = await import('@infinitered/react-native-mlkit-text-recognition');
       const { text } = await recognizeText(result.assets[0].uri);
       const found = extractExpiryDateFromText(text, dateOcrOrder);
@@ -199,8 +212,9 @@ export default function ProductForm() {
       } else {
         Alert.alert('인식 실패', '유통기한을 찾지 못했어요. 직접 입력해 주세요.');
       }
-    } catch {
-      Alert.alert('인식 실패', '사진 인식 중 문제가 발생했어요. 직접 입력해 주세요.');
+    } catch (e) {
+      // 원인을 그대로 보여준다. 네이티브 모듈 누락·카메라 실행 실패를 구분할 수 있어야 한다.
+      Alert.alert('사진 인식 실패', errorMessage(e));
     } finally {
       setOcrBusy(false);
     }
