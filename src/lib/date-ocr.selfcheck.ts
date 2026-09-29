@@ -1,4 +1,4 @@
-import { extractExpiryDateFromText } from './date-ocr';
+import { extractDateCandidates, extractExpiryDateFromText } from './date-ocr';
 
 const REF = '2026-01-01'; // 오늘 날짜에 결과가 좌우되지 않도록 고정한 기준일
 
@@ -42,5 +42,19 @@ console.assert(
   extractExpiryDateFromText('2026.9.1', 'ymd', REF) === '2026-09-01',
   'TRIPLE_RE 한 자리 일(day) 놓치는 버그: 한 자리 숫자도 정확히 매칭되어야 함',
 );
+
+// 사진 인식 후보: 미래(늦은 순) → 지난 날짜(늦은 순), 중복 제거
+console.assert(
+  JSON.stringify(
+    extractDateCandidates('제조 2025.12.01 유통 2026.06.30 LOT 2026.06.30 2025.10.01', 'ymd', REF),
+  ) === JSON.stringify(['2026-06-30', '2025-12-01', '2025-10-01']),
+  '후보 순서/중복 제거 실패',
+);
+// 기한 지난 상품: 지난 날짜만 있어도 후보로 나와야 함(기존 추출은 null)
+console.assert(
+  extractDateCandidates('2025.10.01 14:9 CF1 A', 'ymd', REF)[0] === '2025-10-01',
+  '지난 날짜 후보 누락',
+);
+console.assert(extractDateCandidates('숫자 없음', 'ymd', REF).length === 0, '후보 없으면 빈 배열');
 
 console.log('date-ocr selfcheck OK');

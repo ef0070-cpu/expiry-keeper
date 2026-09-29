@@ -128,3 +128,26 @@ export function extractExpiryDateFromText(
   future.sort();
   return future[future.length - 1];
 }
+
+/** 사진에서 읽힌 날짜 후보를 사용자가 고를 순서로 돌려준다(중복 제거). 유통기한일 가능성이 큰
+ * 순서 — 기준일 이후 날짜(늦은 것부터), 그다음 이미 지난 날짜(늦은 것부터). 지난 날짜도 빼지
+ * 않는 이유: 기한이 지난 상품도 등록해야 하고, 사용자가 직접 보고 고르므로 제조일 오인 위험이 낮다. */
+export function extractDateCandidates(
+  text: string,
+  dateOcrOrder: DateOcrOrder,
+  referenceDate: string = todayStr(),
+): string[] {
+  const found = new Set<string>();
+  for (const m of text.matchAll(TRIPLE_RE)) {
+    const resolved = resolveTriple(m[1], m[2], m[3], dateOcrOrder);
+    if (resolved) found.add(resolved);
+  }
+  if (found.size === 0) {
+    for (const m of text.matchAll(PAIR_RE)) {
+      const resolved = resolvePair(m[1], m[2], dateOcrOrder);
+      if (resolved) found.add(resolved);
+    }
+  }
+  const desc = [...found].sort().reverse();
+  return [...desc.filter((d) => d >= referenceDate), ...desc.filter((d) => d < referenceDate)];
+}

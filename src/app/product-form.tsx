@@ -20,11 +20,11 @@ import {
 import CandidatesModal from '@/components/CandidatesModal';
 import ImageCandidatesModal from '@/components/ImageCandidatesModal';
 import { hasImageSearchKeys, lookupBarcode, searchProductImageCandidates } from '@/lib/barcode-lookup';
-import { extractExpiryDateFromText } from '@/lib/date-ocr';
+import { extractDateCandidates } from '@/lib/date-ocr';
 import { errorMessage } from '@/lib/errors';
 import { deleteLocalPhotoIfOwned, persistLocalPhoto } from '@/lib/local-photo';
 import { uploadPhotoToBucket } from '@/lib/storage';
-import { addMonths, autoFormatDate, formatDate, isValidDateStr } from '@/lib/dates';
+import { addMonths, autoFormatDate, formatDate, isValidDateStr, todayStr } from '@/lib/dates';
 import { cancelExpiryAlerts, scheduleExpiryAlerts } from '@/lib/notifications';
 import {
   deleteProduct,
@@ -206,12 +206,36 @@ export default function ProductForm() {
 
       const { recognizeText } = await import('@infinitered/react-native-mlkit-text-recognition');
       const { text } = await recognizeText(result.assets[0].uri);
-      const found = extractExpiryDateFromText(text, dateOcrOrder);
-      if (found) {
-        setExpiryDate(found);
-      } else {
-        Alert.alert('인식 실패', '유통기한을 찾지 못했어요. 직접 입력해 주세요.');
+      const candidates = extractDateCandidates(text, dateOcrOrder);
+      // 날짜가 하나뿐이면 묻지 않고 바로 넣는다(단계 최소화) — 여러 개거나 못 읽었을 때만 묻고,
+      // 틀렸거나 못 읽었으면 그 자리에서 다시 찍기. 안드로이드 알림창 버튼은 최대 3개라
+      // 후보는 2개까지만 버튼으로 보인다.
+      if (candidates.length === 1) {
+        setExpiryDate(candidates[0]);
+        return;
       }
+      const retry = { text: '다시 찍기', onPress: () => void scanExpiryDatePhoto() };
+      if (candidates.length === 0) {
+        Alert.alert(
+          '날짜를 못 읽었어요',
+          '날짜 글자가 크고 선명하게 나오도록 가까이에서 초점을 맞춰 다시 찍거나, 직접 입력해 주세요.',
+          [{ text: '직접 입력', style: 'cancel' }, retry],
+        );
+        return;
+      }
+      const today = todayStr();
+      const label = (d: string) => (d < today ? `${d} (지난 날짜)` : d);
+      Alert.alert(
+        '읽은 날짜를 확인해 주세요',
+        candidates.length > 2
+          ? `읽은 날짜: ${candidates.map(label).join(', ')}\n다른 날짜면 다시 찍어 주세요.`
+          : '맞는 날짜를 눌러 주세요.',
+        [
+          retry,
+          ...candidates.slice(0, 2).map((d) => ({ text: label(d), onPress: () => setExpiryDate(d) })),
+        ],
+        { cancelable: true },
+      );
     } catch (e) {
       // 원인을 그대로 보여준다. 네이티브 모듈 누락·카메라 실행 실패를 구분할 수 있어야 한다.
       Alert.alert('사진 인식 실패', errorMessage(e));
