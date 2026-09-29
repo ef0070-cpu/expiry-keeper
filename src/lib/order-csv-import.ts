@@ -1,13 +1,15 @@
 import { checkCsvBarcode, parseCsvLines } from './csv-import';
 import { OrderProduct } from './order-types';
 
+/** null = 파일에 그 칸이 없거나 비어 있음. 기존 상품을 수정할 땐 null인 칸은 기존 값을 그대로 두고,
+ * 새 상품일 때만 기본값(빈 글자·가격 0)으로 채운다 — 빈 칸이 기존 가격·브랜드를 지우지 않게. */
 export interface ParsedOrderProductRow {
   name: string;
-  brand: string;
-  price: number;
-  category: string;
+  brand: string | null;
+  price: number | null;
+  category: string | null;
   barcode: string | null;
-  aliases: string[];
+  aliases: string[] | null;
   /** 내려받은 엑셀의 ID 칸 — 있으면 그 상품을 수정, 없으면 새 상품 */
   id: string | null;
 }
@@ -60,7 +62,7 @@ export function parseOrderProductRows(lines: string[][]): ParsedOrderProductCsvR
       continue;
     }
     const priceRaw = (priceIdx === -1 ? '' : (cols[priceIdx] ?? '')).trim();
-    let price = 0;
+    let price: number | null = null;
     if (priceRaw !== '') {
       const parsed = Number(priceRaw);
       if (!Number.isFinite(parsed) || parsed < 0) {
@@ -81,13 +83,13 @@ export function parseOrderProductRows(lines: string[][]): ParsedOrderProductCsvR
 
     rows.push({
       name,
-      brand,
+      brand: brand || null,
       price,
-      category,
+      category: category || null,
       barcode: barcodeCheck.barcode,
       aliases: aliasesRaw
         ? aliasesRaw.split(';').map((a) => a.trim()).filter((a) => a.length > 0)
-        : [],
+        : null,
       id: (idIdx === -1 ? '' : (cols[idIdx] ?? '')).trim() || null,
     });
   }
@@ -111,8 +113,8 @@ export function orderProductsToSheetRows(products: OrderProduct[]): (string | nu
   ]);
 }
 
-/** 올린 행을 기존 상품과 맞춘다 — ID가 같으면(없으면 바코드가 같으면) 그 상품의 엑셀 칸만 바꾸고
- * 사진·납품상태 등 엑셀에 없는 값은 그대로 둔다. 못 찾으면 새 상품. */
+/** 올린 행을 기존 상품과 맞춘다 — ID가 같으면(없으면 바코드가 같으면) 그 상품에서 값이 있는 칸만
+ * 바꾸고, 빈 칸과 사진·납품상태 등 엑셀에 없는 값은 그대로 둔다. 못 찾으면 새 상품. */
 export function planOrderImport(
   rows: ParsedOrderProductRow[],
   existing: OrderProduct[],
@@ -122,17 +124,32 @@ export function planOrderImport(
   const byBarcode = new Map(existing.filter((p) => p.barcode).map((p) => [p.barcode!, p]));
   return rows.map((row) => {
     const match = (row.id && byId.get(row.id)) || (row.barcode && byBarcode.get(row.barcode)) || null;
-    const fields = {
-      name: row.name,
-      brand: row.brand,
-      price: row.price,
-      category: row.category,
-      barcode: row.barcode,
-      aliases: row.aliases,
-    };
-    if (match) return { product: { ...match, ...fields }, isNew: false };
+    if (match) {
+      return {
+        product: {
+          ...match,
+          name: row.name,
+          brand: row.brand ?? match.brand,
+          price: row.price ?? match.price,
+          category: row.category ?? match.category,
+          barcode: row.barcode ?? match.barcode,
+          aliases: row.aliases ?? match.aliases,
+        },
+        isNew: false,
+      };
+    }
     return {
-      product: { id: newId(), imageUri: null, status: 'active', ...fields },
+      product: {
+        id: newId(),
+        imageUri: null,
+        status: 'active',
+        name: row.name,
+        brand: row.brand ?? '',
+        price: row.price ?? 0,
+        category: row.category ?? '',
+        barcode: row.barcode,
+        aliases: row.aliases ?? [],
+      },
       isNew: true,
     };
   });

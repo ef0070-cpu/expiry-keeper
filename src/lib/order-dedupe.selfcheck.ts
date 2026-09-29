@@ -12,27 +12,25 @@ const p = (id: string, barcode: string | null, extra: Partial<OrderProduct> = {}
   ...extra,
 });
 
-// 재설치로 같은 바코드가 3개 — 빠른발주 배치에 쓰인 것(b)을 남기고, 사진·별칭은 중복에서 채운다
+// 같은 바코드 3개 — 가장 먼저 만든 사본(id가 가장 작은 a)을 남기고, 사진·별칭은 중복에서 채운다
 {
-  const items = [p('a', '880'), p('b', '880'), p('c', '880', { imageUri: 'img', aliases: ['별'] }), p('d', '111')];
-  const { items: next, idRemap } = planBarcodeDedupe(items, new Set(['b']));
+  const items = [p('b', '880'), p('a', '880'), p('c', '880', { imageUri: 'img', aliases: ['별'] }), p('d', '111')];
+  const { items: next, idRemap } = planBarcodeDedupe(items);
   console.assert(next.length === 2, '880은 하나만: ' + next.length);
   const kept = next.find((x) => x.barcode === '880')!;
-  console.assert(kept.id === 'b', '배치에 쓰인 상품을 남겨야 함: ' + kept.id);
+  console.assert(kept.id === 'a', '가장 먼저 만든 사본을 남겨야 함: ' + kept.id);
   console.assert(kept.imageUri === 'img' && kept.aliases?.[0] === '별', '사진·별칭 보완');
-  console.assert(idRemap.get('a') === 'b' && idRemap.get('c') === 'b', 'a,c → b로 옮김');
+  console.assert(idRemap.get('b') === 'a' && idRemap.get('c') === 'a', 'b,c → a로 옮김');
 }
-// 참조가 없으면 사진 있는 것, 그것도 없으면 먼저 있던 것
+// 기기 두 대가 목록 순서·사진 유무가 달라도 같은 사본을 남겨야 서로 번갈아 지우지 않는다
 {
-  const { items: next } = planBarcodeDedupe([p('a', '9'), p('b', '9', { imageUri: 'i' })], new Set());
-  console.assert(next[0].id === 'b', '사진 있는 상품 우선');
-  const { items: n2 } = planBarcodeDedupe([p('a', '9'), p('b', '9')], new Set());
-  console.assert(n2.length === 1 && n2[0].id === 'a', '먼저 있던 상품');
+  const onA = planBarcodeDedupe([p('m2', '9', { imageUri: 'i' }), p('m1', '9')]).items[0].id;
+  const onB = planBarcodeDedupe([p('m1', '9'), p('m2', '9')]).items[0].id;
+  console.assert(onA === 'm1' && onB === 'm1', `기기마다 결과가 다름: ${onA} / ${onB}`);
 }
 // 바코드 없는 상품과 중복 없는 목록은 그대로
 {
-  const items = [p('a', null), p('b', null), p('c', '1')];
-  const r = planBarcodeDedupe(items, new Set());
+  const r = planBarcodeDedupe([p('a', null), p('b', null), p('c', '1')]);
   console.assert(r.items.length === 3 && r.idRemap.size === 0, '건드리지 않음');
 }
 
@@ -42,7 +40,8 @@ const p = (id: string, barcode: string | null, extra: Partial<OrderProduct> = {}
 {
   const barcodes = Array.from({ length: 50 }, (_, i) => `880${i}`);
   let seq = 0;
-  const seed = () => barcodes.map((b) => p(`id${++seq}`, b)); // 설치 직후 기본 상품(매번 새 id)
+  // 설치 직후 기본 상품(매번 새 id). 실제 id처럼 뒤에 만든 것이 글자순으로도 뒤에 오게 자리수를 맞춘다
+  const seed = () => barcodes.map((b) => p(`id${String(++seq).padStart(5, '0')}`, b));
   let server: OrderProduct[] = [];
   let serverAssignments: string[] = []; // 서버에 저장된 빠른발주 배치(상품 id)
   for (let install = 1; install <= 3; install++) {
@@ -50,7 +49,7 @@ const p = (id: string, barcode: string | null, extra: Partial<OrderProduct> = {}
     // 재설치 직후엔 배치도 서버에서 받아온다 — 서버 쪽 id를 가리킴
     const assignments = install === 1 ? [local[0].id, local[1].id] : serverAssignments;
     const merged = mergeRemoteOrderProducts(local, server, new Set());
-    const { items, idRemap } = planBarcodeDedupe(merged, new Set(assignments));
+    const { items, idRemap } = planBarcodeDedupe(merged);
     const liveAssignments = assignments.map((id) => idRemap.get(id) ?? id);
     console.assert(items.length === barcodes.length, `설치 ${install}회차: 중복이 쌓임 ${items.length}`);
     const ids = new Set(items.map((x) => x.id));

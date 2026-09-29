@@ -1,15 +1,16 @@
 import { OrderProduct } from './order-types';
 
 /**
- * 같은 바코드의 발주 상품이 여러 개면 하나만 남긴다. 남길 것 고르는 순서:
- * 빠른발주 배치·장바구니에서 쓰는 상품(referencedIds) → 사진 있는 상품 → 먼저 있던 상품.
- * 배치에 쓰인 걸 남겨야 구역 진열이 깨지지 않는다(나머지 참조는 idRemap으로 옮긴다).
- * 남긴 상품의 빈 사진·별칭은 지워질 중복에서 채운다.
+ * 같은 바코드의 발주 상품이 여러 개면 가장 먼저 만든 사본(id가 가장 작은 것 — id 앞부분이 생성
+ * 시각이라 글자순 = 생성순)만 남긴다. 어느 기기에서나 같은 결과가 나와야 한다 — 기기마다 다른
+ * 기준(이 기기의 진열에 쓰였는지, 사진 유무)으로 고르면 두 기기가 동기화 때마다 서로의 사본을
+ * 서버에서 번갈아 지운다. 재설치 땐 서버에 있던 옛 사본이 남아, 서버에서 받아온 진열과도 맞는다.
+ * 지운 사본을 가리키던 진열·장바구니는 idRemap으로 옮기고, 남긴 상품의 빈 사진·별칭은 채운다.
  */
-export function planBarcodeDedupe(
-  items: OrderProduct[],
-  referencedIds: Set<string>,
-): { items: OrderProduct[]; idRemap: Map<string, string> } {
+export function planBarcodeDedupe(items: OrderProduct[]): {
+  items: OrderProduct[];
+  idRemap: Map<string, string>;
+} {
   const groups = new Map<string, OrderProduct[]>();
   for (const p of items) {
     if (!p.barcode) continue;
@@ -22,8 +23,7 @@ export function planBarcodeDedupe(
   const keepers = new Map<string, OrderProduct>();
   for (const dupes of groups.values()) {
     if (dupes.length < 2) continue;
-    const score = (p: OrderProduct) => (referencedIds.has(p.id) ? 2 : 0) + (p.imageUri ? 1 : 0);
-    let keeper = dupes.reduce((best, p) => (score(p) > score(best) ? p : best));
+    let keeper = dupes.reduce((oldest, p) => (p.id < oldest.id ? p : oldest));
     for (const dup of dupes) {
       if (dup.id === keeper.id) continue;
       keeper = {
@@ -44,7 +44,7 @@ export function planBarcodeDedupe(
 
 /** 서버에서 받은 상품 중 이 기기에 없는(id 기준) 것을 덧붙인다. 삭제 기록(tombstone)에 있는 id는
  * 되살리지 않는다. 바코드 중복은 여기서 거르지 않는다 — 재설치 직후엔 서버에서 받은 빠른발주
- * 배치가 서버 쪽 id를 가리키므로, 합친 뒤 planBarcodeDedupe가 배치에 쓰인 쪽을 남기게 해야 한다. */
+ * 배치가 서버 쪽(더 오래된) id를 가리키므로, 합친 뒤 planBarcodeDedupe가 오래된 쪽을 남기게 한다. */
 export function mergeRemoteOrderProducts(
   local: OrderProduct[],
   remote: OrderProduct[],

@@ -86,7 +86,9 @@ export default function OrderCsvImportScreen() {
     // 추가하는 것과 동일하게 미리 등록해둔다 — 그래야 가져온 상품이 바로 필터 칩에 보인다.
     const existingCategories = new Set(await listOrderCategories());
     const newCategories = [
-      ...new Set(rows.map((r) => r.category).filter((c) => c && !existingCategories.has(c))),
+      ...new Set(
+        rows.map((r) => r.category).filter((c): c is string => !!c && !existingCategories.has(c)),
+      ),
     ];
     for (const c of newCategories) {
       await addOrderCategory(c).catch(() => {});

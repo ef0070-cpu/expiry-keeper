@@ -959,11 +959,7 @@ async function runDedupe(): Promise<void> {
   const assignmentsByStore = new Map<string, FridgeAssignment[]>();
   for (const store of stores) assignmentsByStore.set(store.id, await listFridgeAssignments(store.id));
 
-  const referenced = new Set<string>();
-  for (const cart of carts.values()) Object.keys(cart).forEach((id) => referenced.add(id));
-  for (const list of assignmentsByStore.values()) list.forEach((a) => referenced.add(a.productId));
-
-  const { items: next, idRemap } = planBarcodeDedupe(items, referenced);
+  const { items: next, idRemap } = planBarcodeDedupe(items);
   if (idRemap.size === 0) return;
 
   await writeOrderProducts(next);
@@ -976,7 +972,12 @@ async function runDedupe(): Promise<void> {
       if (keeperId !== productId) changed = true;
       merged[keeperId] = (merged[keeperId] ?? 0) + qty;
     }
-    if (changed) await AsyncStorage.setItem(key, JSON.stringify(merged));
+    if (changed) {
+      await AsyncStorage.setItem(key, JSON.stringify(merged));
+      // 서버 장바구니도 옮긴 id로 — 안 그러면 재설치 때 받아온 장바구니가 지운 id를 가리켜 항목이 사라진다
+      const storeId = key.startsWith('orderCart:') && key !== CART_KEY ? key.slice('orderCart:'.length) : null;
+      if (storeId) pushCart(storeId, merged).catch(() => {});
+    }
   }
 
   for (const [storeId, assignments] of assignmentsByStore) {
@@ -986,14 +987,34 @@ async function runDedupe(): Promise<void> {
     for (const a of assignments) {
       const keeperId = idRemap.get(a.productId) ?? a.productId;
       if (keeperId !== a.productId) changed = true;
-      if (seen.has(keeperId)) {
+      // 같은 구역 안에서만 중복으로 본다 — 'duplicate' 모드로 한 상품을 여러 구역에 일부러 둔
+      // 진열은 남겨야 한다(상품 id만으로 보면 두 번째 구역의 진열이 조용히 사라진다)
+      const slot = `${keeperId}|${a.section}`;
+      if (seen.has(slot)) {
         changed = true;
-        continue; // 남긴 상품이 이미 배정돼 있으면 중복 배정은 버린다
+        continue; // 같은 구역에 남긴 상품이 이미 배정돼 있으면 중복 배정은 버린다
       }
-      seen.add(keeperId);
+      seen.add(slot);
       merged.push(keeperId === a.productId ? a : { ...a, productId: keeperId });
     }
-    if (changed) await AsyncStorage.setItem(fridgeAssignmentsKey(storeId), JSON.stringify(merged));
+    if (changed) {
+      await AsyncStorage.setItem(fridgeAssignmentsKey(storeId), JSON.stringify(merged));
+      pushStoreLayoutPart(storeId, { assignments: merged }).catch(() => {});
+    }
+
+    // 구역 구분선도 "그 줄 마지막 상품 id"를 가리키므로 같이 옮긴다(안 옮기면 줄 나눔이 사라진다)
+    const dividers = await listFridgeSectionDividers(storeId);
+    let dividersChanged = false;
+    const nextDividers: Record<string, string[]> = {};
+    for (const [section, ids] of Object.entries(dividers)) {
+      const moved = [...new Set(ids.map((id) => idRemap.get(id) ?? id))];
+      if (moved.length !== ids.length || moved.some((id, i) => id !== ids[i])) dividersChanged = true;
+      nextDividers[section] = moved;
+    }
+    if (dividersChanged) {
+      await AsyncStorage.setItem(fridgeSectionDividersKey(storeId), JSON.stringify(nextDividers));
+      pushStoreLayoutPart(storeId, { dividers: nextDividers }).catch(() => {});
+    }
   }
 
   const deleted = await getDeletedOrderProductIds();

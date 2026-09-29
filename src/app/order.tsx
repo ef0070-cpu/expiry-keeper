@@ -105,7 +105,12 @@ export default function Order() {
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scanParams = useLocalSearchParams<{ scannedBarcode?: string; nonce?: string }>();
 
+  // 수량을 바꿀 때마다 올린다. 목록을 다시 읽는 동안(특히 동기화 뒤) 사용자가 +/-를 누르면, 저장이
+  // 끝나기 전에 읽힌 옛 장바구니가 화면을 덮어써 방금 담은 수량이 되돌아갔다 — 그땐 읽은 값을 버린다.
+  const cartVersionRef = useRef(0);
+
   const loadCatalog = useCallback(async () => {
+    const cartVersion = cartVersionRef.current;
     const [productList, categoryList, cartData, badges, storeList, activeId] = await Promise.all([
       listOrderProducts(),
       listOrderCategories(),
@@ -116,7 +121,7 @@ export default function Order() {
     ]);
     setProducts(productList);
     setCategories(categoryList);
-    setCart(cartData);
+    if (cartVersionRef.current === cartVersion) setCart(cartData);
     setUpdateBadges(badges);
     // 발주 화면을 한 번 띄운 것 자체를 "확인함"으로 본다 — 이번 렌더에는 그대로 보이고,
     // 다음부터는 상품을 개별로 안 열어봐도 다시 안 뜬다.
@@ -271,7 +276,11 @@ export default function Order() {
   );
 
   useEffect(() => {
-    if (scanParams.scannedBarcode) setQuery(scanParams.scannedBarcode);
+    if (!scanParams.scannedBarcode) return;
+    // 빠른발주 탭에서 '신규상품 → 바코드 스캔'으로 이미 있는 상품을 찍으면 검색창이 없는 탭이라
+    // 아무 변화가 없어 보였다 — 결과가 보이는 검색발주 탭으로 옮긴다
+    setMode('search');
+    setQuery(scanParams.scannedBarcode);
   }, [scanParams.scannedBarcode, scanParams.nonce]);
 
   useEffect(() => {
@@ -481,6 +490,7 @@ export default function Order() {
   // 이전에는 탭할 때마다 AsyncStorage를 재조회해서 빠르게 연타하면 이전 쓰기가
   // 끝나기 전에 다음 읽기가 시작돼 증가분이 유실될 수 있었다.
   const changeQty = useCallback((productId: string, delta: number) => {
+    cartVersionRef.current += 1;
     setCart((prev) => {
       const nextQty = Math.max(0, (prev[productId] ?? 0) + delta);
       const next = { ...prev };
@@ -747,8 +757,8 @@ export default function Order() {
                 />
               ) : null}
               <HeaderIcon
-                icon="file-delimited-outline"
-                label="CSV"
+                icon="file-excel-outline"
+                label="엑셀"
                 onPress={() => router.push('/order-csv-import')}
               />
               {/* 바코드 스캔(없으면 등록 화면, 이미 있으면 목록에서 찾아 줌) 또는 바코드를 몰라도

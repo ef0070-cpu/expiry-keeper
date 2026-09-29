@@ -39,7 +39,7 @@ import { parseOrderProductCsv, parseOrderProductRows, planOrderImport } from './
     );
   }
   const result = parseOrderProductCsv('상품명,가격\n메로나,');
-  console.assert(result.rows.length === 1 && result.rows[0].price === 0, '가격 비면 기본값 0이어야 함');
+  console.assert(result.rows.length === 1 && result.rows[0].price === null, '가격 비면 null(값 없음)이어야 함');
 }
 
 // 필수 헤더 없음
@@ -54,9 +54,32 @@ import { parseOrderProductCsv, parseOrderProductRows, planOrderImport } from './
   const result = parseOrderProductCsv('상품명\n메로나');
   console.assert(result.errors.length === 0 && result.rows.length === 1, '상품명만 있어도 정상 파싱돼야 함');
   const row = result.rows[0];
+  // 없는 칸은 null(= 값 없음) — 새 상품이면 planOrderImport가 기본값으로 채운다
   console.assert(
-    row.brand === '' && row.category === '' && row.barcode === null && row.aliases.length === 0,
-    '선택 컬럼 없을 때 기본값 확인 실패',
+    row.brand === null && row.category === null && row.barcode === null && row.aliases === null && row.price === null,
+    '선택 컬럼 없을 때 null 확인 실패',
+  );
+  const [{ product }] = planOrderImport([row], [], () => 'n1');
+  console.assert(
+    product.brand === '' && product.price === 0 && product.category === '' && product.aliases?.length === 0,
+    '새 상품은 기본값으로 채워야 함',
+  );
+}
+
+// 빈 칸·없는 칸은 기존 값을 지우지 않는다(예전 형식 파일로 올려도 가격이 0원이 되면 안 됨)
+{
+  const existing = [
+    { id: 'p1', name: '메로나', brand: '빙그레', price: 1000, category: '바', barcode: '8801', imageUri: null, aliases: ['멜론바'] },
+  ];
+  const { rows } = parseOrderProductRows([
+    ['상품명', '바코드', '가격', '브랜드'],
+    ['메로나 새이름', '8801', '', ''],
+  ]);
+  const [{ product, isNew }] = planOrderImport(rows, existing, () => 'x');
+  console.assert(!isNew && product.name === '메로나 새이름', '이름만 바뀌어야 함');
+  console.assert(
+    product.price === 1000 && product.brand === '빙그레' && product.category === '바' && product.aliases?.[0] === '멜론바',
+    '빈 칸이 기존 값을 지움: ' + JSON.stringify(product),
   );
 }
 
