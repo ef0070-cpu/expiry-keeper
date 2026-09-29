@@ -3,7 +3,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Alert, FlatList, Pressable, Text, View } from 'react-native';
 import ProductCard from '@/components/ProductCard';
-import { daysUntil, todayStr } from '@/lib/dates';
+import { daysUntil, signalOf, SIGNAL_BG, todayStr } from '@/lib/dates';
 import { cancelExpiryAlerts } from '@/lib/notifications';
 import { deleteProduct, listProducts } from '@/lib/repo';
 import { Product } from '@/lib/types';
@@ -18,12 +18,10 @@ const MODES: { key: Mode; label: string }[] = [
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
-/** 남은 일수에 따른 점 색상 (DdayBadge와 동일 기준) */
+/** 남은 일수에 따른 점 색상 — 대시보드·D-day 배지와 같은 공통 기준(signalOf)을 쓴다.
+ * 예전엔 여기만 따로 복사한 기준(D-1 빨강, 7일 주황)이라 대시보드와 색이 달랐다. */
 function dotClass(days: number): string {
-  if (days < 0) return 'bg-ink';
-  if (days <= 1) return 'bg-primary';
-  if (days <= 7) return 'bg-warn';
-  return 'bg-ok';
+  return SIGNAL_BG[signalOf(days)];
 }
 
 function pad(n: number): string {

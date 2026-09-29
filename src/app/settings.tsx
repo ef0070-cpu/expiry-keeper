@@ -306,7 +306,9 @@ export default function Settings() {
       ) : null}
 
       <Text className="text-muted mt-6 text-center text-xs">
-        버전 {Constants.expoConfig?.version ?? '?'} ({Constants.platform?.android?.versionCode ?? '?'})
+        {/* 빌드 번호는 EAS가 원격으로 올려서(appVersionSource: remote) 여기서 읽을 수 없다 —
+            ponytail: 빌드 번호까지 보이려면 expo-application(nativeBuildVersion) 추가 후 재빌드 */}
+        버전 {Constants.expoConfig?.version ?? '?'}
       </Text>
 
       {/* Open Food Facts 이미지는 CC BY-SA 3.0이라 출처 표시가 라이선스 조건이다. */}
