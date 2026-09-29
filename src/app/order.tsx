@@ -789,11 +789,13 @@ export default function Order() {
               <Pressable
                 onPress={() => setShowQuickHelp(true)}
                 hitSlop={8}
-                className="h-9 w-9 items-center justify-center rounded-full border border-line bg-paper active:opacity-70"
+                className="h-9 flex-row items-center justify-center rounded-full border border-line bg-paper px-3 active:opacity-70"
                 accessibilityRole="button"
                 accessibilityLabel="빠른발주 사용법 보기"
               >
-                <MaterialCommunityIcons name="help-circle-outline" size={20} color="#1A1A1A" />
+                {/* 아이콘만으론 무슨 버튼인지 모른다는 지적 — 글자를 함께 보여 준다 */}
+                <MaterialCommunityIcons name="help-circle-outline" size={18} color="#1A1A1A" />
+                <Text className="text-ink ml-1 text-sm font-medium">사용법</Text>
               </Pressable>
             ) : null}
             {activeSection ? (
@@ -1121,10 +1123,17 @@ export default function Order() {
                           onLongPress={() => setShowFridgeSectionModal(true)}
                         />
                       ))}
+                      {/* 구역이 있을 때도 꾹 누르지 않고 바로 추가할 수 있게 */}
+                      <Pressable
+                        onPress={() => setShowFridgeSectionModal(true)}
+                        className="flex-row items-center self-start rounded-full border border-dashed border-line bg-paper px-3 py-1.5 active:opacity-70"
+                        accessibilityRole="button"
+                        accessibilityLabel="냉동고 구역 추가하기"
+                      >
+                        <MaterialCommunityIcons name="plus" size={16} color="#888888" />
+                        <Text className="text-muted ml-0.5 text-sm font-medium">구역추가</Text>
+                      </Pressable>
                     </ScrollView>
-                    <Text className="text-muted mb-2 mt-1 text-xs">
-                      구역을 꾹 누르면 이름 변경·삭제·순서 변경을 할 수 있어요
-                    </Text>
                   </>
                 }
                 contentContainerStyle={{ padding: 16, paddingBottom: 120 + insets.bottom }}
@@ -1249,18 +1258,13 @@ const FridgeTile = memo(function FridgeTile({
       delayLongPress={300}
       accessibilityRole="button"
       accessibilityLabel={isPending ? `${product.name} 이동 취소` : product.name}
-      className="mb-3 items-center rounded-xl border border-line bg-paper p-2"
-      style={({ pressed }) => [
-        // flex-1(성장형) + maxWidth 상한 조합은 3칸이 다 안 찬 마지막 줄(예: 1개만 남았을 때)에
-        // flex-grow가 먼저 100%로 늘어난 뒤 퍼센트 maxWidth로 눌러야 하는데, 기기에 따라 이 클램프가
-        // 제대로 안 먹어 타일 하나가 줄 전체 너비로 커지는 문제가 있었다. 고정 width로 바꾸면
-        // 형제 개수와 무관하게 항상 3칸 기준 크기(예: 31%)로 고정된다.
+      className="mb-3 items-center rounded-xl border border-line bg-paper p-2 active:opacity-70"
+      // style을 함수(({ pressed }) => ...)로 주면 NativeWind(className)와 섞일 때 함수가 무시돼
+      // 너비·이동 중 강조가 전혀 적용되지 않았다 → 일반 배열로 주고 눌림 표시는 active:로 대신한다.
+      // 고정 width: 3칸이 다 안 찬 줄이나 이름이 긴 상품도 항상 같은 칸 크기(예: 31%)로 맞춘다.
+      style={[
         { width: maxWidthPercent },
-        isPending
-          ? { borderColor: '#CC2222', borderWidth: 2, backgroundColor: '#FDECEC' }
-          : pressed
-            ? { borderColor: '#1A1A1A', backgroundColor: '#EFEFEF' }
-            : null,
+        isPending ? { borderColor: '#CC2222', borderWidth: 2, backgroundColor: '#FDECEC' } : null,
       ]}
     >
       <Modal visible={showPreview} transparent animationType="fade">
@@ -1294,6 +1298,8 @@ const FridgeTile = memo(function FridgeTile({
       <Text className="text-ink mt-1.5 w-full text-center text-xs font-bold" numberOfLines={2}>
         {product.name}
       </Text>
+      {/* 아래 모서리의 수량 뱃지·이동 버튼(절대 위치) 높이만큼 비워 상품명이 가려지지 않게 */}
+      <View style={{ height: 26 }} />
 
       {qty > 0 ? (
         <Pressable
@@ -1329,10 +1335,31 @@ const QuickOrderHelpModal = memo(function QuickOrderHelpModal({
   visible: boolean;
   onClose: () => void;
 }) {
+  // 처음 쓰는 사람 기준: 무엇을 하는 화면인지 → 시작 순서 → 버튼 설명 순으로 보여 준다
+  const steps = [
+    '위쪽 매장 버튼을 눌러 내 매장을 고르거나 새로 추가해요',
+    "'+ 구역추가'로 냉동고 칸을 만들어요 (예: 600바-1, 콘류)",
+    "'+ 상품 진열하기'로 그 칸에 있는 상품을 실제 진열 순서대로 넣어요",
+    '발주할 상품을 탭해서 담아요 (한 번 탭 = 1박스)',
+    "아래 '발주 내역 확인'에서 수량을 보고 '공유하기'로 보내요",
+  ];
+  const buttons: { icon: keyof typeof MaterialCommunityIcons.glyphMap; color?: string; text: string }[] = [
+    { icon: 'gesture-tap', text: '상품 탭 — 1박스 담기' },
+    { icon: 'numeric-1-circle', color: '#CC2222', text: '빨간 숫자 탭 — 1박스 빼기' },
+    { icon: 'magnify-plus-outline', text: '상품을 꾹 누르고 있기 — 사진 크게 보기' },
+    { icon: 'cog-outline', text: '톱니바퀴 — 상품 수정 · 다른 구역으로 이동 · 줄 아래 구분선' },
+    { icon: 'arrow-all', text: '화살표 — 누른 뒤 옮길 자리의 상품을 탭하면 서로 자리가 바뀌어요' },
+    { icon: 'trash-can-outline', text: '휴지통 — 이 구역에서 빼기 (상품 자체는 지워지지 않아요)' },
+    { icon: 'gesture-tap-hold', text: '구역 이름을 꾹 — 이름 변경 · 순서 변경 · 상품 비우기 · 삭제' },
+  ];
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable className="flex-1 items-center justify-center bg-ink/40 px-6" onPress={onClose}>
-        <Pressable onPress={(e) => e.stopPropagation()} className="w-full rounded-2xl bg-paper p-4">
+        <Pressable
+          onPress={(e) => e.stopPropagation()}
+          className="w-full rounded-2xl bg-paper p-4"
+          style={{ maxHeight: '85%' }}
+        >
           <View className="mb-2 flex-row items-center justify-between">
             <View className="flex-1 flex-row items-center" style={{ gap: 8 }}>
               <MaterialCommunityIcons name="fridge-outline" size={18} color="#1A1A1A" />
@@ -1348,32 +1375,34 @@ const QuickOrderHelpModal = memo(function QuickOrderHelpModal({
               <MaterialCommunityIcons name="close" size={20} color="#888888" />
             </Pressable>
           </View>
-          <View className="gap-2.5">
-            <View className="flex-row items-center" style={{ gap: 10 }}>
-              <MaterialCommunityIcons name="fridge-outline" size={18} color="#1A1A1A" />
-              <Text className="text-ink flex-1 text-sm">냉동고 진열 순서대로 탭해서 빠르게 담아요</Text>
+          <ScrollView>
+            <Text className="text-ink text-sm">
+              냉동고에 진열된 순서 그대로 상품을 보여 줘요. 매장에서 냉동고를 보면서 부족한 상품을
+              탭만 하면 발주가 담겨요.
+            </Text>
+
+            <Text className="text-ink mb-2 mt-4 text-sm font-bold">처음 쓰는 순서</Text>
+            <View className="gap-2">
+              {steps.map((s, i) => (
+                <View key={s} className="flex-row" style={{ gap: 8 }}>
+                  <View className="bg-primary h-5 w-5 items-center justify-center rounded-full">
+                    <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' }}>{i + 1}</Text>
+                  </View>
+                  <Text className="text-ink flex-1 text-sm">{s}</Text>
+                </View>
+              ))}
             </View>
-            <View className="flex-row items-center" style={{ gap: 10 }}>
-              <MaterialCommunityIcons name="gesture-tap" size={18} color="#1A1A1A" />
-              <Text className="text-ink flex-1 text-sm">타일을 탭하면 1개 담겨요</Text>
+
+            <Text className="text-ink mb-2 mt-4 text-sm font-bold">버튼 설명</Text>
+            <View className="gap-2.5">
+              {buttons.map((b) => (
+                <View key={b.text} className="flex-row items-center" style={{ gap: 10 }}>
+                  <MaterialCommunityIcons name={b.icon} size={18} color={b.color ?? '#1A1A1A'} />
+                  <Text className="text-ink flex-1 text-sm">{b.text}</Text>
+                </View>
+              ))}
             </View>
-            <View className="flex-row items-center" style={{ gap: 10 }}>
-              <MaterialCommunityIcons name="cog-outline" size={18} color="#1A1A1A" />
-              <Text className="text-ink flex-1 text-sm">상품 수정 · 다른 구역으로 이동</Text>
-            </View>
-            <View className="flex-row items-center" style={{ gap: 10 }}>
-              <MaterialCommunityIcons name="arrow-all" size={18} color="#1A1A1A" />
-              <Text className="text-ink flex-1 text-sm">진열 순서 바꾸기</Text>
-            </View>
-            <View className="flex-row items-center" style={{ gap: 10 }}>
-              <MaterialCommunityIcons name="trash-can-outline" size={18} color="#1A1A1A" />
-              <Text className="text-ink flex-1 text-sm">이 구역에서 빼기</Text>
-            </View>
-            <View className="flex-row items-center" style={{ gap: 10 }}>
-              <MaterialCommunityIcons name="gesture-tap-hold" size={18} color="#1A1A1A" />
-              <Text className="text-ink flex-1 text-sm">구역 탭을 꾹 누르면 이름 변경 · 삭제 · 순서 변경</Text>
-            </View>
-          </View>
+          </ScrollView>
         </Pressable>
       </Pressable>
     </Modal>
@@ -1912,7 +1941,10 @@ const FridgeSectionModal = memo(function FridgeSectionModal({
           style={{ maxHeight: '70%' }}
         >
           <Text className="text-ink mb-2 text-base font-bold">구역 관리</Text>
-          <Text className="text-muted mb-2 text-xs">화살표로 순서를 바꿀 수 있어요</Text>
+          {/* 아이콘에 이름이 없어 무슨 기능인지 알 수 없다는 지적 — 아이콘별 기능을 적어 둔다 */}
+          <Text className="text-muted mb-2 text-xs">
+            화살표: 순서 변경 · 연필: 이름 변경 · 되돌리기: 진열 상품 비우기 · 휴지통: 구역 삭제
+          </Text>
 
           <FlatList
             data={sections}
@@ -1964,13 +1996,31 @@ const FridgeSectionModal = memo(function FridgeSectionModal({
                   <Text className="text-ink flex-1 px-2 py-2 text-sm font-medium" numberOfLines={1}>
                     {s}
                   </Text>
-                  <Pressable onPress={() => startRename(s)} hitSlop={13} className="ml-3">
+                  <Pressable
+                    onPress={() => startRename(s)}
+                    hitSlop={13}
+                    className="ml-3"
+                    accessibilityRole="button"
+                    accessibilityLabel={`${s} 이름 변경`}
+                  >
                     <MaterialCommunityIcons name="pencil-outline" size={18} color="#888888" />
                   </Pressable>
-                  <Pressable onPress={() => onClear(s)} hitSlop={13} className="ml-3">
+                  <Pressable
+                    onPress={() => onClear(s)}
+                    hitSlop={13}
+                    className="ml-3"
+                    accessibilityRole="button"
+                    accessibilityLabel={`${s} 진열 상품 비우기`}
+                  >
                     <MaterialCommunityIcons name="backup-restore" size={18} color="#888888" />
                   </Pressable>
-                  <Pressable onPress={() => onDelete(s)} hitSlop={13} className="ml-3">
+                  <Pressable
+                    onPress={() => onDelete(s)}
+                    hitSlop={13}
+                    className="ml-3"
+                    accessibilityRole="button"
+                    accessibilityLabel={`${s} 구역 삭제`}
+                  >
                     <MaterialCommunityIcons name="trash-can-outline" size={18} color="#888888" />
                   </Pressable>
                 </View>
