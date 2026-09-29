@@ -23,6 +23,7 @@ import {
   pushStore,
   pushStoreLayoutPart,
 } from './order-cloud-sync';
+import { mergeRemoteOrderProducts, planBarcodeDedupe } from './order-dedupe';
 import { FridgeAssignment, FridgeSection, OrderCart, OrderProduct, Store } from './order-types';
 import { DEFAULT_ORDER_PRODUCTS } from './order-seed-data';
 
@@ -57,6 +58,18 @@ async function writeOrderProducts(items: OrderProduct[]): Promise<void> {
   await AsyncStorage.setItem(PRODUCTS_KEY, JSON.stringify(items));
 }
 
+let productsLock: Promise<unknown> = Promise.resolve();
+
+/** 발주 상품 목록 "읽기→고치기→통째로 쓰기"를 한 번에 하나씩만 실행한다. 목록을 통째로 다시 쓰는
+ * 구조라, 둘이 겹치면(앱 시작 때 동기화 두 개가 동시에 도는 등) 나중에 쓴 쪽이 먼저 쓴 쪽의 변경을
+ * 지운다 — 방금 저장한 상품이 사라지거나 정리한 중복이 되살아난다. writeOrderProducts를 부르는
+ * 곳은 전부 이 안에서 읽고 써야 한다. 안에서 다시 이 함수를 부르면 멈추므로(재진입 불가) 주의. */
+function withProductsLock<T>(fn: () => Promise<T>): Promise<T> {
+  const run = productsLock.then(fn, fn);
+  productsLock = run.catch(() => {});
+  return run;
+}
+
 export async function getOrderProduct(id: string): Promise<OrderProduct | null> {
   const items = await listOrderProducts();
   return items.find((p) => p.id === id) ?? null;
@@ -74,22 +87,25 @@ export async function listOrderProductsByBarcode(barcode: string): Promise<Order
  * 대표 사진이 되려면 다른 사용자의 좋아요를 받아야 한다.
  */
 export async function saveOrderProduct(rawP: OrderProduct): Promise<OrderProduct> {
-  const items = await listOrderProducts();
-  // 신규 등록인데 같은 바코드의 상품이 이미 있으면 새로 만들지 않고 그 상품을 갱신한다 —
-  // 그렇지 않으면 같은 바코드를 여러 번 등록할 때마다(재스캔, 중복 탭 등) id만 다른 중복
-  // 상품이 계속 쌓인다(검색 결과에 같은 이름이 여러 줄 나오던 원인).
-  const existingByBarcode =
-    !items.some((x) => x.id === rawP.id) && rawP.barcode
-      ? items.find((x) => x.barcode === rawP.barcode)
-      : undefined;
-  const p = existingByBarcode ? { ...rawP, id: existingByBarcode.id } : rawP;
-  const idx = items.findIndex((x) => x.id === p.id);
-  const isNew = idx < 0;
-  const categoryChanged = !isNew && items[idx].category !== p.category;
-  const priceChanged = !isNew && items[idx].price !== p.price;
-  if (isNew) items.push(p);
-  else items[idx] = p;
-  await writeOrderProducts(items);
+  const { p, isNew, categoryChanged, priceChanged } = await withProductsLock(async () => {
+    const items = await listOrderProducts();
+    // 신규 등록인데 같은 바코드의 상품이 이미 있으면 새로 만들지 않고 그 상품을 갱신한다 —
+    // 그렇지 않으면 같은 바코드를 여러 번 등록할 때마다(재스캔, 중복 탭 등) id만 다른 중복
+    // 상품이 계속 쌓인다(검색 결과에 같은 이름이 여러 줄 나오던 원인).
+    const existingByBarcode =
+      !items.some((x) => x.id === rawP.id) && rawP.barcode
+        ? items.find((x) => x.barcode === rawP.barcode)
+        : undefined;
+    const p = existingByBarcode ? { ...rawP, id: existingByBarcode.id } : rawP;
+    const idx = items.findIndex((x) => x.id === p.id);
+    const isNew = idx < 0;
+    const categoryChanged = !isNew && items[idx].category !== p.category;
+    const priceChanged = !isNew && items[idx].price !== p.price;
+    if (isNew) items.push(p);
+    else items[idx] = p;
+    await writeOrderProducts(items);
+    return { p, isNew, categoryChanged, priceChanged };
+  });
   upsertBarcodeCatalog(p.barcode, p.name, p.imageUri).catch(() => {});
   if (isNew) {
     submitNewOrderProduct(p).catch(() => {});
@@ -225,9 +241,11 @@ async function clearDeletedOrderProductId(id: string): Promise<void> {
 }
 
 export async function deleteOrderProduct(id: string): Promise<void> {
-  const items = await listOrderProducts();
-  const removed = items.find((p) => p.id === id);
-  await writeOrderProducts(items.filter((p) => p.id !== id));
+  const removed = await withProductsLock(async () => {
+    const items = await listOrderProducts();
+    await writeOrderProducts(items.filter((p) => p.id !== id));
+    return items.find((p) => p.id === id);
+  });
   if (removed) await recordRemovedBarcode(removed.barcode);
   const cart = await getOrderCart();
   if (id in cart) {
@@ -248,9 +266,12 @@ export async function deleteOrderProduct(id: string): Promise<void> {
  * 통째로 비운다.
  */
 export async function clearAllOrderProducts(): Promise<void> {
-  const items = await listOrderProducts();
+  const items = await withProductsLock(async () => {
+    const all = await listOrderProducts();
+    if (all.length > 0) await writeOrderProducts([]);
+    return all;
+  });
   if (items.length === 0) return;
-  await writeOrderProducts([]);
   await writeOrderCart({});
   const removed = await getRemovedBarcodes();
   const deletedIds = await getDeletedOrderProductIds();
@@ -272,18 +293,19 @@ export async function clearAllOrderProducts(): Promise<void> {
  * 후보 제출"까지 같이 하는데, 여기 photoUri는 이미 등록된 후보라 그러면 중복 후보 행이 생긴다.
  * 로컬 표시만 바꾸고, 오버라이드만 남겨 다음 syncOrderCatalog가 이 선택을 덮어쓰지 않게 한다. */
 export async function applyOrderProductPhoto(barcode: string, photoUri: string): Promise<void> {
-  const items = await listOrderProducts();
-  const changedItems: OrderProduct[] = [];
-  const next = items.map((p) => {
-    if (p.barcode !== barcode || p.imageUri === photoUri) return p;
-    const updated = { ...p, imageUri: photoUri };
-    changedItems.push(updated);
-    return updated;
+  const changedItems = await withProductsLock(async () => {
+    const items = await listOrderProducts();
+    const changed: OrderProduct[] = [];
+    const next = items.map((p) => {
+      if (p.barcode !== barcode || p.imageUri === photoUri) return p;
+      const updated = { ...p, imageUri: photoUri };
+      changed.push(updated);
+      return updated;
+    });
+    if (changed.length > 0) await writeOrderProducts(next);
+    return changed;
   });
-  if (changedItems.length > 0) {
-    await writeOrderProducts(next);
-    for (const p of changedItems) pushOrderProduct(p).catch(() => {});
-  }
+  for (const p of changedItems) pushOrderProduct(p).catch(() => {});
   await recordSubmittedPhotoCandidate(barcode, photoUri);
 }
 
@@ -323,12 +345,14 @@ export async function addOrderCategory(name: string): Promise<string[]> {
 export async function renameOrderCategory(from: string, to: string): Promise<void> {
   const categories = await listOrderCategories();
   await writeOrderCategories(categories.map((c) => (c === from ? to : c)));
-  const products = await listOrderProducts();
-  const changed = products.filter((p) => p.category === from);
-  if (changed.length === 0) return;
-  await writeOrderProducts(
-    products.map((p) => (p.category === from ? { ...p, category: to } : p)),
-  );
+  const changed = await withProductsLock(async () => {
+    const products = await listOrderProducts();
+    const hit = products.filter((p) => p.category === from);
+    if (hit.length > 0) {
+      await writeOrderProducts(products.map((p) => (p.category === from ? { ...p, category: to } : p)));
+    }
+    return hit;
+  });
   for (const p of changed) pushOrderProduct({ ...p, category: to }).catch(() => {});
 }
 
@@ -656,12 +680,14 @@ export async function clearOrderCart(): Promise<void> {
  * 대량(388건) 삽입이므로 개별 저장(saveOrderProduct)과 달리 barcode_catalog 공용 캐시에는 쓰지 않는다
  * — 다수의 개별 네트워크 호출을 피하기 위한 의도적 단순화 (공용 캐시는 이후 스캔 시 자연히 채워짐).
  */
-export async function seedDefaultOrderProducts(): Promise<number> {
-  const existing = await listOrderProducts();
-  if (existing.length > 0) return 0;
-  const items: OrderProduct[] = DEFAULT_ORDER_PRODUCTS.map((p) => ({ ...p, id: newId() }));
-  await writeOrderProducts(items);
-  return items.length;
+export function seedDefaultOrderProducts(): Promise<number> {
+  return withProductsLock(async () => {
+    const existing = await listOrderProducts();
+    if (existing.length > 0) return 0;
+    const items: OrderProduct[] = DEFAULT_ORDER_PRODUCTS.map((p) => ({ ...p, id: newId() }));
+    await writeOrderProducts(items);
+    return items.length;
+  });
 }
 
 /** 공용 카탈로그(order_catalog)를 받아와 로컬 발주 상품 목록에 병합한다. 실패(오프라인 등)하면 조용히 무시. */
@@ -673,47 +699,51 @@ export async function syncOrderCatalog(): Promise<void> {
       .select('barcode, name, brand, price, category, image_uri');
     if (error || !data) return;
 
-    const [items, removedBarcodes, categoryOverrides, priceOverrides, brandOverrides, nameOverrides, photoOverrides] =
-      await Promise.all([
-        listOrderProducts(),
-        getRemovedBarcodes(),
-        getCategoryOverrides(),
-        getPriceOverrides(),
-        getBrandOverrides(),
-        getNameOverrides(),
-        getSubmittedPhotoCandidates(),
-      ]);
-    const referencePrices: Record<string, number> = {};
-    for (const row of data as OrderCatalogRow[]) {
-      if (row.price != null) referencePrices[row.barcode] = row.price;
-    }
-    writeCatalogReferencePrices(referencePrices).catch(() => {});
+    const { changed, newBarcodes, updatedBarcodes } = await withProductsLock(async () => {
+      const [items, removedBarcodes, categoryOverrides, priceOverrides, brandOverrides, nameOverrides, photoOverrides] =
+        await Promise.all([
+          listOrderProducts(),
+          getRemovedBarcodes(),
+          getCategoryOverrides(),
+          getPriceOverrides(),
+          getBrandOverrides(),
+          getNameOverrides(),
+          getSubmittedPhotoCandidates(),
+        ]);
+      const referencePrices: Record<string, number> = {};
+      for (const row of data as OrderCatalogRow[]) {
+        if (row.price != null) referencePrices[row.barcode] = row.price;
+      }
+      writeCatalogReferencePrices(referencePrices).catch(() => {});
 
-    const rows = (data as OrderCatalogRow[]).map((row) => {
-      const withCategory = categoryOverrides.has(row.barcode)
-        ? { ...row, category: categoryOverrides.get(row.barcode)! }
-        : row;
-      const withPrice = priceOverrides.has(row.barcode)
-        ? { ...withCategory, price: priceOverrides.get(row.barcode)! }
-        : withCategory;
-      const withBrand = brandOverrides.has(row.barcode)
-        ? { ...withPrice, brand: brandOverrides.get(row.barcode)! }
-        : withPrice;
-      const withName = nameOverrides.has(row.barcode)
-        ? { ...withBrand, name: nameOverrides.get(row.barcode)! }
-        : withBrand;
-      // 이 기기에서 직접 고른 사진은 투표로 대표사진이 되기 전까지 공용 값이 덮어쓰지 않게 한다
-      // (카테고리/브랜드/상품명 오버라이드와 같은 이유).
-      return photoOverrides.has(row.barcode)
-        ? { ...withName, image_uri: photoOverrides.get(row.barcode)! }
-        : withName;
+      const rows = (data as OrderCatalogRow[]).map((row) => {
+        const withCategory = categoryOverrides.has(row.barcode)
+          ? { ...row, category: categoryOverrides.get(row.barcode)! }
+          : row;
+        const withPrice = priceOverrides.has(row.barcode)
+          ? { ...withCategory, price: priceOverrides.get(row.barcode)! }
+          : withCategory;
+        const withBrand = brandOverrides.has(row.barcode)
+          ? { ...withPrice, brand: brandOverrides.get(row.barcode)! }
+          : withPrice;
+        const withName = nameOverrides.has(row.barcode)
+          ? { ...withBrand, name: nameOverrides.get(row.barcode)! }
+          : withBrand;
+        // 이 기기에서 직접 고른 사진은 투표로 대표사진이 되기 전까지 공용 값이 덮어쓰지 않게 한다
+        // (카테고리/브랜드/상품명 오버라이드와 같은 이유).
+        return photoOverrides.has(row.barcode)
+          ? { ...withName, image_uri: photoOverrides.get(row.barcode)! }
+          : withName;
+      });
+      const { items: merged, changed, newBarcodes, updatedBarcodes } = mergeCatalogIntoProducts(
+        items,
+        rows,
+        removedBarcodes,
+      );
+      if (changed) await writeOrderProducts(merged);
+      return { changed, newBarcodes, updatedBarcodes };
     });
-    const { items: merged, changed, newBarcodes, updatedBarcodes } = mergeCatalogIntoProducts(
-      items,
-      rows,
-      removedBarcodes,
-    );
-    if (changed) await writeOrderProducts(merged);
+    if (changed) await dedupeOrderProductsByBarcode();
     if (newBarcodes.length || updatedBarcodes.length) {
       const badges = await getCatalogUpdateBadges();
       for (const b of newBarcodes) badges.set(b, 'new');
@@ -837,19 +867,20 @@ export async function syncOrderStores(): Promise<void> {
       deleteOrderProductCloud(id).then(() => clearDeletedOrderProductId(id)).catch(() => {});
     }
 
-    const [remoteProducts, localProducts] = await Promise.all([fetchMyOrderProducts(), listOrderProducts()]);
-    const localProductIds = new Set(localProducts.map((p) => p.id));
+    // 서버 응답은 잠금 밖에서 기다리고(그동안 저장이 막히지 않게), 합치기만 잠금 안에서 한다
+    const remoteProducts = await fetchMyOrderProducts();
     const remoteProductIds = new Set(remoteProducts.map((p) => p.id));
-
-    const newProductsFromRemote = remoteProducts.filter(
-      (r) => !localProductIds.has(r.id) && !deletedProductIds.has(r.id),
-    );
-    if (newProductsFromRemote.length > 0) {
-      await writeOrderProducts([...localProducts, ...newProductsFromRemote]);
-    }
+    const localProducts = await withProductsLock(async () => {
+      const local = await listOrderProducts();
+      const merged = mergeRemoteOrderProducts(local, remoteProducts, deletedProductIds);
+      if (merged.length !== local.length) await writeOrderProducts(merged);
+      return local;
+    });
     for (const local of localProducts) {
       if (!remoteProductIds.has(local.id)) pushOrderProduct(local).catch(() => {});
     }
+    // 서버에서 받아온 상품이 이미 있는 상품과 바코드가 같으면(재설치·다른 기기) 여기서 합친다
+    await dedupeOrderProductsByBarcode();
   } catch {
     // best-effort
   }
@@ -897,88 +928,82 @@ export async function migrateLocalOrderDataToCloud(): Promise<void> {
   }
 }
 
-const ORDER_PRODUCTS_DEDUPED_KEY = 'orderProductsDedupedByBarcode:v1';
+let dedupeRunning: Promise<void> | null = null;
 
 /**
- * 과거 saveOrderProduct 버그(같은 바코드를 재등록할 때마다 id만 다른 새 상품이 생기던 문제,
- * 이제는 위 saveOrderProduct에서 막힘)로 이미 쌓인 중복 상품을 바코드 기준 1회성으로 정리한다.
- * 바코드별로 가장 먼저 등록된 걸 대표로 남기고(빈 사진/별칭은 중복 항목에서 보완), 나머지는
- * 지운다. 모든 매장(+ 매장 미선택 전역) 장바구니 수량은 대표 상품으로 합산하고, 냉장고 배정은
- * 매장별로 대표 상품 배정이 이미 있으면 중복 배정을 버린다.
+ * 같은 바코드의 중복 발주 상품을 하나로 합친다(규칙은 planBarcodeDedupe). 예전엔 평생 1회만 돌아서,
+ * 앱을 새로 설치할 때마다 생기는 중복(설치 직후 기본 상품 ~420개가 새 id로 채워지고, 이어서
+ * 서버에 있던 이전 설치의 상품이 id만 다르다는 이유로 또 추가됨)이 설치 횟수만큼 쌓였다.
+ * 이제 동기화 끝마다 돌린다 — 중복이 없으면 읽기만 하고 끝나 가볍다. 지운 id는 tombstone에
+ * 기록해 다음 동기화가 서버 사본을 다시 끌어오지 않고 서버 삭제를 재시도하게 한다.
+ * 모든 매장(+ 매장 미선택 전역) 장바구니 수량은 남긴 상품으로 합산하고, 냉장고 배정은 매장별로
+ * 남긴 상품 배정이 이미 있으면 중복 배정을 버린다.
  */
-export async function dedupeOrderProductsByBarcode(): Promise<void> {
-  if (await AsyncStorage.getItem(ORDER_PRODUCTS_DEDUPED_KEY)) return;
+export function dedupeOrderProductsByBarcode(): Promise<void> {
+  // 동기화 여러 개가 동시에 부를 수 있어, 도는 중이면 그 작업을 같이 기다린다
+  dedupeRunning ??= withProductsLock(runDedupe).finally(() => {
+    dedupeRunning = null;
+  });
+  return dedupeRunning;
+}
 
+async function runDedupe(): Promise<void> {
   const items = await listOrderProducts();
-  const byBarcode = new Map<string, OrderProduct[]>();
-  for (const p of items) {
-    if (!p.barcode) continue;
-    const list = byBarcode.get(p.barcode) ?? [];
-    list.push(p);
-    byBarcode.set(p.barcode, list);
-  }
-
-  const idRemap = new Map<string, string>(); // 제거될 id -> 대표 id
-  const keepers = new Map<string, OrderProduct>(); // 대표 id -> 병합된 상품
-
-  for (const dupes of byBarcode.values()) {
-    if (dupes.length < 2) continue;
-    let keeper = dupes[0];
-    for (const dup of dupes.slice(1)) {
-      keeper = {
-        ...keeper,
-        imageUri: keeper.imageUri ?? dup.imageUri,
-        aliases: keeper.aliases?.length ? keeper.aliases : dup.aliases,
-      };
-      idRemap.set(dup.id, keeper.id);
-    }
-    keepers.set(keeper.id, keeper);
-  }
-
-  if (idRemap.size === 0) {
-    await AsyncStorage.setItem(ORDER_PRODUCTS_DEDUPED_KEY, '1');
-    return;
-  }
-
-  const removedIds = new Set(idRemap.keys());
-  await writeOrderProducts(items.filter((p) => !removedIds.has(p.id)).map((p) => keepers.get(p.id) ?? p));
-
-  const cartKeys = [CART_KEY, ...(await listStores()).map((s) => `orderCart:${s.id}`)];
+  const stores = await listStores();
+  const cartKeys = [CART_KEY, ...stores.map((s) => `orderCart:${s.id}`)];
+  const carts = new Map<string, OrderCart>();
   for (const key of cartKeys) {
     const raw = await AsyncStorage.getItem(key);
-    if (!raw) continue;
-    const cart = JSON.parse(raw) as OrderCart;
+    if (raw) carts.set(key, JSON.parse(raw) as OrderCart);
+  }
+  const assignmentsByStore = new Map<string, FridgeAssignment[]>();
+  for (const store of stores) assignmentsByStore.set(store.id, await listFridgeAssignments(store.id));
+
+  const referenced = new Set<string>();
+  for (const cart of carts.values()) Object.keys(cart).forEach((id) => referenced.add(id));
+  for (const list of assignmentsByStore.values()) list.forEach((a) => referenced.add(a.productId));
+
+  const { items: next, idRemap } = planBarcodeDedupe(items, referenced);
+  if (idRemap.size === 0) return;
+
+  await writeOrderProducts(next);
+
+  for (const [key, cart] of carts) {
     let changed = false;
-    const next: OrderCart = {};
+    const merged: OrderCart = {};
     for (const [productId, qty] of Object.entries(cart)) {
       const keeperId = idRemap.get(productId) ?? productId;
       if (keeperId !== productId) changed = true;
-      next[keeperId] = (next[keeperId] ?? 0) + qty;
+      merged[keeperId] = (merged[keeperId] ?? 0) + qty;
     }
-    if (changed) await AsyncStorage.setItem(key, JSON.stringify(next));
+    if (changed) await AsyncStorage.setItem(key, JSON.stringify(merged));
   }
 
-  for (const store of await listStores()) {
-    const assignments = await listFridgeAssignments(store.id);
-    if (assignments.length === 0) continue;
+  for (const [storeId, assignments] of assignmentsByStore) {
     const seen = new Set<string>();
     let changed = false;
-    const next: FridgeAssignment[] = [];
+    const merged: FridgeAssignment[] = [];
     for (const a of assignments) {
       const keeperId = idRemap.get(a.productId) ?? a.productId;
       if (keeperId !== a.productId) changed = true;
       if (seen.has(keeperId)) {
         changed = true;
-        continue; // 대표 상품이 이미 배정돼 있으면 중복 배정은 버린다
+        continue; // 남긴 상품이 이미 배정돼 있으면 중복 배정은 버린다
       }
       seen.add(keeperId);
-      next.push(keeperId === a.productId ? a : { ...a, productId: keeperId });
+      merged.push(keeperId === a.productId ? a : { ...a, productId: keeperId });
     }
-    if (changed) await AsyncStorage.setItem(fridgeAssignmentsKey(store.id), JSON.stringify(next));
+    if (changed) await AsyncStorage.setItem(fridgeAssignmentsKey(storeId), JSON.stringify(merged));
   }
 
-  for (const removedId of removedIds) deleteOrderProductCloud(removedId).catch(() => {});
-  for (const keeper of keepers.values()) pushOrderProduct(keeper).catch(() => {});
-
-  await AsyncStorage.setItem(ORDER_PRODUCTS_DEDUPED_KEY, '1');
+  const deleted = await getDeletedOrderProductIds();
+  for (const id of idRemap.keys()) deleted.add(id);
+  await AsyncStorage.setItem(DELETED_ORDER_PRODUCT_IDS_KEY, JSON.stringify([...deleted]));
+  for (const id of idRemap.keys()) {
+    deleteOrderProductCloud(id)
+      .then(() => clearDeletedOrderProductId(id))
+      .catch(() => {});
+  }
+  const keeperIds = new Set(idRemap.values());
+  for (const p of next) if (keeperIds.has(p.id)) pushOrderProduct(p).catch(() => {});
 }
