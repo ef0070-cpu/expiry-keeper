@@ -13,8 +13,18 @@ function lastDayOfMonth(year: number, month: number): number {
   return new Date(year, month, 0).getDate();
 }
 
-const TRIPLE_RE = /(\d{2,4})\s*[.\-/]\s*(\d{1,2})\s*[.\-/]\s*(\d{1,4})/g;
-const PAIR_RE = /(\d{2,4})\s*[.\-/]\s*(\d{1,2})(?!\d)/g;
+// (?<!\d)·(?!\d): 더 긴 숫자의 일부는 날짜로 보지 않는다 — '나트륨 120.5mg'의 '20.5'가 2020년 5월,
+// '12345.6'이 '2345.6'으로 잡히던 문제. 연도는 2자리·4자리만(3자리 '120'이 2120년이 되던 문제).
+const TRIPLE_RE = /(?<!\d)(\d{4}|\d{1,2})\s*[.\-/]\s*(\d{1,2})\s*[.\-/]\s*(\d{4}|\d{1,2})(?!\d)/g;
+const PAIR_RE = /(?<!\d)(\d{4}|\d{2})\s*[.\-/]\s*(\d{1,2})(?!\d)/g;
+
+/** 유통기한으로 말이 되는 연도 범위(기준 해 3년 전 ~ 10년 뒤). 성분표 숫자 등이 우연히 날짜
+ * 모양이 돼도 터무니없는 연도(2120년 등)는 후보에서 뺀다. */
+function isPlausibleYear(date: string, referenceDate: string): boolean {
+  const y = Number(date.slice(0, 4));
+  const ref = Number(referenceDate.slice(0, 4));
+  return y >= ref - 3 && y <= ref + 10;
+}
 
 /** 3묶음(년+월+일) 후보 하나를 dateOcrOrder 기준으로 해석한다. */
 function resolveTriple(a: string, b: string, c: string, order: DateOcrOrder): string | null {
@@ -101,32 +111,16 @@ function resolvePair(a: string, b: string, order: DateOcrOrder): string | null {
   return isValidDateStr(result) ? result : null;
 }
 
-/** ML Kit이 인식한 원문 텍스트에서 유통기한으로 보이는 날짜를 찾아 YYYY-MM-DD로 반환한다.
- * 못 찾으면 null. referenceDate는 "미래(또는 오늘) 날짜만 채택" 판단 기준일(기본값: 오늘) —
+/** 유통기한으로 보이는 날짜 하나(기준일 이후 중 가장 늦은 날짜). 없으면 null.
  * 제조일자와 유통기한이 함께 찍힌 경우 기준일 이전 후보를 제외하기 위함. */
 export function extractExpiryDateFromText(
   text: string,
   dateOcrOrder: DateOcrOrder,
   referenceDate: string = todayStr(),
 ): string | null {
-  const candidates: string[] = [];
-
-  for (const m of text.matchAll(TRIPLE_RE)) {
-    const resolved = resolveTriple(m[1], m[2], m[3], dateOcrOrder);
-    if (resolved) candidates.push(resolved);
-  }
-
-  if (candidates.length === 0) {
-    for (const m of text.matchAll(PAIR_RE)) {
-      const resolved = resolvePair(m[1], m[2], dateOcrOrder);
-      if (resolved) candidates.push(resolved);
-    }
-  }
-
-  const future = candidates.filter((d) => d >= referenceDate);
-  if (future.length === 0) return null;
-  future.sort();
-  return future[future.length - 1];
+  // 후보는 기준일 이후(늦은 순)가 먼저 오므로 첫 후보가 기준일 이후면 그게 답이다
+  const first = extractDateCandidates(text, dateOcrOrder, referenceDate)[0];
+  return first && first >= referenceDate ? first : null;
 }
 
 /** 사진에서 읽힌 날짜 후보를 사용자가 고를 순서로 돌려준다(중복 제거). 유통기한일 가능성이 큰
@@ -148,6 +142,6 @@ export function extractDateCandidates(
       if (resolved) found.add(resolved);
     }
   }
-  const desc = [...found].sort().reverse();
+  const desc = [...found].filter((d) => isPlausibleYear(d, referenceDate)).sort().reverse();
   return [...desc.filter((d) => d >= referenceDate), ...desc.filter((d) => d < referenceDate)];
 }

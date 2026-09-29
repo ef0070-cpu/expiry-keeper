@@ -57,4 +57,17 @@ console.assert(
 );
 console.assert(extractDateCandidates('숫자 없음', 'ymd', REF).length === 0, '후보 없으면 빈 배열');
 
+// 성분표·용량 숫자가 날짜로 잡히면 안 된다(더 긴 숫자의 일부, 3자리 연도, 터무니없는 연도)
+{
+  const R2 = '2026-09-29';
+  const none = (t: string) => extractDateCandidates(t, 'ymd', R2).length === 0;
+  console.assert(none('나트륨 120.5mg'), "'120.5'가 2120년 5월로 잡힘");
+  console.assert(none('12345.6'), "'12345.6'의 일부가 날짜로 잡힘");
+  console.assert(none('2120.05'), '10년 넘게 뒤의 연도는 빼야 함');
+  // 정상 날짜는 그대로
+  console.assert(extractDateCandidates('26.12.31', 'ymd', R2)[0] === '2026-12-31', '2자리 연도 실패');
+  console.assert(extractDateCandidates('5.9.2026', 'dmy', R2)[0] === '2026-09-05', '한 자리 일-월-연 실패');
+  console.assert(extractDateCandidates('31.12.2026', 'dmy', R2)[0] === '2026-12-31', '일-월-연 실패');
+}
+
 console.log('date-ocr selfcheck OK');

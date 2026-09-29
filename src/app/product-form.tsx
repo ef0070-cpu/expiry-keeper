@@ -4,7 +4,7 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import * as Linking from 'expo-linking';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -89,22 +89,44 @@ export default function ProductForm() {
 
   }, []);
 
+  // 사용자가 고칠 수 있는 칸의 최신 값 — 늦게 온 서버 응답이 방금 고친 내용을 덮어쓰지 않게 비교용
+  const editableRef = useRef('');
+  editableRef.current = JSON.stringify([
+    name,
+    imageUri,
+    barcode,
+    expiryDate,
+    quantity,
+    [...selectedCategories].sort(),
+    memo,
+  ]);
+
   // 수정 모드: 기존 상품 불러오기. 목록에서 받아 둔 값으로 화면을 그리기 전에(useLayoutEffect)
   // 먼저 채우고, 서버의 최신 값은 뒤이어 받아 덮어쓴다. 받아오기 실패는 조용히 넘기지 않는다.
   useLayoutEffect(() => {
     if (!params.id) return;
     const id = params.id;
+    const snapshot = (p: Product) =>
+      JSON.stringify([
+        p.name,
+        p.imageUri,
+        p.barcode,
+        p.expiryDate,
+        p.quantity,
+        [...p.categories].sort(),
+        p.memo ?? '',
+      ]);
     const apply = (p: Product) => {
       setName(p.name);
-        setImageUri(p.imageUri);
-        setBarcode(p.barcode);
-        setExpiryDate(p.expiryDate);
-        setQuantity(p.quantity);
-        setSelectedCategories(new Set(p.categories));
-        setMemo(p.memo ?? '');
-        setCreatedAt(p.createdAt);
-        setStatus(p.status);
-        setResolvedAt(p.resolvedAt);
+      setImageUri(p.imageUri);
+      setBarcode(p.barcode);
+      setExpiryDate(p.expiryDate);
+      setQuantity(p.quantity);
+      setSelectedCategories(new Set(p.categories));
+      setMemo(p.memo ?? '');
+      setCreatedAt(p.createdAt);
+      setStatus(p.status);
+      setResolvedAt(p.resolvedAt);
       setProductMode(p.mode);
     };
     const cached = getCachedProduct(id);
@@ -113,7 +135,10 @@ export default function ProductForm() {
     const fetchLatest = () =>
       getProduct(id)
         .then((p) => {
-          if (alive && p) apply(p);
+          if (!alive || !p) return;
+          // 캐시로 채운 뒤 사용자가 이미 고치기 시작했으면 서버 값으로 되돌리지 않는다
+          if (cached && editableRef.current !== snapshot(cached)) return;
+          apply(p);
         })
         .catch((e) => {
           if (!alive || cached) return; // 화면에 이미 내용이 있으면 최신화 실패는 넘어간다
@@ -230,10 +255,10 @@ export default function ProductForm() {
       const { recognizeText } = await import('@infinitered/react-native-mlkit-text-recognition');
       const { text } = await recognizeText(result.assets[0].uri);
       const candidates = extractDateCandidates(text, dateOcrOrder);
-      // 날짜가 하나뿐이면 묻지 않고 바로 넣는다(단계 최소화) — 여러 개거나 못 읽었을 때만 묻고,
-      // 틀렸거나 못 읽었으면 그 자리에서 다시 찍기. 안드로이드 알림창 버튼은 최대 3개라
-      // 후보는 2개까지만 버튼으로 보인다.
-      if (candidates.length === 1) {
+      const today = todayStr();
+      // 오늘 이후 날짜 하나만 읽혔을 때만 묻지 않고 바로 넣는다(단계 최소화). 지난 날짜 하나는
+      // 제조일일 수 있어(유통기한이 흐리게 찍힌 경우) 바로 넣지 않고 확인받는다.
+      if (candidates.length === 1 && candidates[0] >= today) {
         setExpiryDate(candidates[0]);
         return;
       }
@@ -246,19 +271,24 @@ export default function ProductForm() {
         );
         return;
       }
-      const today = todayStr();
       const label = (d: string) => (d < today ? `${d} (지난 날짜)` : d);
-      Alert.alert(
-        '읽은 날짜를 확인해 주세요',
-        candidates.length > 2
-          ? `읽은 날짜: ${candidates.map(label).join(', ')}\n다른 날짜면 다시 찍어 주세요.`
-          : '맞는 날짜를 눌러 주세요.',
-        [
-          retry,
-          ...candidates.slice(0, 2).map((d) => ({ text: label(d), onPress: () => setExpiryDate(d) })),
-        ],
-        { cancelable: true },
-      );
+      // 안드로이드 알림창 버튼은 최대 3개 — 후보가 더 있으면 '다른 날짜…'로 다음 후보를 넘겨 본다
+      // (예전엔 3번째 후보부터는 고를 방법이 없어 다시 찍어도 같은 후보만 반복됐다)
+      const showChoices = (from: number) => {
+        const rest = candidates.slice(from);
+        const hasMore = rest.length > 2;
+        const shown = hasMore ? rest.slice(0, 1) : rest.slice(0, 2);
+        Alert.alert(
+          '읽은 날짜를 확인해 주세요',
+          `읽은 날짜: ${candidates.map(label).join(', ')}\n맞는 날짜를 눌러 주세요.`,
+          [
+            hasMore ? { text: '다른 날짜…', onPress: () => showChoices(from + 1) } : retry,
+            ...shown.map((d) => ({ text: label(d), onPress: () => setExpiryDate(d) })),
+          ],
+          { cancelable: true },
+        );
+      };
+      showChoices(0);
     } catch (e) {
       // 원인을 그대로 보여준다. 네이티브 모듈 누락·카메라 실행 실패를 구분할 수 있어야 한다.
       Alert.alert('사진 인식 실패', errorMessage(e));
