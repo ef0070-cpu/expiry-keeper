@@ -4,7 +4,7 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import * as Linking from 'expo-linking';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -28,6 +28,7 @@ import { addMonths, autoFormatDate, formatDate, isValidDateStr, todayStr } from 
 import { cancelExpiryAlerts, scheduleExpiryAlerts } from '@/lib/notifications';
 import {
   deleteProduct,
+  getCachedProduct,
   getProduct,
   listProducts,
   listProductsByBarcode,
@@ -86,11 +87,15 @@ export default function ProductForm() {
       })
       .catch(() => {});
 
-    // 수정 모드: 기존 상품 불러오기
-    if (params.id) {
-      getProduct(params.id).then((p) => {
-        if (!p) return;
-        setName(p.name);
+  }, []);
+
+  // 수정 모드: 기존 상품 불러오기. 목록에서 받아 둔 값으로 화면을 그리기 전에(useLayoutEffect)
+  // 먼저 채우고, 서버의 최신 값은 뒤이어 받아 덮어쓴다. 받아오기 실패는 조용히 넘기지 않는다.
+  useLayoutEffect(() => {
+    if (!params.id) return;
+    const id = params.id;
+    const apply = (p: Product) => {
+      setName(p.name);
         setImageUri(p.imageUri);
         setBarcode(p.barcode);
         setExpiryDate(p.expiryDate);
@@ -100,9 +105,27 @@ export default function ProductForm() {
         setCreatedAt(p.createdAt);
         setStatus(p.status);
         setResolvedAt(p.resolvedAt);
-        setProductMode(p.mode);
-      });
-    }
+      setProductMode(p.mode);
+    };
+    const cached = getCachedProduct(id);
+    if (cached) apply(cached);
+    let alive = true;
+    const fetchLatest = () =>
+      getProduct(id)
+        .then((p) => {
+          if (alive && p) apply(p);
+        })
+        .catch((e) => {
+          if (!alive || cached) return; // 화면에 이미 내용이 있으면 최신화 실패는 넘어간다
+          Alert.alert('상품을 불러오지 못했어요', errorMessage(e), [
+            { text: '닫기', style: 'cancel', onPress: () => router.back() },
+            { text: '다시 시도', onPress: () => void fetchLatest() },
+          ]);
+        });
+    fetchLatest();
+    return () => {
+      alive = false;
+    };
   }, [params.id]);
 
   const categories = useMemo(() => {

@@ -95,6 +95,20 @@ async function uploadImageIfNeeded(p: Product): Promise<Product> {
 
 export type ListFilter = 'active' | 'resolved' | 'all';
 
+// 목록에서 받은 상품을 기억해 두었다가 상세(수정) 화면이 서버 응답을 기다리지 않고 바로 그리게
+// 한다 — 예전엔 상세 화면이 매번 서버에서 다시 받아와서, 느리면 빈 화면이 보였다.
+const productCache = new Map<string, Product>();
+
+/** 목록에서 이미 받아 둔 상품(없으면 null). 화면을 먼저 채우는 용도 — 최신 값은 getProduct로. */
+export function getCachedProduct(id: string): Product | null {
+  return productCache.get(id) ?? null;
+}
+
+function remember(items: Product[]): Product[] {
+  items.forEach((p) => productCache.set(p.id, p));
+  return items;
+}
+
 export async function listProducts(filter: ListFilter = 'active'): Promise<Product[]> {
   const mode = getCachedAppMode() ?? 'retail';
   if (supabase) {
@@ -107,7 +121,7 @@ export async function listProducts(filter: ListFilter = 'active'): Promise<Produ
     if (filter === 'resolved') query = query.neq('status', 'active');
     const { data, error } = await query;
     if (error) throw new Error(error.message);
-    return (data as ProductRow[]).map(fromRow);
+    return remember((data as ProductRow[]).map(fromRow));
   }
   const items = await localList();
   const filtered = items.filter((p) => {
@@ -116,7 +130,7 @@ export async function listProducts(filter: ListFilter = 'active'): Promise<Produ
     if (filter === 'resolved') return p.status !== 'active';
     return true;
   });
-  return filtered.sort((a, b) => a.expiryDate.localeCompare(b.expiryDate));
+  return remember(filtered.sort((a, b) => a.expiryDate.localeCompare(b.expiryDate)));
 }
 
 /** 상품을 소진/폐기 처리한다. */
