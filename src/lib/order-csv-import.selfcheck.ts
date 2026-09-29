@@ -1,4 +1,4 @@
-import { parseOrderProductCsv } from './order-csv-import';
+import { parseOrderProductCsv, parseOrderProductRows, planOrderImport } from './order-csv-import';
 
 // 정상 케이스
 {
@@ -68,4 +68,42 @@ import { parseOrderProductCsv } from './order-csv-import';
   console.assert(result.errors.length === 1 && result.errors[0].line === 2, '2번째 데이터 행이 오류로 잡혀야 함');
 }
 
+// 엑셀이 지수로 바꾼 바코드(8.80908E+12)는 뒷자리가 사라진 값이라 그 줄을 막아야 함
+{
+  const result = parseOrderProductCsv(
+    ['상품명,바코드', '메로나,8.80908E+12', '비비빅,8801062518142', '누가바,88-01', '옥동자,'].join('\n'),
+  );
+  console.assert(result.rows.length === 2, '정상 바코드·빈 바코드 2줄만 가져와야 함');
+  console.assert(result.rows[0].barcode === '8801062518142', '정상 바코드 유지');
+  console.assert(result.rows[1].barcode === null, '빈 바코드는 null');
+  console.assert(
+    result.errors.length === 2 && result.errors[0].line === 1 && result.errors[0].reason.includes('텍스트'),
+    '지수 바코드는 고치는 법과 함께 오류',
+  );
+}
+
 console.log('order-csv-import selfcheck OK');
+
+// 엑셀 올리기: ID가 같으면 수정(사진·상태 유지), ID 없으면 바코드로, 둘 다 없으면 새 상품
+{
+  const existing = [
+    { id: 'p1', name: '메로나', brand: '빙그레', price: 1000, category: '바', barcode: '8801', imageUri: 'img', status: 'paused' as const, aliases: [] },
+    { id: 'p2', name: '비비빅', brand: '빙그레', price: 1000, category: '바', barcode: null, imageUri: null },
+  ];
+  const { rows } = parseOrderProductRows([
+    ['상품명', '가격', '바코드', 'ID(수정 금지)'],
+    ['메로나', '1200', '8801', 'p1'],
+    ['비비빅(수정)', '900', '', 'p2'],
+    ['누가바', '1000', '8801', ''],
+    ['옥동자', '1500', '', ''],
+  ]);
+  let n = 0;
+  const plan = planOrderImport(rows, existing, () => `new${++n}`);
+  console.assert(plan[0].isNew === false && plan[0].product.price === 1200, 'ID로 수정');
+  console.assert(plan[0].product.imageUri === 'img' && plan[0].product.status === 'paused', '사진·상태 유지');
+  console.assert(plan[1].isNew === false && plan[1].product.name === '비비빅(수정)', '바코드 없어도 ID로 수정');
+  console.assert(plan[2].isNew === false && plan[2].product.id === 'p1', 'ID 없으면 바코드로 찾음');
+  console.assert(plan[3].isNew === true && plan[3].product.id === 'new1', '둘 다 없으면 새 상품');
+}
+
+console.log('order-csv-import planOrderImport OK');

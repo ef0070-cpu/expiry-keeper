@@ -1,74 +1,80 @@
 import * as DocumentPicker from 'expo-document-picker';
-import { File, Paths } from 'expo-file-system';
-import { StorageAccessFramework } from 'expo-file-system/legacy';
-import * as Sharing from 'expo-sharing';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ParsedOrderProductRow, parseOrderProductCsv } from '@/lib/order-csv-import';
-import { addOrderCategory, listOrderCategories, newId, saveOrderProduct } from '@/lib/order-repo';
-import { OrderProduct } from '@/lib/order-types';
-
-const TEMPLATE_CSV =
-  '﻿상품명,브랜드,가격,카테고리,바코드,별칭\n' +
-  '메로나,빙그레,1000,바,8801234567890,메론바;멜론바\n';
+import { readPickedRows, saveXlsxTemplate } from '@/lib/spreadsheet-file';
+import {
+  ORDER_SHEET_HEADER,
+  orderProductsToSheetRows,
+  ParsedOrderProductRow,
+  parseOrderProductRows,
+  planOrderImport,
+} from '@/lib/order-csv-import';
+import {
+  addOrderCategory,
+  listOrderCategories,
+  listOrderProducts,
+  newId,
+  saveOrderProduct,
+} from '@/lib/order-repo';
 
 type ImportState =
   | { step: 'idle' }
-  | { step: 'parsed'; rows: ParsedOrderProductRow[]; errors: { line: number; reason: string }[] }
+  | {
+      step: 'parsed';
+      rows: ParsedOrderProductRow[];
+      errors: { line: number; reason: string }[];
+      newCount: number;
+      updateCount: number;
+    }
   | { step: 'importing'; total: number; done: number }
   | { step: 'done'; success: number; failed: number; firstError?: string };
+
+function todayStamp(): string {
+  const d = new Date();
+  return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+}
 
 export default function OrderCsvImportScreen() {
   const insets = useSafeAreaInsets();
   const [state, setState] = useState<ImportState>({ step: 'idle' });
 
-  const shareTemplate = async () => {
+  // 내려받기 하나로 통합: 등록된 상품이 있으면 전체 목록(고쳐서 다시 올리면 수정됨), 없으면 예시
+  // 1줄짜리 템플릿. 바코드·ID 칸은 텍스트 형식이라 엑셀이 숫자를 망가뜨리지 않는다.
+  const downloadSheet = async () => {
     try {
-      // Android는 expo-sharing이 다른 앱으로 "보내기"만 할 뿐이라, 고른 앱이 저장을 지원
-      // 안 하면 공유 시트는 뜨는데 실제로는 아무 파일도 안 남는다(csv-import.tsx의 템플릿
-      // 받기와 같은 이유로 같은 방식을 씀) — SAF로 사용자가 고른 폴더에 직접 써서 확실히 남긴다.
-      if (Platform.OS === 'android') {
-        const downloadsHint = StorageAccessFramework.getUriForDirectoryInRoot('Download');
-        const perm = await StorageAccessFramework.requestDirectoryPermissionsAsync(downloadsHint);
-        if (!perm.granted) return;
-        const fileUri = await StorageAccessFramework.createFileAsync(
-          perm.directoryUri,
-          'order-product-template',
-          'text/csv',
-        );
-        await StorageAccessFramework.writeAsStringAsync(fileUri, TEMPLATE_CSV);
-        Alert.alert('저장 완료', '선택한 폴더에 템플릿 파일을 저장했어요.');
-        return;
-      }
-
-      const file = new File(Paths.cache, 'order-product-template.csv');
-      if (file.exists) file.delete();
-      file.create();
-      file.write(TEMPLATE_CSV);
-      const available = await Sharing.isAvailableAsync();
-      if (!available) {
-        Alert.alert('공유 불가', '이 기기에서는 파일 공유를 지원하지 않아요.');
-        return;
-      }
-      await Sharing.shareAsync(file.uri, { mimeType: 'text/csv' });
+      const products = await listOrderProducts();
+      const rows = products.length
+        ? orderProductsToSheetRows(products)
+        : [['메로나', '빙그레', 1000, '바', '8801234567890', '메론바;멜론바', '']];
+      const { buildTemplateXlsx } = await import('@/lib/xlsx-io');
+      await saveXlsxTemplate(
+        products.length ? `order-products-${todayStamp()}` : 'order-product-template',
+        buildTemplateXlsx(ORDER_SHEET_HEADER, rows, ['바코드', 'ID(수정 금지)']),
+      );
     } catch (e) {
-      Alert.alert('오류', e instanceof Error ? e.message : '템플릿을 만들지 못했어요.');
+      Alert.alert('오류', e instanceof Error ? e.message : '엑셀 파일을 만들지 못했어요.');
     }
   };
 
   const pickFile = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: ['text/csv', 'text/comma-separated-values', 'text/plain', '*/*'],
+        type: [
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'text/csv',
+          'text/comma-separated-values',
+          'text/plain',
+          '*/*',
+        ],
         copyToCacheDirectory: true,
       });
       if (result.canceled || !result.assets?.[0]) return;
-      const picked = new File(result.assets[0].uri);
-      const text = await picked.text();
-      const { rows, errors } = parseOrderProductCsv(text);
-      setState({ step: 'parsed', rows, errors });
+      const { rows, errors } = parseOrderProductRows(await readPickedRows(result.assets[0]));
+      const plan = planOrderImport(rows, await listOrderProducts(), newId);
+      const newCount = plan.filter((x) => x.isNew).length;
+      setState({ step: 'parsed', rows, errors, newCount, updateCount: plan.length - newCount });
     } catch (e) {
       Alert.alert('오류', e instanceof Error ? e.message : '파일을 읽지 못했어요.');
     }
@@ -76,7 +82,7 @@ export default function OrderCsvImportScreen() {
 
   const runImport = async (rows: ParsedOrderProductRow[]) => {
     setState({ step: 'importing', total: rows.length, done: 0 });
-    // CSV에만 있고 기존 카테고리 목록에 없는 카테고리는 상품 등록 화면에서 수동으로 "+"로
+    // 파일에만 있고 기존 카테고리 목록에 없는 카테고리는 상품 등록 화면에서 수동으로 "+"로
     // 추가하는 것과 동일하게 미리 등록해둔다 — 그래야 가져온 상품이 바로 필터 칩에 보인다.
     const existingCategories = new Set(await listOrderCategories());
     const newCategories = [
@@ -86,24 +92,17 @@ export default function OrderCsvImportScreen() {
       await addOrderCategory(c).catch(() => {});
     }
 
+    // ID(없으면 바코드)가 같은 기존 상품은 엑셀 칸만 바꿔 수정 — 사진·납품상태는 유지
+    const plan = planOrderImport(rows, await listOrderProducts(), newId);
     let success = 0;
+    let added = 0;
     let failed = 0;
     let firstError: string | undefined;
-    for (const row of rows) {
+    for (const { product, isNew } of plan) {
       try {
-        const product: OrderProduct = {
-          id: newId(),
-          name: row.name,
-          brand: row.brand,
-          price: row.price,
-          category: row.category,
-          barcode: row.barcode,
-          imageUri: null,
-          status: 'active',
-          aliases: row.aliases,
-        };
         await saveOrderProduct(product);
         success++;
+        if (isNew) added++;
       } catch (e) {
         failed++;
         firstError ??= e instanceof Error ? e.message : String(e);
@@ -111,12 +110,21 @@ export default function OrderCsvImportScreen() {
       setState((prev) => (prev.step === 'importing' ? { ...prev, done: prev.done + 1 } : prev));
     }
     setState({ step: 'done', success, failed, firstError });
+    // 끝났다는 걸 확실히 알 수 있게 팝업으로도 알린다(결과 카드는 그대로 남음)
+    const counts = `새 상품 ${added}개 · 수정 ${success - added}개`;
+    Alert.alert(
+      failed > 0 ? '등록 결과' : '등록 완료',
+      failed > 0
+        ? `${success}개 등록 완료 되었습니다(${counts}).\n${failed}개는 저장하지 못했어요.${firstError ? `\n사유: ${firstError}` : ''}`
+        : `등록 완료 되었습니다.\n${counts}`,
+      [{ text: '확인', onPress: () => router.back() }],
+    );
   };
 
-  const confirmImport = (rows: ParsedOrderProductRow[]) => {
-    Alert.alert('가져오기', `${rows.length}개 발주 상품을 등록할까요?`, [
+  const confirmImport = (rows: ParsedOrderProductRow[], newCount: number, updateCount: number) => {
+    Alert.alert('올리기', `새 상품 ${newCount}개를 추가하고 ${updateCount}개를 수정할까요?`, [
       { text: '취소', style: 'cancel' },
-      { text: '가져오기', onPress: () => runImport(rows) },
+      { text: '올리기', onPress: () => runImport(rows) },
     ]);
   };
 
@@ -125,17 +133,19 @@ export default function OrderCsvImportScreen() {
       className="flex-1 bg-bg"
       contentContainerStyle={{ padding: 16, paddingBottom: Math.max(insets.bottom, 16) + 16 }}
     >
-      <Text className="text-ink text-2xl font-bold">발주 상품 CSV로 가져오기</Text>
+      <Text className="text-ink text-2xl font-bold">엑셀로 한 번에 관리</Text>
       <Text className="text-muted mt-2 text-sm leading-5">
-        엑셀 등에서 저장한 CSV 파일로 발주 상품을 한 번에 등록해요.{'\n'}
-        템플릿의 예시 행은 지우고 실제 상품으로 바꿔서 사용하세요.
+        1. 엑셀로 내려받기 — 지금 등록된 상품 전체가 들어 있어요(없으면 예시 1줄).{'\n'}
+        2. 엑셀에서 고치거나 맨 아래에 새 상품을 추가해 저장해요.{'\n'}
+        3. 파일 올리기 — ID가 있는 줄은 수정, ID가 빈 줄은 새 상품으로 등록돼요.{'\n'}
+        ID 칸은 고치지 마세요. 사진과 납품상태는 그대로 유지돼요. CSV 파일도 올릴 수 있어요.
       </Text>
 
       <Pressable
-        onPress={shareTemplate}
+        onPress={downloadSheet}
         className="mt-6 items-center rounded-xl border border-line bg-paper p-4 active:opacity-70"
       >
-        <Text className="text-ink text-base font-bold">템플릿 받기</Text>
+        <Text className="text-ink text-base font-bold">엑셀로 내려받기</Text>
       </Pressable>
 
       <Pressable
@@ -143,13 +153,13 @@ export default function OrderCsvImportScreen() {
         disabled={state.step === 'importing'}
         className="mt-3 items-center rounded-xl bg-primary p-4 active:opacity-80"
       >
-        <Text className="text-paper text-base font-bold">CSV 파일 선택</Text>
+        <Text className="text-paper text-base font-bold">파일 올리기 (엑셀·CSV)</Text>
       </Pressable>
 
       {state.step === 'parsed' ? (
         <View className="mt-6 rounded-xl border border-line bg-paper p-4">
           <Text className="text-ink text-base font-bold">
-            정상 {state.rows.length}개 / 오류 {state.errors.length}개
+            새 상품 {state.newCount}개 · 수정 {state.updateCount}개 / 오류 {state.errors.length}개
           </Text>
           {state.errors.slice(0, 5).map((err, i) => (
             <Text key={i} className="text-muted mt-2 text-xs">
@@ -161,7 +171,7 @@ export default function OrderCsvImportScreen() {
           ) : null}
 
           <Pressable
-            onPress={() => confirmImport(state.rows)}
+            onPress={() => confirmImport(state.rows, state.newCount, state.updateCount)}
             disabled={state.rows.length === 0}
             className={`mt-4 items-center rounded-xl p-4 ${
               state.rows.length === 0 ? 'bg-line' : 'bg-primary active:opacity-80'
@@ -172,7 +182,7 @@ export default function OrderCsvImportScreen() {
                 state.rows.length === 0 ? 'text-muted' : 'text-paper'
               }`}
             >
-              {state.rows.length}개 가져오기
+              {state.rows.length}개 올리기
             </Text>
           </Pressable>
         </View>

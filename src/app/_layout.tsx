@@ -81,12 +81,12 @@ export default function RootLayout() {
           <Stack.Screen name="recipes" options={{ title: '레시피 추천' }} />
           <Stack.Screen name="recipe-video" options={{ title: '레시피 영상' }} />
           <Stack.Screen name="settings" options={{ title: '설정' }} />
-          <Stack.Screen name="csv-import" options={{ title: 'CSV로 가져오기' }} />
+          <Stack.Screen name="csv-import" options={{ title: '엑셀·CSV로 가져오기' }} />
         </Stack.Protected>
         <Stack.Protected guard={authed && mode === 'retail'}>
           <Stack.Screen name="order" options={{ title: '발주 관리' }} />
           <Stack.Screen name="order-product-form" options={{ title: '발주 상품' }} />
-          <Stack.Screen name="order-csv-import" options={{ title: '발주 상품 CSV로 가져오기' }} />
+          <Stack.Screen name="order-csv-import" options={{ title: '발주 상품 가져오기' }} />
           <Stack.Screen name="margin-calculator" options={{ title: '원가 계산기' }} />
           <Stack.Screen
             name="order-cart"

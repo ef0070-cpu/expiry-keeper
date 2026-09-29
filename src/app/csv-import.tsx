@@ -1,20 +1,14 @@
 import * as DocumentPicker from 'expo-document-picker';
-import { File, Paths } from 'expo-file-system';
-import { StorageAccessFramework } from 'expo-file-system/legacy';
-import * as Sharing from 'expo-sharing';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ParsedProductRow, parseProductCsv } from '@/lib/csv-import';
+import { readPickedRows, saveXlsxTemplate } from '@/lib/spreadsheet-file';
+import { ParsedProductRow, parseProductRows } from '@/lib/csv-import';
 import { scheduleExpiryAlerts } from '@/lib/notifications';
 import { newId, saveProduct } from '@/lib/repo';
 import { getCachedAppMode } from '@/lib/settings';
 import { Product } from '@/lib/types';
-
-const TEMPLATE_CSV =
-  '﻿상품명,유통기한,바코드,수량,카테고리,메모\n' +
-  '딸기우유,2026-12-31,8801234567890,3,냉장;유제품,예시 행입니다. 지우고 사용하세요\n';
 
 type ImportState =
   | { step: 'idle' }
@@ -28,33 +22,13 @@ export default function CsvImportScreen() {
 
   const shareTemplate = async () => {
     try {
-      // Android는 expo-sharing이 다른 앱으로 "보내기"만 할 뿐이라, 고른 앱이 저장을 지원
-      // 안 하면(예: 채팅 앱) 공유 시트는 뜨는데 실제로는 아무 파일도 안 남는다 — SAF로
-      // 사용자가 고른 폴더(기본으로 다운로드 폴더를 먼저 보여줌)에 직접 써서 확실히 남긴다.
-      if (Platform.OS === 'android') {
-        const downloadsHint = StorageAccessFramework.getUriForDirectoryInRoot('Download');
-        const perm = await StorageAccessFramework.requestDirectoryPermissionsAsync(downloadsHint);
-        if (!perm.granted) return;
-        const fileUri = await StorageAccessFramework.createFileAsync(
-          perm.directoryUri,
-          'expiry-keeper-template',
-          'text/csv',
-        );
-        await StorageAccessFramework.writeAsStringAsync(fileUri, TEMPLATE_CSV);
-        Alert.alert('저장 완료', '선택한 폴더에 템플릿 파일을 저장했어요.');
-        return;
-      }
-
-      const file = new File(Paths.cache, 'expiry-keeper-template.csv');
-      if (file.exists) file.delete();
-      file.create();
-      file.write(TEMPLATE_CSV);
-      const available = await Sharing.isAvailableAsync();
-      if (!available) {
-        Alert.alert('공유 불가', '이 기기에서는 파일 공유를 지원하지 않아요.');
-        return;
-      }
-      await Sharing.shareAsync(file.uri, { mimeType: 'text/csv' });
+      // 엑셀 템플릿 — 바코드·날짜 칸을 미리 텍스트 형식으로 지정해, 엑셀이 13자리 바코드를
+      // 8.80908E+12로 바꿔 뒷자리가 사라지는 것을 막는다(CSV로는 막을 방법이 없음)
+      const { buildTemplateXlsx } = await import('@/lib/xlsx-io');
+      await saveXlsxTemplate(
+        'expiry-keeper-template',
+        buildTemplateXlsx(["상품명","유통기한","바코드","수량","카테고리","메모"], [["딸기우유","2026-12-31","8801234567890",3,"냉장;유제품","예시 행입니다. 지우고 사용하세요"]], ["유통기한","바코드"]),
+      );
     } catch (e) {
       Alert.alert('오류', e instanceof Error ? e.message : '템플릿을 만들지 못했어요.');
     }
@@ -63,13 +37,17 @@ export default function CsvImportScreen() {
   const pickFile = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: ['text/csv', 'text/comma-separated-values', 'text/plain', '*/*'],
+        type: [
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'text/csv',
+          'text/comma-separated-values',
+          'text/plain',
+          '*/*',
+        ],
         copyToCacheDirectory: true,
       });
       if (result.canceled || !result.assets?.[0]) return;
-      const picked = new File(result.assets[0].uri);
-      const text = await picked.text();
-      const { rows, errors } = parseProductCsv(text);
+      const { rows, errors } = parseProductRows(await readPickedRows(result.assets[0]));
       setState({ step: 'parsed', rows, errors });
     } catch (e) {
       Alert.alert('오류', e instanceof Error ? e.message : '파일을 읽지 못했어요.');
@@ -107,6 +85,14 @@ export default function CsvImportScreen() {
       setState((prev) => (prev.step === 'importing' ? { ...prev, done: prev.done + 1 } : prev));
     }
     setState({ step: 'done', success, failed, firstError });
+    // 끝났다는 걸 확실히 알 수 있게 팝업으로도 알린다(결과 카드는 그대로 남음)
+    Alert.alert(
+      failed > 0 ? '등록 결과' : '등록 완료',
+      failed > 0
+        ? `${success}개 등록 완료 되었습니다.\n${failed}개는 저장하지 못했어요.${firstError ? `\n사유: ${firstError}` : ''}`
+        : `${success}개 상품이 등록 완료 되었습니다.`,
+      [{ text: '확인', onPress: () => router.back() }],
+    );
   };
 
   const confirmImport = (rows: ParsedProductRow[]) => {
@@ -121,9 +107,9 @@ export default function CsvImportScreen() {
       className="flex-1 bg-bg"
       contentContainerStyle={{ padding: 16, paddingBottom: Math.max(insets.bottom, 16) + 16 }}
     >
-      <Text className="text-ink text-2xl font-bold">CSV로 가져오기</Text>
+      <Text className="text-ink text-2xl font-bold">엑셀·CSV로 가져오기</Text>
       <Text className="text-muted mt-2 text-sm leading-5">
-        엑셀 등에서 저장한 CSV 파일로 상품을 한 번에 등록해요.{'\n'}
+        엑셀 템플릿에 입력해 저장한 파일을 그대로 올리면 한 번에 등록돼요(CSV도 돼요).{'\n'}
         사진은 CSV로 옮길 수 없어 등록 후 사진 없이 저장돼요.
       </Text>
 
@@ -131,7 +117,7 @@ export default function CsvImportScreen() {
         onPress={shareTemplate}
         className="mt-6 items-center rounded-xl border border-line bg-paper p-4 active:opacity-70"
       >
-        <Text className="text-ink text-base font-bold">템플릿 받기</Text>
+        <Text className="text-ink text-base font-bold">엑셀 템플릿 받기</Text>
       </Pressable>
 
       <Pressable
@@ -139,7 +125,7 @@ export default function CsvImportScreen() {
         disabled={state.step === 'importing'}
         className="mt-3 items-center rounded-xl bg-primary p-4 active:opacity-80"
       >
-        <Text className="text-paper text-base font-bold">CSV 파일 선택</Text>
+        <Text className="text-paper text-base font-bold">파일 선택 (엑셀·CSV)</Text>
       </Pressable>
 
       {state.step === 'parsed' ? (

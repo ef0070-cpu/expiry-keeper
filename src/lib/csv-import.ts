@@ -58,7 +58,11 @@ export interface ParsedCsvResult {
 }
 
 export function parseProductCsv(text: string): ParsedCsvResult {
-  const lines = parseCsvLines(text);
+  return parseProductRows(parseCsvLines(text));
+}
+
+/** 행 목록(CSV 또는 엑셀에서 읽은 것)을 검증한다. 첫 행은 머리글. */
+export function parseProductRows(lines: string[][]): ParsedCsvResult {
   if (lines.length === 0) {
     return { rows: [], errors: [{ line: 0, reason: '파일이 비어있습니다' }] };
   }
@@ -106,11 +110,16 @@ export function parseProductCsv(text: string): ParsedCsvResult {
     const barcodeRaw = (barcodeIdx === -1 ? '' : (cols[barcodeIdx] ?? '')).trim();
     const categoriesRaw = (categoriesIdx === -1 ? '' : (cols[categoriesIdx] ?? '')).trim();
     const memoRaw = (memoIdx === -1 ? '' : (cols[memoIdx] ?? '')).trim();
+    const barcodeCheck = checkCsvBarcode(barcodeRaw);
+    if ('error' in barcodeCheck) {
+      errors.push({ line, reason: barcodeCheck.error });
+      continue;
+    }
 
     rows.push({
       name,
       expiryDate,
-      barcode: barcodeRaw || null,
+      barcode: barcodeCheck.barcode,
       quantity,
       categories: categoriesRaw
         ? categoriesRaw.split(';').map((c) => c.trim()).filter((c) => c.length > 0)
@@ -120,4 +129,19 @@ export function parseProductCsv(text: string): ParsedCsvResult {
   }
 
   return { rows, errors };
+}
+
+/** CSV 바코드 칸 검사(유통기한·발주 가져오기 공용). 비어 있으면 null, 이상하면 사유 문자열.
+ * 엑셀은 13자리 바코드를 숫자로 보고 8.80908E+12 같은 지수로 바꿔 저장해 뒷자리가 사라진다 —
+ * 그대로 받으면 스캔으로 영영 못 찾는 상품이 생기므로 그 줄을 막고 고치는 법을 알려 준다. */
+export function checkCsvBarcode(raw: string): { barcode: string | null } | { error: string } {
+  const v = raw.trim();
+  if (!v) return { barcode: null };
+  if (/e\+?\d/i.test(v)) {
+    return {
+      error: `바코드가 ${v}처럼 줄어 저장됐어요. 엑셀에서 바코드 칸을 '텍스트' 형식으로 바꿔 숫자를 다시 입력한 뒤 저장해 주세요`,
+    };
+  }
+  if (!/^\d+$/.test(v)) return { error: `바코드는 숫자만 입력해 주세요 (${v})` };
+  return { barcode: v };
 }
