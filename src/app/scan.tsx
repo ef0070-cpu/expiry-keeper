@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { lookupBarcode } from '@/lib/barcode-lookup';
 import { listOrderProductsByBarcode } from '@/lib/order-repo';
 import { listProductsByBarcode } from '@/lib/repo';
+import { setPickedBarcode } from '@/lib/scan-pick';
 import { getScanHapticEnabled } from '@/lib/settings';
 
 // 가이드 사각형 크기 (아래 오버레이의 h-40 w-72 와 동일한 값, px 단위)
@@ -111,6 +112,22 @@ export default function Scan() {
       // params만 갱신한다(리마운트 없음 — replace는 홈 화면을 스택에 중복시킴).
       router.dismissTo({
         pathname: '/',
+        params: { scannedBarcode: data, nonce: String(Date.now()) },
+      });
+      return;
+    }
+
+    if (params.mode === 'pick') {
+      // 바코드 입력란 채우기: 읽은 값만 넘기고 부른 화면으로 돌아간다
+      setPickedBarcode(data);
+      router.back();
+      return;
+    }
+
+    if (params.mode === 'order-search') {
+      // 발주 검색: 조회·등록 없이 바코드만 들고 발주 화면 검색창으로 돌아간다
+      router.dismissTo({
+        pathname: '/order',
         params: { scannedBarcode: data, nonce: String(Date.now()) },
       });
       return;
@@ -305,7 +322,7 @@ export default function Scan() {
       </View>
 
       {/* 직접 입력 (검색 모드에서는 의미가 없으므로 숨김) */}
-      {params.mode !== 'search' ? (
+      {params.mode !== 'search' && params.mode !== 'order-search' && params.mode !== 'pick' ? (
         <View
           className="absolute w-full items-center"
           style={{ bottom: Math.max(insets.bottom, 48) + 24 }}

@@ -15,6 +15,7 @@ import {
 import Chip from '@/components/Chip';
 import Fab from '@/components/Fab';
 import ProductCard from '@/components/ProductCard';
+import HeaderIcon from '@/components/HeaderIcon';
 import SummaryHeader from '@/components/SummaryHeader';
 import { lookupBarcode } from '@/lib/barcode-lookup';
 import { SIGNAL_ORDER, SIGNAL_TITLES, SIGNAL_BG, SignalKey, daysUntil, signalOf } from '@/lib/dates';
@@ -394,32 +395,5 @@ export default function Dashboard() {
         accessibilityLabel={mode === 'home' ? '상품 추가' : '바코드 스캔'}
       />
     </View>
-  );
-}
-
-function HeaderIcon({
-  icon,
-  label,
-  onPress,
-  color = '#1A1A1A',
-}: {
-  icon: keyof typeof MaterialCommunityIcons.glyphMap;
-  label: string;
-  onPress: () => void;
-  color?: string;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      hitSlop={8}
-      className="items-center"
-      accessibilityRole="button"
-      accessibilityLabel={label}
-    >
-      <MaterialCommunityIcons name={icon} size={27} color={color} />
-      <Text className="mt-0.5 text-[10px] leading-none" style={{ color }}>
-        {label}
-      </Text>
-    </Pressable>
   );
 }

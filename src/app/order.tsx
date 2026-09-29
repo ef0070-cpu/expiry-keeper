@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Chip from '@/components/Chip';
+import HeaderIcon from '@/components/HeaderIcon';
 import Thumbnail from '@/components/Thumbnail';
 import {
   addFridgeSection,
@@ -737,41 +738,32 @@ export default function Order() {
       <Stack.Screen
         options={{
           headerRight: () => (
-            <View className="flex-row items-center" style={{ gap: 16 }}>
+            <View className="flex-row items-center" style={{ gap: 8 }}>
               {products.length > 0 ? (
-                <Pressable
+                <HeaderIcon
+                  icon="delete-sweep-outline"
+                  label="초기화"
                   onPress={() => setShowResetConfirm(true)}
-                  hitSlop={11}
-                  accessibilityRole="button"
-                  accessibilityLabel="상품 초기화"
-                >
-                  <MaterialCommunityIcons name="delete-sweep-outline" size={22} color="#1A1A1A" />
-                </Pressable>
+                />
               ) : null}
-              <Pressable
+              <HeaderIcon
+                icon="file-delimited-outline"
+                label="CSV"
                 onPress={() => router.push('/order-csv-import')}
-                hitSlop={11}
-                accessibilityRole="button"
-                accessibilityLabel="CSV로 가져오기"
-              >
-                <MaterialCommunityIcons name="file-delimited-outline" size={22} color="#1A1A1A" />
-              </Pressable>
-              <Pressable
-                onPress={() => router.push('/scan?mode=order')}
-                hitSlop={11}
-                accessibilityRole="button"
-                accessibilityLabel="바코드 스캔"
-              >
-                <MaterialCommunityIcons name="barcode-scan" size={22} color="#1A1A1A" />
-              </Pressable>
-              <Pressable
-                onPress={() => router.push('/order-product-form')}
-                hitSlop={11}
-                accessibilityRole="button"
-                accessibilityLabel="발주 상품 등록"
-              >
-                <MaterialCommunityIcons name="plus" size={22} color="#1A1A1A" />
-              </Pressable>
+              />
+              {/* 바코드 스캔(없으면 등록 화면, 이미 있으면 목록에서 찾아 줌) 또는 바코드를 몰라도
+                  바로 등록 화면으로 — 카메라를 거치지 않게 먼저 고르게 한다 */}
+              <HeaderIcon
+                icon="plus-box-outline"
+                label="신규상품"
+                onPress={() =>
+                  Alert.alert('신규상품 등록', '어떻게 등록할까요?', [
+                    { text: '취소', style: 'cancel' },
+                    { text: '직접 입력', onPress: () => router.push('/order-product-form') },
+                    { text: '바코드 스캔', onPress: () => router.push('/scan?mode=order') },
+                  ])
+                }
+              />
             </View>
           ),
         }}
@@ -925,11 +917,20 @@ export default function Order() {
               <MaterialCommunityIcons name="magnify" size={20} color="#888888" />
               <TextInput
                 className="text-ink ml-2 flex-1 py-2.5 text-base"
-                placeholder="상품명을 입력하여 검색하세요"
+                placeholder="상품명·바코드로 검색하세요"
                 placeholderTextColor="#BBBBBB"
                 value={query}
                 onChangeText={setQuery}
               />
+              <Pressable
+                onPress={() => router.push('/scan?mode=order-search')}
+                hitSlop={10}
+                className="ml-2"
+                accessibilityRole="button"
+                accessibilityLabel="바코드로 검색"
+              >
+                <MaterialCommunityIcons name="barcode-scan" size={22} color="#1A1A1A" />
+              </Pressable>
               {query ? (
                 <Pressable
                   onPress={() => setQuery('')}
@@ -1760,7 +1761,7 @@ const CatalogRow = memo(function CatalogRow({
           </Text>
         </View>
         <Text className="text-muted mt-0.5 text-sm">
-          {product.brand} · {product.price.toLocaleString()}원
+          {product.brand} · {product.price > 0 ? `${product.price.toLocaleString()}원` : '가격 미등록'}
         </Text>
         {product.barcode ? (
           <Text className="text-muted mt-0.5 text-xs">{product.barcode}</Text>
@@ -1822,7 +1823,7 @@ const SuggestionRow = memo(function SuggestionRow({
           {product.name}
         </Text>
         <Text className="text-muted mt-0.5 text-xs" numberOfLines={1}>
-          {product.brand} · {product.price.toLocaleString()}원
+          {product.brand} · {product.price > 0 ? `${product.price.toLocaleString()}원` : '가격 미등록'}
         </Text>
       </Pressable>
       <View className="flex-row items-center">

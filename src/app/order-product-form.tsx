@@ -2,8 +2,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import * as Linking from 'expo-linking';
-import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -31,6 +31,7 @@ import {
 } from '@/lib/order-repo';
 import { deletePhotoCandidate, reportOrderProductIssue } from '@/lib/order-report';
 import { errorMessage } from '@/lib/errors';
+import { takePickedBarcode } from '@/lib/scan-pick';
 import { clearSubmittedPhotoCandidate } from '@/lib/photo-candidates';
 import { OrderProduct, OrderStatus } from '@/lib/order-types';
 
@@ -49,6 +50,13 @@ export default function OrderProductForm() {
   const [brand, setBrand] = useState('');
   const [price, setPrice] = useState('');
   const [barcode, setBarcode] = useState(params.barcode ?? '');
+  // 바코드 입력란의 스캔 버튼으로 스캔 화면에 갔다가 돌아오면 읽은 값을 채운다
+  useFocusEffect(
+    useCallback(() => {
+      const picked = takePickedBarcode();
+      if (picked) setBarcode(picked);
+    }, []),
+  );
   const [aliasesText, setAliasesText] = useState('');
   const [categories, setCategories] = useState<string[]>([]);
   const [category, setCategory] = useState('');
@@ -426,11 +434,19 @@ export default function OrderProductForm() {
           <View className="flex-row gap-2">
             <TextInput
               className="text-ink flex-1 rounded-xl border border-line bg-paper px-3 py-2.5 text-base"
-              placeholder="바코드 번호 입력 또는 스캔"
+              placeholder="바코드 번호"
               placeholderTextColor="#BBBBBB"
               value={barcode}
               onChangeText={setBarcode}
             />
+            <Pressable
+              onPress={() => router.push('/scan?mode=pick')}
+              className="items-center justify-center rounded-xl border border-line bg-paper px-3 active:opacity-70"
+              accessibilityRole="button"
+              accessibilityLabel="바코드 스캔"
+            >
+              <MaterialCommunityIcons name="barcode-scan" size={22} color="#1A1A1A" />
+            </Pressable>
             <Pressable
               onPress={checkBarcode}
               disabled={checkingBarcode}
