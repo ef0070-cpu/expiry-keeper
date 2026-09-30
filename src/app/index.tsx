@@ -243,10 +243,15 @@ export default function Dashboard() {
       />
 
       {/* 검색 */}
-      <View className="mx-4 mt-3 flex-row items-center rounded-xl border border-line bg-paper px-3">
+      {/* 오른쪽 버튼(지우기·바코드·정렬)은 붙어 있고 터치 영역(hitSlop)이 겹쳐 옆 버튼이 눌리기
+          쉬웠다 — 버튼마다 44×44 칸을 따로 주고 칸 사이를 띄운다(발주 검색창과 같은 방식) */}
+      <View
+        className="mx-4 mt-3 flex-row items-center rounded-xl border border-line bg-paper pl-3 pr-1"
+        style={{ gap: 4 }}
+      >
         <MaterialCommunityIcons name="magnify" size={20} color="#888888" />
         <TextInput
-          className="text-ink ml-2 flex-1 py-2.5 text-base"
+          className="text-ink ml-1 flex-1 py-2.5 text-base"
           placeholder="상품명, 바코드, 메모 검색"
           placeholderTextColor="#BBBBBB"
           value={query}
@@ -255,32 +260,30 @@ export default function Dashboard() {
         {query ? (
           <Pressable
             onPress={() => setQuery('')}
-            hitSlop={13}
+            className="h-11 w-11 items-center justify-center rounded-lg active:bg-bg"
             accessibilityRole="button"
             accessibilityLabel="검색어 지우기"
           >
-            <MaterialCommunityIcons name="close-circle" size={18} color="#888888" />
+            <MaterialCommunityIcons name="close-circle" size={22} color="#888888" />
           </Pressable>
         ) : null}
         <Pressable
           onPress={() => router.push('/scan?mode=search')}
-          hitSlop={12}
-          className="ml-2"
+          className="h-11 w-11 items-center justify-center rounded-lg active:bg-bg"
           accessibilityRole="button"
           accessibilityLabel="바코드로 검색"
         >
-          <MaterialCommunityIcons name="barcode-scan" size={20} color="#888888" />
+          <MaterialCommunityIcons name="barcode-scan" size={22} color="#888888" />
         </Pressable>
         <Pressable
           onPress={() => setSortBy((v) => (v === 'expiry' ? 'name' : 'expiry'))}
-          hitSlop={12}
-          className="ml-2"
+          className="h-11 w-11 items-center justify-center rounded-lg active:bg-bg"
           accessibilityRole="button"
           accessibilityLabel={sortBy === 'expiry' ? '이름순으로 정렬' : '유통기한순으로 정렬'}
         >
           <MaterialCommunityIcons
             name={sortBy === 'expiry' ? 'sort-calendar-ascending' : 'sort-alphabetical-ascending'}
-            size={20}
+            size={22}
             color="#888888"
           />
         </Pressable>

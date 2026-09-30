@@ -71,7 +71,10 @@ function SignalStat({
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${label} ${active ? '필터 해제' : '필터'}`}
+      // 라벨이 자식 글자를 대신 읽혀서 개수가 빠졌었다 — 개수와 필터 상태를 함께 읽게 한다
+      accessibilityLabel={`${label} ${value}개`}
+      accessibilityHint={active ? '누르면 필터를 해제해요' : '누르면 이 상품만 보여요'}
+      accessibilityState={{ selected: active }}
       className={`relative flex-1 items-center rounded-xl border py-3 active:opacity-70 ${
         active ? `${SIGNAL_BG[signalKey]} border-transparent` : 'border-line bg-paper'
       }`}

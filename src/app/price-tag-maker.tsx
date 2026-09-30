@@ -124,7 +124,8 @@ export default function PriceTagMaker() {
       {/* 네이티브 헤더는 숨기고 Modal 안에 직접 그린다 — Modal은 별도 네이티브 레이어라
        * 헤더까지 함께 가려지기 때문. 아래 SafeAreaView 헤더가 이를 대체한다. */}
       <Stack.Screen options={{ title: '가격표 만들기', headerShown: false }} />
-      <Modal visible transparent={false} animationType="none">
+      {/* onRequestClose가 없으면 안드로이드 뒤로 가기 버튼·제스처가 이 Modal에 막혀 아무 반응이 없었다 */}
+      <Modal visible transparent={false} animationType="none" onRequestClose={() => router.back()}>
         <SafeAreaView edges={['top']} style={{ backgroundColor: '#FFFFFF' }}>
           <View
             style={{

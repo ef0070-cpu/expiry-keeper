@@ -15,6 +15,10 @@ export default function Chip({
     <Pressable
       onPress={onPress}
       onLongPress={onLongPress}
+      // 화면 읽기 기능이 어떤 분류가 선택됐는지 알 수 있게 — 색으로만 구분하던 상태를 전달
+      accessibilityRole="button"
+      accessibilityLabel={label === '+' ? '추가' : label}
+      accessibilityState={{ selected: active }}
       className={`self-start justify-center rounded-full border px-3.5 py-1.5 ${
         active ? 'border-primary bg-primary' : 'border-line bg-paper'
       }`}

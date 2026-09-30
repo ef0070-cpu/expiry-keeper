@@ -61,7 +61,8 @@ import { buildProductSearchIndex, searchOrderProducts } from '@/lib/order-search
 const STATUS_META: Record<OrderStatus, { label: string; color: string }> = {
   active: { label: '시판중', color: '#2E7D32' },
   discontinued: { label: '단종', color: '#C62828' },
-  paused: { label: '생산중단', color: '#F9A825' },
+  // 흰 글자라 밝은 노랑(#F9A825, 대비 2:1)은 안 보였다 — 앱의 '임박' 주황과 같은 진한 색
+  paused: { label: '생산중단', color: '#B45309' },
 };
 
 const UPDATE_BADGE_META: Record<CatalogUpdateBadge, { label: string; color: string }> = {
@@ -859,6 +860,8 @@ export default function Order() {
       <View className="mx-4 mt-3 flex-row gap-2">
         <Pressable
           onPress={() => setMode('search')}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: mode === 'search' }}
           className={`flex-1 items-center rounded-xl border py-2.5 ${
             mode === 'search' ? 'border-primary' : 'border-line'
           }`}
@@ -869,6 +872,8 @@ export default function Order() {
         </Pressable>
         <Pressable
           onPress={() => setMode('quick')}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: mode === 'quick' }}
           className={`flex-1 items-center rounded-xl border py-2.5 ${
             mode === 'quick' ? 'border-primary' : 'border-line'
           }`}
@@ -925,10 +930,15 @@ export default function Order() {
       {mode === 'search' ? (
         <>
           <View className="relative mx-4 mt-3" style={{ zIndex: 10 }}>
-            <View className="flex-row items-center rounded-xl border border-line bg-paper px-3">
+            {/* 오른쪽 버튼(바코드·지우기·목록 접기)은 붙어 있고 터치 영역(hitSlop)이 서로 겹쳐 옆
+                버튼이 눌리기 쉬웠다 — 버튼마다 44×44 칸을 따로 주고 칸 사이를 띄운다(hitSlop 없음) */}
+            <View
+              className="flex-row items-center rounded-xl border border-line bg-paper pl-3 pr-1"
+              style={{ gap: 4 }}
+            >
               <MaterialCommunityIcons name="magnify" size={20} color="#888888" />
               <TextInput
-                className="text-ink ml-2 flex-1 py-2.5 text-base"
+                className="text-ink ml-1 flex-1 py-2.5 text-base"
                 placeholder="상품명·바코드로 검색하세요"
                 placeholderTextColor="#BBBBBB"
                 value={query}
@@ -936,8 +946,7 @@ export default function Order() {
               />
               <Pressable
                 onPress={() => router.push('/scan?mode=order-search')}
-                hitSlop={10}
-                className="ml-2"
+                className="h-11 w-11 items-center justify-center rounded-lg active:bg-bg"
                 accessibilityRole="button"
                 accessibilityLabel="바코드로 검색"
               >
@@ -946,7 +955,7 @@ export default function Order() {
               {query ? (
                 <Pressable
                   onPress={() => setQuery('')}
-                  hitSlop={13}
+                  className="h-11 w-11 items-center justify-center rounded-lg active:bg-bg"
                   accessibilityRole="button"
                   accessibilityLabel="검색어 지우기"
                 >
@@ -956,8 +965,7 @@ export default function Order() {
               {suggestions.length > 0 ? (
                 <Pressable
                   onPress={() => setSuggestionsCollapsed((v) => !v)}
-                  hitSlop={12}
-                  className="ml-2"
+                  className="h-11 w-11 items-center justify-center rounded-lg active:bg-bg"
                   accessibilityRole="button"
                   accessibilityLabel={suggestionsCollapsed ? '추천 목록 펼치기' : '추천 목록 접기'}
                 >
