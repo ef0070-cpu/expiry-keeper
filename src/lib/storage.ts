@@ -18,13 +18,19 @@ export async function uploadPhotoToBucket(
   if (!supabase) return null;
   if (!forceUpload && uri.startsWith('http')) return uri;
   try {
+    // 사용자 폴더 아래에 올린다 — 서버는 덮어쓰기를 올린 본인에게만 허락하므로(보안 점검 2026-09-30),
+    // 공용 경로(상품ID.jpg)에 올리면 팀원이 먼저 올린 같은 이름 사진을 바꿀 때 실패한다
+    const { data: auth } = await supabase.auth.getSession();
+    const userId = auth.session?.user.id;
+    if (!userId) return null;
+    const fullPath = `${userId}/${path}`;
     const res = await fetch(uri);
     const buffer = await res.arrayBuffer();
     const { error } = await supabase.storage
       .from(bucket)
-      .upload(path, buffer, { contentType: 'image/jpeg', upsert: true });
+      .upload(fullPath, buffer, { contentType: 'image/jpeg', upsert: true });
     if (error) return null;
-    const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+    const { data } = supabase.storage.from(bucket).getPublicUrl(fullPath);
     return data.publicUrl;
   } catch {
     return null;
