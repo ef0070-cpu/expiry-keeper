@@ -3,7 +3,7 @@
     "name": "유통기한 매니저",
     "slug": "expiry-keeper",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "expirykeeper",
     "userInterfaceStyle": "light",
@@ -79,11 +79,12 @@
         "expo-build-properties",
         {
           "android": {
-            "enableProguardInReleaseBuilds": true,
+            "enableMinifyInReleaseBuilds": true,
             "enableShrinkResourcesInReleaseBuilds": true
           }
         }
-      ]
+      ],
+      "./plugins/withR8Optimize"
     ],
     "experiments": {
       "typedRoutes": true,
