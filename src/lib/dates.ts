@@ -50,17 +50,18 @@ export const SIGNAL_TITLES: Record<SignalKey, string> = {
 export const SIGNAL_ORDER: SignalKey[] = ['red', 'yellow', 'green'];
 
 // 배지/섹션 점/통계 카드에서 공통으로 사용하는 배경색
+// 색 값은 tailwind.config.js의 sig-* (유통기한 상태 전용 색)
 export const SIGNAL_BG: Record<SignalKey, string> = {
-  red: 'bg-primary',
-  yellow: 'bg-warn',
-  green: 'bg-ok',
+  red: 'bg-sig-red',
+  yellow: 'bg-sig-yellow',
+  green: 'bg-sig-green',
 };
 
 // 통계 카드 비활성 상태의 숫자 색
 export const SIGNAL_TEXT: Record<SignalKey, string> = {
-  red: 'text-primary',
-  yellow: 'text-warn',
-  green: 'text-ok',
+  red: 'text-sig-red',
+  yellow: 'text-sig-yellow',
+  green: 'text-sig-green',
 };
 
 /** YYYY-MM-DD 형식인지 + 실제 존재하는 날짜인지 검사 */
