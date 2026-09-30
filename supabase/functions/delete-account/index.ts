@@ -54,6 +54,11 @@ Deno.serve(async (req) => {
     // 사진 정리 — 계정을 지우기 전에(누가 올렸는지 알 수 있을 때) 한다. 다른 사람이 쓰는 사진은
     // 남기고 소유자 정보만 지우며, 개인 사진만 파일째 삭제(migration-account-photo-cleanup.sql).
     // 실패해도 탈퇴는 막지 않는다(탈퇴 요청이 우선) — 남은 개수를 응답에 담아 추적할 수 있게 한다.
+    // 혼자 쓰던 발주 데이터(매장·발주 상품·분류) 삭제 — 발주 테이블은 계정과 FK 연결이 없어 탈퇴해도
+    // 남았다. 사진 정리보다 먼저: 지워질 발주 상품이 가리키던 사진이 '사용 중'으로 남지 않게.
+    const { error: orderError } = await adminClient.rpc('account_order_cleanup', { p_uid: uid });
+    if (orderError) console.error('account_order_cleanup failed', orderError.message);
+
     let photosDeleted = 0;
     let photosFailed = 0;
     const { data: photos, error: photoError } = await adminClient.rpc('account_photo_cleanup', {
