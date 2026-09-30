@@ -1,5 +1,35 @@
 {
   "enabledPlugins": {
     "expo@claude-plugins-official": true
+  },
+  "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(**/credentials.json)",
+      "Read(**/*.keystore)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(rm -rf:*)",
+      "Bash(eas submit:*)",
+      "Bash(sudo:*)",
+      "Bash(chmod 777:*)",
+      "Bash(ssh:*)",
+      "Write(/dev/**)"
+    ],
+    "ask": [
+      "Bash(git push:*)",
+      "Bash(npx supabase db:*)",
+      "Bash(eas build:*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Read|Edit|Write",
+        "hooks": [{ "type": "command", "command": "node .claude/hooks/guard.js" }]
+      }
+    ]
   }
 }
