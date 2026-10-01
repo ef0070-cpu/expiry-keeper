@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import Chip from '@/components/Chip';
 import Fab from '@/components/Fab';
+import HomeBanner, { adsAvailable } from '@/components/HomeBanner';
 import ProductCard from '@/components/ProductCard';
 import HeaderIcon from '@/components/HeaderIcon';
 import SummaryHeader from '@/components/SummaryHeader';
@@ -348,6 +349,9 @@ export default function Dashboard() {
         </Pressable>
       ) : null}
 
+      {/* 목록 + 상품추가 버튼은 위 영역, 가정용 애드몹 배너는 그 아래 고정 — 버튼이 배너에 붙지 않아
+          잘못 눌러 광고가 클릭되는 일(애드몹 정책 위반)이 없게 */}
+      <View className="flex-1">
       <SectionList
         sections={sections}
         keyExtractor={(item) => item.id}
@@ -396,7 +400,10 @@ export default function Dashboard() {
         icon={mode === 'home' ? 'plus' : 'barcode-scan'}
         label={mode === 'home' ? '상품추가' : undefined}
         accessibilityLabel={mode === 'home' ? '상품 추가' : '바코드 스캔'}
+        bottom={mode === 'home' && adsAvailable ? 24 : undefined}
       />
+      </View>
+      {mode === 'home' ? <HomeBanner /> : null}
     </View>
   );
 }

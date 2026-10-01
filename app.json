@@ -92,6 +92,13 @@
           "enableMicrophonePermission": false,
           "enableFrameProcessors": false
         }
+      ],
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-9764423893666665~3171270388",
+          "delayAppMeasurementInit": true
+        }
       ]
     ],
     "experiments": {
