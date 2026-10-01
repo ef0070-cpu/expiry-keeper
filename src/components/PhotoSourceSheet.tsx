@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, Text, View } from 'react-native';
 import ImageCandidatesModal from '@/components/ImageCandidatesModal';
 import { hasImageSearchKeys, lookupBarcode, searchProductImageCandidates } from '@/lib/barcode-lookup';
-import { dedupeByImage } from '@/lib/image-dedupe';
 import { uploadPhotoToBucket } from '@/lib/storage';
 
 /**
@@ -48,15 +47,14 @@ export default function PhotoSourceSheet({
     }
     setSearching(true);
     try {
-      const urls: string[] = [];
+      // 바코드 사진·상품명 검색을 동시에. 미리 사진을 전부 내려받아 비교하던 단계(dedupeByImage)는
+      // 원본 크기 사진을 다 받느라 느려서 뺐다 — 같은 주소만 합치고, 못 여는 사진은 목록이 스스로 숨긴다.
       const code = web.barcode?.trim();
-      if (code) {
-        const info = await lookupBarcode(code);
-        if (info.imageUrl) urls.push(info.imageUrl);
-      }
-      for (const u of await searchProductImageCandidates(name)) if (!urls.includes(u)) urls.push(u);
-      // 주소만 다른 같은 사진은 하나로, 못 불러오는 사진은 빼고 보여 준다
-      const shown = await dedupeByImage(urls, (u) => u);
+      const [info, found] = await Promise.all([
+        code ? lookupBarcode(code) : Promise.resolve(null),
+        searchProductImageCandidates(name),
+      ]);
+      const shown = [...new Set([...(info?.imageUrl ? [info.imageUrl] : []), ...found])];
       if (shown.length === 0) {
         Alert.alert('검색 결과 없음', '사진을 찾지 못했습니다. 직접 촬영해 주세요.');
         return;

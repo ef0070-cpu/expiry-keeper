@@ -89,7 +89,7 @@ export default function CoupangRebuyCard({
           <Text className="text-ink text-base font-bold" numberOfLines={1}>
             {name.trim()}
           </Text>
-          <Text className="text-muted mt-0.5 text-xs">쿠팡에서 바로 찾아보기</Text>
+          <TypingText text={`🔍 ${name.trim()} 찾아보기`} still={reduceMotion} />
         </View>
         <View className="flex-row items-center rounded-full bg-primary px-3 py-2">
           <Animated.View style={cartStyle}>
@@ -100,5 +100,25 @@ export default function CoupangRebuyCard({
       </Pressable>
       <Text className="text-muted mt-1.5 text-center text-[11px]">{COUPANG_DISCLOSURE}</Text>
     </Animated.View>
+  );
+}
+
+/** 검색어를 한 글자씩 치는 효과: 다 치면 2초 멈췄다가 처음부터. still이면(동작 줄이기) 그냥 전체 표시. */
+function TypingText({ text, still }: { text: string; still: boolean }) {
+  const [count, setCount] = useState(still ? text.length : 0);
+  useEffect(() => {
+    if (still) {
+      setCount(text.length);
+      return;
+    }
+    const delay = count >= text.length ? 2000 : 90;
+    const t = setTimeout(() => setCount((c) => (c >= text.length ? 0 : c + 1)), delay);
+    return () => clearTimeout(t);
+  }, [count, text, still]);
+  return (
+    <Text className="text-muted mt-0.5 text-xs" numberOfLines={1} accessibilityLabel={text}>
+      {text.slice(0, count)}
+      {still ? '' : '▍'}
+    </Text>
   );
 }

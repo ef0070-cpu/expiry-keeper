@@ -37,6 +37,7 @@ import {
 } from '@/lib/repo';
 import { AppMode, useAppMode, useCoupangSuggestEnabled, useDateInputMethod, useDateOcrOrder } from '@/lib/settings';
 import CoupangRebuyCard from '@/components/CoupangRebuyCard';
+import CoupangSearchWidget from '@/components/CoupangSearchWidget';
 import { Product, ProductStatus } from '@/lib/types';
 
 export default function ProductForm() {
@@ -736,6 +737,9 @@ export default function ProductForm() {
         {isEdit && mode === 'home' && coupangSuggest && name.trim() ? (
           <View className="mt-5">
             <CoupangRebuyCard name={name} imageUri={imageUri} />
+            <View className="mt-3">
+              <CoupangSearchWidget />
+            </View>
           </View>
         ) : null}
       </ScrollView>
