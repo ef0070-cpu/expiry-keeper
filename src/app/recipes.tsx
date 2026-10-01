@@ -1,7 +1,8 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { Alert, FlatList, Pressable, Text, View } from 'react-native';
+import { Alert, FlatList, Pressable, ScrollView, Text, View } from 'react-native';
+import HomeBanner from '@/components/HomeBanner';
 import { daysUntil, ddayLabel } from '@/lib/dates';
 import { RecipeMatch, matchRecipes, urgentProducts } from '@/lib/recipes';
 import { listProducts } from '@/lib/repo';
@@ -56,6 +57,8 @@ export default function Recipes() {
   }, []);
 
   return (
+    // 레시피 목록 아래에 애드몹 배너 고정(가정용 전용 화면). 쿠팡 칩과 붙지 않게 배너는 목록 밖에 둔다
+    <View className="flex-1 bg-bg">
     <FlatList
       className="flex-1 bg-bg"
       contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
@@ -85,12 +88,14 @@ export default function Recipes() {
       }
       ListHeaderComponent={
         urgent.length > 0 ? (
-          <View className="mb-4 rounded-xl border border-line bg-paper p-4">
+          // 절반 크기: 안내 문구를 제목 줄에 합치고, 재료 칩은 한 줄 가로 스크롤
+          <View className="mb-3 rounded-xl border border-line bg-paper px-3 py-2.5">
             <View className="flex-row items-center justify-between">
-              <Text className="text-ink flex-1 text-sm font-bold">
+              <Text className="text-ink flex-1 text-xs font-bold">
                 {picked.length > 0
                   ? `선택한 재료 ${picked.length}개로 추천 중`
                   : `7일 이내 소진해야 할 재료 ${urgent.length}개`}
+                <Text className="text-muted font-normal">  · 눌러서 고르기</Text>
               </Text>
               {picked.length > 0 ? (
                 <Pressable
@@ -102,8 +107,12 @@ export default function Recipes() {
                 </Pressable>
               ) : null}
             </View>
-            <Text className="text-muted mt-1 text-xs">재료를 눌러 원하는 것만 골라보세요</Text>
-            <View className="mt-2.5 flex-row flex-wrap gap-2">
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              className="mt-2"
+              contentContainerStyle={{ gap: 6 }}
+            >
               {urgent.map((p) => {
                 const on = selectedIds.has(p.id);
                 return (
@@ -112,22 +121,22 @@ export default function Recipes() {
                     onPress={() => toggle(p.id)}
                     accessibilityRole="checkbox"
                     accessibilityState={{ checked: on }}
-                    className={`flex-row items-center rounded-full border px-3 py-1.5 active:opacity-70 ${
+                    className={`flex-row items-center rounded-full border px-2.5 py-1 active:opacity-70 ${
                       on ? 'border-primary bg-primary' : 'border-line bg-bg'
                     }`}
                   >
-                    <Text className={`text-sm ${on ? 'text-paper font-bold' : 'text-ink'}`}>
+                    <Text className={`text-xs ${on ? 'text-paper font-bold' : 'text-ink'}`}>
                       {p.name}
                     </Text>
                     <Text
-                      className={`ml-1.5 text-xs font-bold ${on ? 'text-paper' : 'text-primary'}`}
+                      className={`ml-1 text-[10px] font-bold ${on ? 'text-paper' : 'text-primary'}`}
                     >
                       {ddayLabel(daysUntil(p.expiryDate))}
                     </Text>
                   </Pressable>
                 );
               })}
-            </View>
+            </ScrollView>
           </View>
         ) : null
       }
@@ -148,6 +157,8 @@ export default function Recipes() {
         </View>
       }
     />
+    <HomeBanner />
+    </View>
   );
 }
 
