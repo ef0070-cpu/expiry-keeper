@@ -583,37 +583,7 @@ export default function ProductForm() {
         {/* 유통기한 + 수량 (한 줄 배치) */}
         <View className="mt-4 flex-row gap-3">
           <View className="flex-1">
-            {/* 좁은 화면·넓은 글꼴에서 버튼이 옆 '수량'과 겹치지 않게 넘치면 다음 줄로 */}
-            <View className="flex-row flex-wrap items-center justify-between" style={{ rowGap: 4 }}>
-              <Label text="유통기한 *" />
-              <View className="flex-row flex-wrap items-center" style={{ gap: 12 }}>
-              <Pressable
-                onPress={() => setLiveScanVisible(true)}
-                className="flex-row items-center"
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel="카메라로 유통기한 자동 인식"
-              >
-                <MaterialCommunityIcons name="line-scan" size={15} color="#CC2222" />
-                <Text className="text-primary ml-1 text-xs font-medium">자동 인식</Text>
-              </Pressable>
-              <Pressable
-                onPress={scanExpiryDatePhoto}
-                disabled={ocrBusy}
-                className="flex-row items-center"
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel="사진으로 유통기한 인식"
-              >
-                {ocrBusy ? (
-                  <ActivityIndicator size="small" color="#CC2222" />
-                ) : (
-                  <MaterialCommunityIcons name="text-recognition" size={15} color="#CC2222" />
-                )}
-                <Text className="text-primary ml-1 text-xs font-medium">사진으로 인식</Text>
-              </Pressable>
-              </View>
-            </View>
+            <Label text="유통기한 *" />
             {liveScanVisible ? (
               <ExpiryLiveScanModal
                 dateOcrOrder={dateOcrOrder}
@@ -673,6 +643,34 @@ export default function ProductForm() {
                 ) : null}
               </View>
             ) : null}
+            {/* 인식 버튼은 입력칸 아래 — 제목 줄에 두면 좁은 화면에서 두 줄로 밀려 옆 '수량'과 높이가 어긋났다 */}
+            <View className="mt-2 flex-row flex-wrap items-center" style={{ columnGap: 14, rowGap: 6 }}>
+              <Pressable
+                onPress={() => setLiveScanVisible(true)}
+                className="flex-row items-center"
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="카메라로 유통기한 자동 인식"
+              >
+                <MaterialCommunityIcons name="line-scan" size={15} color="#CC2222" />
+                <Text className="text-primary ml-1 text-xs font-medium">자동 인식</Text>
+              </Pressable>
+              <Pressable
+                onPress={scanExpiryDatePhoto}
+                disabled={ocrBusy}
+                className="flex-row items-center"
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="사진으로 유통기한 인식"
+              >
+                {ocrBusy ? (
+                  <ActivityIndicator size="small" color="#CC2222" />
+                ) : (
+                  <MaterialCommunityIcons name="text-recognition" size={15} color="#CC2222" />
+                )}
+                <Text className="text-primary ml-1 text-xs font-medium">사진으로 인식</Text>
+              </Pressable>
+            </View>
             <Pressable onPress={() => setManufactureCalcVisible(true)} className="mt-1.5">
               <Text className="text-muted text-xs underline">제조일+기간으로 계산</Text>
             </Pressable>
