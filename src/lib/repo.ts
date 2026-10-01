@@ -112,6 +112,13 @@ export function getCachedCategories(): string[] {
   return [...set].sort();
 }
 
+/** 목록 화면이 받아 둔 현재 모드의 보관 중 상품(서버를 다시 부르지 않음). 레시피 화면이 열리자마자
+ * 그리게 — 예전엔 매번 서버 응답을 기다리는 동안 "임박한 재료가 없어요"가 먼저 보였다. */
+export function getCachedActiveProducts(): Product[] {
+  const mode = getCachedAppMode() ?? 'retail';
+  return [...productCache.values()].filter((p) => p.mode === mode && p.status === 'active');
+}
+
 function remember(items: Product[]): Product[] {
   items.forEach((p) => productCache.set(p.id, p));
   return items;

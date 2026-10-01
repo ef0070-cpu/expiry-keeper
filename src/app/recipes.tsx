@@ -2,12 +2,12 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, FlatList, LayoutAnimation, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, LayoutAnimation, Pressable, ScrollView, Text, View } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 import HomeBanner from '@/components/HomeBanner';
 import { daysUntil, ddayLabel } from '@/lib/dates';
 import { RecipeMatch, matchRecipes, urgentProducts } from '@/lib/recipes';
-import { listProducts } from '@/lib/repo';
+import { getCachedActiveProducts, listProducts } from '@/lib/repo';
 import { CoupangAdHeader } from '@/components/CoupangRebuyCard';
 import { COUPANG_DISCLOSURE, openCoupangSearch } from '@/lib/coupang';
 import { RECIPE_SHOPPING, missingIngredients } from '@/lib/recipe-shopping';
@@ -19,7 +19,9 @@ function openVideoSearch(query: string) {
 }
 
 export default function Recipes() {
-  const [products, setProducts] = useState<Product[]>([]);
+  // 목록 화면이 이미 받아 둔 상품으로 바로 그리고, 서버 최신값은 뒤에서 받아 바꾼다
+  const [products, setProducts] = useState<Product[]>(getCachedActiveProducts);
+  const [loaded, setLoaded] = useState(products.length > 0);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
@@ -27,6 +29,8 @@ export default function Recipes() {
       setProducts(await listProducts('active'));
     } catch (e) {
       Alert.alert('불러오기 실패', e instanceof Error ? e.message : '알 수 없는 오류');
+    } finally {
+      setLoaded(true);
     }
   }, []);
 
@@ -101,6 +105,12 @@ export default function Recipes() {
       }
       renderItem={({ item }) => <RecipeCard match={item} haveNames={haveNames} showShop={coupangSuggest} />}
       ListEmptyComponent={
+        !loaded ? (
+          // 첫 응답 전엔 "없어요" 대신 로딩 표시 — 예전엔 잠깐 "임박한 재료가 없어요"가 보였다 바뀌었다
+          <View className="mt-20 items-center">
+            <ActivityIndicator color="#CC2222" />
+          </View>
+        ) : (
         <View className="mt-20 items-center">
           <MaterialCommunityIcons name="chef-hat" size={48} color="#CCCCCC" />
           {urgent.length === 0 ? (
@@ -114,6 +124,7 @@ export default function Recipes() {
             <Text className="text-muted mt-4 text-base">고정 레시피는 없지만, 아래에서 영상으로 찾아보세요</Text>
           )}
         </View>
+        )
       }
     />
     <HomeBanner />
