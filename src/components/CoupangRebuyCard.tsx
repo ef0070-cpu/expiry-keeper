@@ -132,11 +132,14 @@ export default function CoupangRebuyCard({
 }
 
 /** 쿠팡 영역 머리줄(공용): 왼쪽 공식 로고, 오른쪽 회색 "광고" 배지 — 광고임을 분명히 해 신뢰를 지킨다. */
-export function CoupangAdHeader({ small }: { small?: boolean }) {
-  const w = small ? 60 : 75;
+export function CoupangAdHeader({ small, label }: { small?: boolean; label?: string }) {
+  const w = small ? 52 : 75;
   return (
     <View className="flex-row items-center justify-between">
-      <Image source={COUPANG_LOGO} style={{ width: w, height: w * 0.227 }} contentFit="contain" accessibilityLabel="쿠팡" />
+      <View className="flex-row items-center">
+        <Image source={COUPANG_LOGO} style={{ width: w, height: w * 0.227 }} contentFit="contain" accessibilityLabel="쿠팡" />
+        {label ? <Text className="text-ink ml-2 text-xs font-bold">{label}</Text> : null}
+      </View>
       <View className="rounded bg-bg px-1.5 py-0.5">
         <Text className="text-muted text-[10px] font-medium">광고</Text>
       </View>

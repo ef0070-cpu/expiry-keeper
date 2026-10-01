@@ -193,37 +193,33 @@ function RecipeCard({
       {/* 부족 재료 → 쿠팡 검색. 칩 하나만 눌러도 그 뒤 24시간 쿠팡 구매가 실적이 된다.
           쿠팡은 앱 전체에서 테두리 버튼(빨간 꽉 찬 버튼은 앱 자체 동작만)으로 통일 */}
       {missing.length > 0 || mealkit ? (
-        <View className="mt-3 rounded-xl border border-line bg-bg p-3">
-          <CoupangAdHeader small />
-          {missing.length > 0 ? (
-            <>
-              <Text className="text-ink mt-2.5 text-xs font-bold">🛒 부족한 재료</Text>
-              <View className="mt-1.5 flex-row flex-wrap" style={{ gap: 6 }}>
-                {missing.map((m) => (
-                  <Pressable
-                    key={m.name}
-                    onPress={() => openCoupangSearch(m.name)}
-                    className="rounded-full border border-line bg-paper px-3 py-1.5 active:opacity-70"
-                    accessibilityRole="link"
-                    accessibilityLabel={`쿠팡에서 ${m.name} 검색`}
-                  >
-                    <Text className={`text-sm ${m.staple ? 'text-muted' : 'text-ink'}`}>{m.name}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            </>
-          ) : null}
-          {mealkit ? (
-            <Pressable
-              onPress={() => openCoupangSearch(`${recipe.name} 밀키트`)}
-              className="mt-2.5 flex-row items-center justify-center rounded-lg border border-line bg-paper py-2.5 active:opacity-70"
-              accessibilityRole="link"
-            >
-              <Text className="text-ink text-sm font-bold">🍱 {recipe.name} 밀키트 한 번에 보기</Text>
-              <MaterialCommunityIcons name="chevron-right" size={16} color="#888888" />
-            </Pressable>
-          ) : null}
-          <Text className="text-muted mt-2 text-[10px]">{COUPANG_DISCLOSURE}</Text>
+        <View className="mt-2.5 rounded-lg border border-line bg-bg px-2.5 py-2">
+          <CoupangAdHeader small label="부족한 재료" />
+          <View className="mt-1.5 flex-row flex-wrap" style={{ gap: 4 }}>
+            {missing.map((m) => (
+              <Pressable
+                key={m.name}
+                onPress={() => openCoupangSearch(m.name)}
+                className="rounded-full border border-line bg-paper px-2.5 py-1 active:opacity-70"
+                accessibilityRole="link"
+                accessibilityLabel={`쿠팡에서 ${m.name} 검색`}
+              >
+                <Text className={`text-xs ${m.staple ? 'text-muted' : 'text-ink'}`}>{m.name}</Text>
+              </Pressable>
+            ))}
+            {mealkit ? (
+              <Pressable
+                onPress={() => openCoupangSearch(`${recipe.name} 밀키트`)}
+                className="rounded-full border border-line bg-paper px-2.5 py-1 active:opacity-70"
+                accessibilityRole="link"
+                accessibilityLabel={`쿠팡에서 ${recipe.name} 밀키트 검색`}
+              >
+                <Text className="text-ink text-xs font-bold">🍱 밀키트 한 번에</Text>
+              </Pressable>
+            ) : null}
+          </View>
+          {/* 법적 표시 문구라 잘리면 안 된다 — 줄임표 없이 두 줄까지 */}
+          <Text className="text-muted mt-1.5 text-[9px] leading-3">{COUPANG_DISCLOSURE}</Text>
         </View>
       ) : null}
     </View>
