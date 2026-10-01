@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import CandidatesModal from '@/components/CandidatesModal';
+import PhotoSourceSheet from '@/components/PhotoSourceSheet';
 import Chip from '@/components/Chip';
 import { hasImageSearchKeys, lookupBarcode } from '@/lib/barcode-lookup';
 import { deleteLocalPhotoIfOwned, persistLocalPhoto } from '@/lib/local-photo';
@@ -103,29 +104,20 @@ export default function OrderProductForm() {
     getCatalogReferencePrice(trimmed).then(setReferencePrice);
   }, [barcode]);
 
-  const pickPhoto = (
-    title: string,
-    message: string,
-    onPicked: (uri: string) => void,
-    aspect?: [number, number]
-  ) => {
-    Alert.alert(title, message, [
-      { text: '취소', style: 'cancel' },
-      { text: '앨범에서 선택', onPress: () => launchPicker('library', onPicked, aspect) },
-      { text: '카메라 촬영', onPress: () => launchPicker('camera', onPicked, aspect) },
-    ]);
+  // 사진 추가 방법 시트: 상품 사진이면 웹 찾기까지, 신고 사진이면 촬영·앨범만
+  const [photoSource, setPhotoSource] = useState<'product' | 'report' | null>(null);
+  const applyProductPhoto = (uri: string) => {
+    deleteLocalPhotoIfOwned(imageUri);
+    setImageUri(uri);
   };
+  const applyReportPhoto = (uri: string) => {
+    deleteLocalPhotoIfOwned(reportPhotoUri);
+    setReportPhotoUri(uri);
+  };
+  const onPhotoPicked = photoSource === 'report' ? applyReportPhoto : applyProductPhoto;
 
-  const pickImage = () =>
-    pickPhoto('상품 사진', '사진을 어떻게 추가할까요?', (uri) => {
-      deleteLocalPhotoIfOwned(imageUri);
-      setImageUri(uri);
-    });
-  const pickReportPhoto = () =>
-    pickPhoto('신고 사진', '사진을 어떻게 첨부할까요?', (uri) => {
-      deleteLocalPhotoIfOwned(reportPhotoUri);
-      setReportPhotoUri(uri);
-    });
+  const pickImage = () => setPhotoSource('product');
+  const pickReportPhoto = () => setPhotoSource('report');
 
   /** 권한이 거부돼 있으면(특히 "다시 묻지 않음"으로 완전히 거부된 상태) 카메라 앱이 그냥
    * 조용히 안 열려서 사용자 눈엔 "눌러도 반응이 없다"로 보인다 — canAskAgain이 false면 OS가
@@ -358,6 +350,15 @@ export default function OrderProductForm() {
       className="flex-1"
     >
       <Stack.Screen options={{ title: isEdit ? '발주 상품 수정' : '발주 상품 등록' }} />
+      <PhotoSourceSheet
+        visible={photoSource !== null}
+        title={photoSource === 'report' ? '신고 사진' : '상품 사진'}
+        message={photoSource === 'report' ? '사진을 어떻게 첨부할까요?' : '사진을 어떻게 추가할까요?'}
+        onClose={() => setPhotoSource(null)}
+        onCamera={() => launchPicker('camera', onPhotoPicked)}
+        onLibrary={() => launchPicker('library', onPhotoPicked)}
+        web={photoSource === 'report' ? undefined : { name, barcode, onPicked: applyProductPhoto }}
+      />
       <CandidatesModal
         visible={showPhotoPicker}
         barcode={barcode.trim()}

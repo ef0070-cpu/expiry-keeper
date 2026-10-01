@@ -19,13 +19,10 @@ import {
 } from 'react-native';
 import CandidatesModal from '@/components/CandidatesModal';
 import ExpiryLiveScanModal from '@/components/ExpiryLiveScanModal';
-import { dedupeByImage } from '@/lib/image-dedupe';
-import ImageCandidatesModal from '@/components/ImageCandidatesModal';
-import { hasImageSearchKeys, lookupBarcode, searchProductImageCandidates } from '@/lib/barcode-lookup';
+import PhotoSourceSheet from '@/components/PhotoSourceSheet';
 import { extractDateCandidates } from '@/lib/date-ocr';
 import { errorMessage } from '@/lib/errors';
 import { deleteLocalPhotoIfOwned, persistLocalPhoto } from '@/lib/local-photo';
-import { uploadPhotoToBucket } from '@/lib/storage';
 import { addMonths, autoFormatDate, formatDate, isValidDateStr, todayStr } from '@/lib/dates';
 import { cancelExpiryAlerts, scheduleExpiryAlerts } from '@/lib/notifications';
 import {
@@ -70,8 +67,7 @@ export default function ProductForm() {
   const [existingCategories, setExistingCategories] = useState<string[]>(getCachedCategories);
   const [newCategory, setNewCategory] = useState('');
   const [busy, setBusy] = useState(false);
-  const [searching, setSearching] = useState(false);
-  const [imageCandidates, setImageCandidates] = useState<string[] | null>(null);
+  const [showPhotoSource, setShowPhotoSource] = useState(false);
   const [showPhotoPicker, setShowPhotoPicker] = useState(false);
   const [ocrBusy, setOcrBusy] = useState(false);
   const [liveScanVisible, setLiveScanVisible] = useState(false);
@@ -193,13 +189,7 @@ export default function ProductForm() {
     if (event.type === 'set' && selected) setExpiryDate(formatDate(selected));
   };
 
-  const pickImage = () => {
-    Alert.alert('상품 사진', '사진을 어떻게 추가할까요?', [
-      { text: '취소', style: 'cancel' },
-      { text: '앨범에서 선택', onPress: () => launchPicker('library') },
-      { text: '카메라 촬영', onPress: () => launchPicker('camera') },
-    ]);
-  };
+  const pickImage = () => setShowPhotoSource(true);
 
   const ensureCameraPermission = async (): Promise<boolean> => {
     const perm = await ImagePicker.requestCameraPermissionsAsync();
@@ -303,39 +293,6 @@ export default function ProductForm() {
     }
   };
 
-  /** 웹에서 이미지 후보 검색 — 바코드 매칭 이미지(있으면)를 1순위 후보로 넣고 상품명
-   * 검색 결과를 더해 사용자가 직접 고르게 한다. 자동으로 하나를 확정 적용하지 않는다. */
-  const findImageOnWeb = async () => {
-    if (!name.trim()) {
-      Alert.alert('입력 확인', '먼저 상품명을 입력해 주세요.');
-      return;
-    }
-    if (!hasImageSearchKeys()) {
-      Alert.alert(
-        '클라우드 모드 전용 기능',
-        '이미지 검색은 클라우드 모드에서만 사용할 수 있어요. 지금은 로컬 모드라 사진을 직접 촬영하거나 앨범에서 선택해 주세요.',
-      );
-      return;
-    }
-    setSearching(true);
-    const candidates: string[] = [];
-    if (barcode && barcode.trim()) {
-      const info = await lookupBarcode(barcode.trim());
-      if (info.imageUrl) candidates.push(info.imageUrl);
-    }
-    const found = await searchProductImageCandidates(name.trim());
-    for (const url of found) {
-      if (!candidates.includes(url)) candidates.push(url);
-    }
-    // 주소만 다른 같은 사진은 하나로, 못 불러오는 사진은 빼고 보여 준다
-    const shown = await dedupeByImage(candidates, (u) => u);    setSearching(false);
-    if (shown.length === 0) {
-      Alert.alert('검색 결과 없음', '이미지를 찾지 못했습니다. 직접 촬영해 주세요.');
-      return;
-    }
-    setImageCandidates(shown);
-  };
-
   const doSave = async () => {
     setBusy(true);
     try {
@@ -431,19 +388,21 @@ export default function ProductForm() {
       className="flex-1"
     >
       <Stack.Screen options={{ title: isEdit ? '상품 수정' : '상품 등록' }} />
-      <ImageCandidatesModal
-        visible={imageCandidates !== null}
-        candidates={imageCandidates ?? []}
-        onSelect={async (url) => {
-          setImageCandidates(null);
-          // 검색결과 원본 링크는 핫링크 차단·임시 링크 등으로 나중에 깨질 수 있어, 고르는 순간
-          // 우리 Storage로 재업로드해 안정적인 URL로 바꾼다. 실패하면 원본 링크라도 우선 보여준다.
-          const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
-          const hosted = await uploadPhotoToBucket(url, 'product-images', path, true);
-          deleteLocalPhotoIfOwned(imageUri);
-          setImageUri(hosted ?? url);
+      <PhotoSourceSheet
+        visible={showPhotoSource}
+        title="상품 사진"
+        message="사진을 어떻게 추가할까요?"
+        onClose={() => setShowPhotoSource(false)}
+        onCamera={() => launchPicker('camera')}
+        onLibrary={() => launchPicker('library')}
+        web={{
+          name,
+          barcode,
+          onPicked: (url) => {
+            deleteLocalPhotoIfOwned(imageUri);
+            setImageUri(url);
+          },
         }}
-        onClose={() => setImageCandidates(null)}
       />
       <CandidatesModal
         visible={showPhotoPicker}
@@ -561,20 +520,6 @@ export default function ProductForm() {
               value={name}
               onChangeText={setName}
             />
-            <View className="mt-2 flex-row items-center gap-4">
-              <Pressable
-                onPress={findImageOnWeb}
-                disabled={searching}
-                className="flex-row items-center"
-              >
-                {searching ? (
-                  <ActivityIndicator size="small" color="#CC2222" />
-                ) : (
-                  <MaterialCommunityIcons name="image-search-outline" size={15} color="#CC2222" />
-                )}
-                <Text className="text-primary ml-1 text-xs font-medium">웹에서 이미지 찾기</Text>
-              </Pressable>
-            </View>
             {barcode ? (
               <View className="mt-1.5 flex-row flex-wrap" style={{ gap: 12 }}>
                 <Pressable onPress={() => setShowPhotoPicker(true)}>
