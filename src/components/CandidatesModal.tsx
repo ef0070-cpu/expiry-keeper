@@ -3,6 +3,7 @@ import { Image } from 'expo-image';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { errorMessage } from '@/lib/errors';
+import { dedupeByImage } from '@/lib/image-dedupe';
 import { applyOrderProductPhoto } from '@/lib/order-repo';
 import { deletePhotoCandidate, listPhotoCandidates, voteOnPhoto, type PhotoCandidate } from '@/lib/order-report';
 
@@ -34,6 +35,9 @@ export default function CandidatesModal({
     let cancelled = false;
     setLoading(true);
     listPhotoCandidates(barcode)
+      // 같은 사진(주소만 다름)은 하나로, 못 불러오는 사진(빈 칸으로 보이던 것)은 빼고 보여 준다.
+      // 목록은 먼저 올린 순이라 첫 번째(오래된 후보)가 남는다.
+      .then((result) => dedupeByImage(result, (c) => c.photoUri))
       .then((result) => {
         if (!cancelled) setCandidates(result);
       })
