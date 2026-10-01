@@ -1,7 +1,9 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
-import { Alert, FlatList, Pressable, ScrollView, Text, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Alert, FlatList, LayoutAnimation, Pressable, ScrollView, Text, View } from 'react-native';
+import { useReducedMotion } from 'react-native-reanimated';
 import HomeBanner from '@/components/HomeBanner';
 import { daysUntil, ddayLabel } from '@/lib/dates';
 import { RecipeMatch, matchRecipes, urgentProducts } from '@/lib/recipes';
@@ -88,56 +90,13 @@ export default function Recipes() {
       }
       ListHeaderComponent={
         urgent.length > 0 ? (
-          // 절반 크기: 안내 문구를 제목 줄에 합치고, 재료 칩은 한 줄 가로 스크롤
-          <View className="mb-3 rounded-xl border border-line bg-paper px-3 py-2.5">
-            <View className="flex-row items-center justify-between">
-              <Text className="text-ink flex-1 text-xs font-bold">
-                {picked.length > 0
-                  ? `선택한 재료 ${picked.length}개로 추천 중`
-                  : `7일 이내 소진해야 할 재료 ${urgent.length}개`}
-                <Text className="text-muted font-normal">  · 눌러서 고르기</Text>
-              </Text>
-              {picked.length > 0 ? (
-                <Pressable
-                  onPress={() => setSelectedIds(new Set())}
-                  hitSlop={8}
-                  className="ml-2 active:opacity-70"
-                >
-                  <Text className="text-primary text-xs font-medium">전체 보기</Text>
-                </Pressable>
-              ) : null}
-            </View>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              className="mt-2"
-              contentContainerStyle={{ gap: 6 }}
-            >
-              {urgent.map((p) => {
-                const on = selectedIds.has(p.id);
-                return (
-                  <Pressable
-                    key={p.id}
-                    onPress={() => toggle(p.id)}
-                    accessibilityRole="checkbox"
-                    accessibilityState={{ checked: on }}
-                    className={`flex-row items-center rounded-full border px-2.5 py-1 active:opacity-70 ${
-                      on ? 'border-primary bg-primary' : 'border-line bg-bg'
-                    }`}
-                  >
-                    <Text className={`text-xs ${on ? 'text-paper font-bold' : 'text-ink'}`}>
-                      {p.name}
-                    </Text>
-                    <Text
-                      className={`ml-1 text-[10px] font-bold ${on ? 'text-paper' : 'text-primary'}`}
-                    >
-                      {ddayLabel(daysUntil(p.expiryDate))}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-          </View>
+          <UrgentPicker
+            urgent={urgent}
+            selectedIds={selectedIds}
+            pickedCount={picked.length}
+            onToggle={toggle}
+            onClear={() => setSelectedIds(new Set())}
+          />
         ) : null
       }
       renderItem={({ item }) => <RecipeCard match={item} haveNames={haveNames} showShop={coupangSuggest} />}
@@ -158,6 +117,109 @@ export default function Recipes() {
       }
     />
     <HomeBanner />
+    </View>
+  );
+}
+
+const EXPANDED_KEY = 'recipeUrgentExpanded:v1';
+
+/**
+ * 임박 재료 고르기(접었다 펴기). 접힘: 한 줄 가로 스크롤(작은 칩), 펼침: 여러 줄 큰 칩(누르기 쉬운 높이).
+ * 재료 4개 이하면 처음부터 펼치고, 그 이상이면 마지막에 둔 상태(접힘/펼침)를 기억해 그대로 보여 준다.
+ * 고른 재료는 맨 앞 — 접힌 상태에서도 무엇을 골랐는지 바로 보이게.
+ */
+function UrgentPicker({
+  urgent,
+  selectedIds,
+  pickedCount,
+  onToggle,
+  onClear,
+}: {
+  urgent: Product[];
+  selectedIds: Set<string>;
+  pickedCount: number;
+  onToggle: (id: string) => void;
+  onClear: () => void;
+}) {
+  const few = urgent.length <= 4;
+  const [saved, setSaved] = useState<boolean | null>(null);
+  const reduceMotion = useReducedMotion();
+  useEffect(() => {
+    AsyncStorage.getItem(EXPANDED_KEY)
+      .then((v) => setSaved(v === null ? null : v === '1'))
+      .catch(() => {});
+  }, []);
+  const expanded = few || (saved ?? false);
+
+  const toggleExpanded = () => {
+    if (!reduceMotion) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    const next = !expanded;
+    setSaved(next);
+    AsyncStorage.setItem(EXPANDED_KEY, next ? '1' : '0').catch(() => {});
+  };
+
+  const ordered = [...urgent].sort((a, b) => Number(selectedIds.has(b.id)) - Number(selectedIds.has(a.id)));
+  const chips = ordered.map((p) => {
+    const on = selectedIds.has(p.id);
+    return (
+      <Pressable
+        key={p.id}
+        onPress={() => onToggle(p.id)}
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: on }}
+        className={`flex-row items-center rounded-full border active:opacity-70 ${
+          expanded ? 'px-3.5' : 'px-2.5 py-1'
+        } ${on ? 'border-primary bg-primary' : 'border-line bg-bg'}`}
+        style={expanded ? { minHeight: 40 } : undefined}
+      >
+        <Text className={`${expanded ? 'text-sm' : 'text-xs'} ${on ? 'text-paper font-bold' : 'text-ink'}`}>
+          {p.name}
+        </Text>
+        <Text className={`ml-1 ${expanded ? 'text-xs' : 'text-[10px]'} font-bold ${on ? 'text-paper' : 'text-primary'}`}>
+          {ddayLabel(daysUntil(p.expiryDate))}
+        </Text>
+      </Pressable>
+    );
+  });
+
+  return (
+    <View className="mb-3 rounded-xl border border-line bg-paper px-3 py-2.5">
+      <View className="flex-row items-center justify-between">
+        <Text className="text-ink flex-1 text-xs font-bold">
+          7일 이내 소진할 재료 {urgent.length}개
+          {pickedCount > 0 ? <Text className="text-primary"> · 선택 {pickedCount}</Text> : null}
+        </Text>
+        {few ? null : (
+          <Pressable
+            onPress={toggleExpanded}
+            hitSlop={10}
+            className="ml-2 flex-row items-center active:opacity-70"
+            accessibilityRole="button"
+            accessibilityState={{ expanded }}
+            accessibilityLabel={expanded ? '재료 목록 접기' : '재료 목록 펼치기'}
+          >
+            <Text className="text-muted text-xs">{expanded ? '접기' : '펼치기'}</Text>
+            <MaterialCommunityIcons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color="#888888" />
+          </Pressable>
+        )}
+      </View>
+      {expanded ? (
+        <>
+          <Text className="text-muted mt-1 text-xs">재료를 눌러 원하는 것만 골라보세요</Text>
+          <View className="mt-2 flex-row flex-wrap" style={{ gap: 8 }}>
+            {chips}
+          </View>
+          {pickedCount > 0 ? (
+            <Pressable onPress={onClear} hitSlop={8} className="mt-2.5 self-end active:opacity-70">
+              <Text className="text-primary text-xs font-medium">선택 해제 (전체 보기)</Text>
+            </Pressable>
+          ) : null}
+        </>
+      ) : (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-2" contentContainerStyle={{ gap: 6 }}>
+          {chips}
+        </ScrollView>
+      )}
     </View>
   );
 }
