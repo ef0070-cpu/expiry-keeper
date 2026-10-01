@@ -6,6 +6,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, Switch, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { COUPANG_DISCLOSURE } from '@/lib/coupang';
 import { ddayLabel } from '@/lib/dates';
 import { rescheduleAllExpiryAlerts } from '@/lib/notifications';
 import {
@@ -20,6 +21,7 @@ import {
   MODE_LABELS,
   setAlertSettings,
   setAppMode,
+  setCoupangSuggestEnabled,
   setDateInputMethod,
   setDateOcrOrder,
   setScanHapticEnabled,
@@ -27,6 +29,7 @@ import {
   lockLabs,
   useAlertSettings,
   useAppMode,
+  useCoupangSuggestEnabled,
   useDateInputMethod,
   useDateOcrOrder,
   useLabsUnlocked,
@@ -40,6 +43,7 @@ export default function Settings() {
   const dateInputMethod = useDateInputMethod();
   const dateOcrOrder = useDateOcrOrder();
   const scanHapticEnabled = useScanHapticEnabled();
+  const coupangSuggestEnabled = useCoupangSuggestEnabled();
   const [deleting, setDeleting] = useState(false);
   const [notifDenied, setNotifDenied] = useState(false);
   const labsUnlocked = useLabsUnlocked();
@@ -222,6 +226,21 @@ export default function Settings() {
         </View>
         <Switch value={scanHapticEnabled} onValueChange={setScanHapticEnabled} />
       </View>
+
+      {mode === 'home' ? (
+        <>
+          <SectionTitle text="구매 추천" />
+          <View className="flex-row items-center justify-between rounded-xl border border-line bg-paper p-4">
+            <View className="flex-1 pr-3">
+              <Text className="text-ink text-base font-bold">쿠팡에서 다시 사기 보기</Text>
+              <Text className="text-muted mt-0.5 text-xs">
+                다 먹은 상품을 쿠팡에서 찾아볼 수 있게 링크를 보여 줘요. {COUPANG_DISCLOSURE}
+              </Text>
+            </View>
+            <Switch value={coupangSuggestEnabled} onValueChange={setCoupangSuggestEnabled} />
+          </View>
+        </>
+      ) : null}
 
       <SectionTitle text="기능" />
       <View className="overflow-hidden rounded-xl border border-line bg-paper">

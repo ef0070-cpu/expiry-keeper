@@ -244,6 +244,38 @@ export function useScanHapticEnabled(): boolean {
   return enabled;
 }
 
+// ---------- 쿠팡 구매 추천(가정용) ----------
+
+const COUPANG_SUGGEST_KEY = 'coupangSuggest:v1';
+
+let coupangSuggestCache: boolean | undefined;
+const coupangSuggestListeners = new Set<() => void>();
+
+export async function setCoupangSuggestEnabled(enabled: boolean): Promise<void> {
+  coupangSuggestCache = enabled;
+  coupangSuggestListeners.forEach((fn) => fn());
+  await AsyncStorage.setItem(COUPANG_SUGGEST_KEY, enabled ? '1' : '0');
+}
+
+/** 기본값 켜짐. 사용자가 끄면 소진 후 안내·상세 화면의 쿠팡 링크를 모두 숨긴다. */
+export function useCoupangSuggestEnabled(): boolean {
+  const [enabled, setEnabled] = useState<boolean>(coupangSuggestCache ?? true);
+  useEffect(() => {
+    const update = () => setEnabled(coupangSuggestCache ?? true);
+    coupangSuggestListeners.add(update);
+    if (coupangSuggestCache === undefined) {
+      AsyncStorage.getItem(COUPANG_SUGGEST_KEY).then((raw) => {
+        coupangSuggestCache = raw !== '0';
+        update();
+      });
+    }
+    return () => {
+      coupangSuggestListeners.delete(update);
+    };
+  }, []);
+  return enabled;
+}
+
 // ---------- 실험실(비공개 기능) ----------
 // 아직 실험 중인 기능(가격표 만들기)을 일반 사용자에게 안 보이게 숨기고, 비밀번호를 아는
 // 관리자만 계속 켜서 테스트할 수 있게 한다. 실제 로그인/권한 체계가 아니라 화면 노출을

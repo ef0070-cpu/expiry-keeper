@@ -38,7 +38,8 @@ import {
   newId,
   saveProduct,
 } from '@/lib/repo';
-import { AppMode, useAppMode, useDateInputMethod, useDateOcrOrder } from '@/lib/settings';
+import { AppMode, useAppMode, useCoupangSuggestEnabled, useDateInputMethod, useDateOcrOrder } from '@/lib/settings';
+import { COUPANG_DISCLOSURE, openCoupangSearch } from '@/lib/coupang';
 import { Product, ProductStatus } from '@/lib/types';
 
 export default function ProductForm() {
@@ -50,6 +51,7 @@ export default function ProductForm() {
   }>();
   const isEdit = !!params.id;
   const mode = useAppMode();
+  const coupangSuggest = useCoupangSuggestEnabled();
   const dateInputMethod = useDateInputMethod();
   const dateOcrOrder = useDateOcrOrder();
 
@@ -785,6 +787,22 @@ export default function ProductForm() {
             )}
           </Pressable>
         </View>
+
+        {/* 가정용: 이미 등록한 상품을 쿠팡에서 다시 찾아보기 (설정에서 끌 수 있음) */}
+        {isEdit && mode === 'home' && coupangSuggest && name.trim() ? (
+          <View className="mt-5 items-center">
+            <Pressable
+              onPress={() => openCoupangSearch(name)}
+              className="flex-row items-center py-2 active:opacity-70"
+              accessibilityRole="link"
+              accessibilityLabel={`쿠팡에서 ${name.trim()} 다시 사기`}
+            >
+              <MaterialCommunityIcons name="cart-outline" size={16} color="#CC2222" />
+              <Text className="text-primary ml-1 text-sm font-medium">쿠팡에서 다시 사기</Text>
+            </Pressable>
+            <Text className="text-muted text-center text-[11px]">{COUPANG_DISCLOSURE}</Text>
+          </View>
+        ) : null}
       </ScrollView>
     </KeyboardAvoidingView>
   );

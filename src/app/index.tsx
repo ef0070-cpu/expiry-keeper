@@ -22,11 +22,13 @@ import { SIGNAL_ORDER, SIGNAL_TITLES, SIGNAL_BG, SignalKey, daysUntil, signalOf 
 import { cancelExpiryAlerts } from '@/lib/notifications';
 import { matchesSearch } from '@/lib/korean-search';
 import { deleteProduct, listProducts, resolveProduct } from '@/lib/repo';
-import { useAppMode } from '@/lib/settings';
+import { useAppMode, useCoupangSuggestEnabled } from '@/lib/settings';
+import { COUPANG_DISCLOSURE, openCoupangSearch } from '@/lib/coupang';
 import { BarcodeInfo, Product } from '@/lib/types';
 
 export default function Dashboard() {
   const mode = useAppMode();
+  const coupangSuggest = useCoupangSuggestEnabled();
   const [products, setProducts] = useState<Product[]>([]);
   const [query, setQuery] = useState('');
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
@@ -167,9 +169,22 @@ export default function Dashboard() {
         load();
       } catch (e) {
         Alert.alert('처리 실패', e instanceof Error ? e.message : '알 수 없는 오류');
+        return;
+      }
+      // 가정용에서 다 먹은 상품만 — 폐기한 상품에 다시 사라고 하면 거부감이 든다.
+      if (status === 'consumed' && mode === 'home' && coupangSuggest) {
+        Alert.alert(
+          `${p.name} 다 드셨네요`,
+          `쿠팡에서 다시 살까요?\n\n${COUPANG_DISCLOSURE}`,
+          [
+            { text: '괜찮아요', style: 'cancel' },
+            { text: '쿠팡에서 보기', onPress: () => openCoupangSearch(p.name) },
+          ],
+          { cancelable: true },
+        );
       }
     },
-    [load],
+    [load, mode, coupangSuggest],
   );
 
   const showActions = useCallback(
