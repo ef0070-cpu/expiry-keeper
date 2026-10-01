@@ -80,11 +80,15 @@ export default function CoupangRebuyCard({
 
   return (
     <Animated.View entering={reduceMotion ? undefined : FadeInDown.duration(400).springify()}>
+      {/* 저장·삭제 버튼과 확실히 떨어뜨려 잘못 누르지 않게: 구분선 + 작은 제목 */}
+      <View className="mb-3 flex-row items-center">
+        <View className="h-px flex-1 bg-line" />
+        <Text className="text-muted mx-3 text-xs">쿠팡에서 다시 구매</Text>
+        <View className="h-px flex-1 bg-line" />
+      </View>
       <View className="overflow-hidden rounded-2xl border border-line bg-paper">
-        {/* 머리: 쿠팡 공식 로고 — 어디로 연결되는지 한눈에 */}
-        <View className="flex-row items-center justify-between border-b border-line px-4 py-2.5">
-          <Image source={COUPANG_LOGO} style={{ width: 75, height: 17 }} contentFit="contain" accessibilityLabel="쿠팡" />
-          <Text className="text-muted text-[11px]">쿠팡 파트너스</Text>
+        <View className="border-b border-line px-4 py-2.5">
+          <CoupangAdHeader />
         </View>
 
         <View className="p-4">
@@ -107,21 +111,36 @@ export default function CoupangRebuyCard({
             </View>
           </View>
 
+          {/* 빨간 꽉 찬 버튼은 앱의 주 동작(수정 저장)만 — 쿠팡은 테두리 버튼으로 구분 */}
           <Pressable
             onPress={() => openCoupangSearch(key)}
-            className="mt-3 flex-row items-center justify-center rounded-xl bg-primary py-3 active:opacity-80"
+            className="mt-3 flex-row items-center justify-center rounded-xl border border-line bg-paper py-3 active:opacity-70"
             accessibilityRole="link"
             accessibilityLabel={`쿠팡에서 ${key} 구매하기`}
           >
             <Animated.View style={cartStyle}>
-              <MaterialCommunityIcons name="cart-outline" size={18} color="#FFFFFF" />
+              <MaterialCommunityIcons name="cart-outline" size={18} color="#1A1A1A" />
             </Animated.View>
-            <Text className="text-paper ml-1.5 text-base font-bold">쿠팡에서 구매하기</Text>
+            <Text className="text-ink ml-1.5 text-base font-bold">쿠팡에서 구매하기</Text>
+            <MaterialCommunityIcons name="chevron-right" size={18} color="#888888" style={{ marginLeft: 2 }} />
           </Pressable>
         </View>
       </View>
       <Text className="text-muted mt-1.5 text-center text-[11px]">{COUPANG_DISCLOSURE}</Text>
     </Animated.View>
+  );
+}
+
+/** 쿠팡 영역 머리줄(공용): 왼쪽 공식 로고, 오른쪽 회색 "광고" 배지 — 광고임을 분명히 해 신뢰를 지킨다. */
+export function CoupangAdHeader({ small }: { small?: boolean }) {
+  const w = small ? 60 : 75;
+  return (
+    <View className="flex-row items-center justify-between">
+      <Image source={COUPANG_LOGO} style={{ width: w, height: w * 0.227 }} contentFit="contain" accessibilityLabel="쿠팡" />
+      <View className="rounded bg-bg px-1.5 py-0.5">
+        <Text className="text-muted text-[10px] font-medium">광고</Text>
+      </View>
+    </View>
   );
 }
 

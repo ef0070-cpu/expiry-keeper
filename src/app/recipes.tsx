@@ -5,6 +5,10 @@ import { Alert, FlatList, Pressable, Text, View } from 'react-native';
 import { daysUntil, ddayLabel } from '@/lib/dates';
 import { RecipeMatch, matchRecipes, urgentProducts } from '@/lib/recipes';
 import { listProducts } from '@/lib/repo';
+import { CoupangAdHeader } from '@/components/CoupangRebuyCard';
+import { COUPANG_DISCLOSURE, openCoupangSearch } from '@/lib/coupang';
+import { RECIPE_SHOPPING, missingIngredients } from '@/lib/recipe-shopping';
+import { useCoupangSuggestEnabled } from '@/lib/settings';
 import { Product } from '@/lib/types';
 
 function openVideoSearch(query: string) {
@@ -30,6 +34,9 @@ export default function Recipes() {
   );
 
   const urgent = useMemo(() => urgentProducts(products), [products]);
+  // 부족 재료 계산은 임박 상품만이 아니라 보관 중인 상품 전부와 비교한다(냉장고에 양파가 있으면 빼야 하니까)
+  const haveNames = useMemo(() => products.map((p) => p.name), [products]);
+  const coupangSuggest = useCoupangSuggestEnabled();
   // 선택한 재료만 추천 대상으로. 선택이 없거나 목록에서 사라진 재료뿐이면 전체 임박 재료 사용.
   const picked = useMemo(() => urgent.filter((p) => selectedIds.has(p.id)), [urgent, selectedIds]);
   const target = picked.length > 0 ? picked : urgent;
@@ -124,7 +131,7 @@ export default function Recipes() {
           </View>
         ) : null
       }
-      renderItem={({ item }) => <RecipeCard match={item} />}
+      renderItem={({ item }) => <RecipeCard match={item} haveNames={haveNames} showShop={coupangSuggest} />}
       ListEmptyComponent={
         <View className="mt-20 items-center">
           <MaterialCommunityIcons name="chef-hat" size={48} color="#CCCCCC" />
@@ -144,8 +151,18 @@ export default function Recipes() {
   );
 }
 
-function RecipeCard({ match }: { match: RecipeMatch }) {
+function RecipeCard({
+  match,
+  haveNames,
+  showShop,
+}: {
+  match: RecipeMatch;
+  haveNames: string[];
+  showShop: boolean;
+}) {
   const { recipe, matchedProducts } = match;
+  const missing = showShop ? missingIngredients(recipe.name, haveNames) : [];
+  const mealkit = showShop && RECIPE_SHOPPING[recipe.name]?.mealkit;
   return (
     <View className="mb-3 rounded-xl border border-line bg-paper p-4">
       <View className="flex-row items-center">
@@ -172,6 +189,43 @@ function RecipeCard({ match }: { match: RecipeMatch }) {
         <MaterialCommunityIcons name="youtube" size={16} color="#CC2222" />
         <Text className="text-primary ml-1 text-xs font-medium">영상으로 레시피 보기</Text>
       </Pressable>
+
+      {/* 부족 재료 → 쿠팡 검색. 칩 하나만 눌러도 그 뒤 24시간 쿠팡 구매가 실적이 된다.
+          쿠팡은 앱 전체에서 테두리 버튼(빨간 꽉 찬 버튼은 앱 자체 동작만)으로 통일 */}
+      {missing.length > 0 || mealkit ? (
+        <View className="mt-3 rounded-xl border border-line bg-bg p-3">
+          <CoupangAdHeader small />
+          {missing.length > 0 ? (
+            <>
+              <Text className="text-ink mt-2.5 text-xs font-bold">🛒 부족한 재료</Text>
+              <View className="mt-1.5 flex-row flex-wrap" style={{ gap: 6 }}>
+                {missing.map((m) => (
+                  <Pressable
+                    key={m.name}
+                    onPress={() => openCoupangSearch(m.name)}
+                    className="rounded-full border border-line bg-paper px-3 py-1.5 active:opacity-70"
+                    accessibilityRole="link"
+                    accessibilityLabel={`쿠팡에서 ${m.name} 검색`}
+                  >
+                    <Text className={`text-sm ${m.staple ? 'text-muted' : 'text-ink'}`}>{m.name}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </>
+          ) : null}
+          {mealkit ? (
+            <Pressable
+              onPress={() => openCoupangSearch(`${recipe.name} 밀키트`)}
+              className="mt-2.5 flex-row items-center justify-center rounded-lg border border-line bg-paper py-2.5 active:opacity-70"
+              accessibilityRole="link"
+            >
+              <Text className="text-ink text-sm font-bold">🍱 {recipe.name} 밀키트 한 번에 보기</Text>
+              <MaterialCommunityIcons name="chevron-right" size={16} color="#888888" />
+            </Pressable>
+          ) : null}
+          <Text className="text-muted mt-2 text-[10px]">{COUPANG_DISCLOSURE}</Text>
+        </View>
+      ) : null}
     </View>
   );
 }
