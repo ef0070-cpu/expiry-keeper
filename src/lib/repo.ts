@@ -104,6 +104,14 @@ export function getCachedProduct(id: string): Product | null {
   return productCache.get(id) ?? null;
 }
 
+/** 목록에서 받아 둔 상품들의 카테고리(가나다순). 상세 화면이 처음부터 전체 칩을 그리게 —
+ * 서버 응답을 기다리는 사이 이 상품의 카테고리 하나만 맨 앞에 보였다가 제자리로 밀려나 움직여 보였다. */
+export function getCachedCategories(): string[] {
+  const set = new Set<string>();
+  productCache.forEach((p) => p.categories.forEach((c) => set.add(c)));
+  return [...set].sort();
+}
+
 function remember(items: Product[]): Product[] {
   items.forEach((p) => productCache.set(p.id, p));
   return items;

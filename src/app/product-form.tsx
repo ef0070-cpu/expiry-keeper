@@ -30,6 +30,7 @@ import { addMonths, autoFormatDate, formatDate, isValidDateStr, todayStr } from 
 import { cancelExpiryAlerts, scheduleExpiryAlerts } from '@/lib/notifications';
 import {
   deleteProduct,
+  getCachedCategories,
   getCachedProduct,
   getProduct,
   listProducts,
@@ -64,7 +65,7 @@ export default function ProductForm() {
   // 수정 시 기존 소진/폐기 상태를 잃지 않도록 함께 보관
   const [status, setStatus] = useState<ProductStatus>('active');
   const [resolvedAt, setResolvedAt] = useState<string | null>(null);
-  const [existingCategories, setExistingCategories] = useState<string[]>([]);
+  const [existingCategories, setExistingCategories] = useState<string[]>(getCachedCategories);
   const [newCategory, setNewCategory] = useState('');
   const [busy, setBusy] = useState(false);
   const [searching, setSearching] = useState(false);
