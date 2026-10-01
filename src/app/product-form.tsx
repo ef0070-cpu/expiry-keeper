@@ -328,8 +328,7 @@ export default function ProductForm() {
       if (!candidates.includes(url)) candidates.push(url);
     }
     // 주소만 다른 같은 사진은 하나로, 못 불러오는 사진은 빼고 보여 준다
-    const shown = await dedupeByImage(candidates, (u) => u);
-    setSearching(false);
+    const shown = await dedupeByImage(candidates, (u) => u);    setSearching(false);
     if (shown.length === 0) {
       Alert.alert('검색 결과 없음', '이미지를 찾지 못했습니다. 직접 촬영해 주세요.');
       return;

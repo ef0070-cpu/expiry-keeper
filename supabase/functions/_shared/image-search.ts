@@ -119,16 +119,21 @@ export async function searchProductImageCandidates(query: string, limit = 6): Pr
   if (kakaoKey) {
     try {
       const res = await fetch(
-        `https://dapi.kakao.com/v2/search/image?query=${encodeURIComponent(query)}&size=${limit}`,
+        `https://dapi.kakao.com/v2/search/image?query=${encodeURIComponent(query)}&size=30`,
         { headers: { Authorization: `KakaoAK ${kakaoKey}` } },
       );
       if (res.ok) {
         const json = await res.json();
-        const docs: { image_url?: string; doc_url?: string }[] = json?.documents ?? [];
+        const docs: { image_url?: string; thumbnail_url?: string; doc_url?: string }[] =
+          json?.documents ?? [];
         const urls = docs
           .filter((d) => d.image_url && isLikelyProductImage(d.doc_url))
           .map((d) => d.image_url!);
         if (urls.length > 0) return urls.slice(0, limit);
+        // 일반 단어("두부")는 30장이 전부 블로그·카페라 다 걸러진다 — 그때는 카카오가 만든
+        // 썸네일 사본(앱에서 바로 열림)이라도 돌려준다. 빈 결과보다 낫다.
+        const thumbs = docs.map((d) => d.thumbnail_url).filter((u): u is string => !!u);
+        if (thumbs.length > 0) return thumbs.slice(0, limit);
       }
     } catch {
       // no more fallbacks
