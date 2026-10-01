@@ -112,6 +112,11 @@ export function getCachedCategories(): string[] {
   return [...set].sort();
 }
 
+/** 목록에서 받아 둔 상품 전체(서버를 다시 부르지 않음). 쿠팡 구매하기 카드의 임박 상품 표시용. */
+export function getCachedProducts(): Product[] {
+  return [...productCache.values()];
+}
+
 function remember(items: Product[]): Product[] {
   items.forEach((p) => productCache.set(p.id, p));
   return items;

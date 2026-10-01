@@ -24,9 +24,7 @@ import { cancelExpiryAlerts } from '@/lib/notifications';
 import { matchesSearch } from '@/lib/korean-search';
 import { deleteProduct, listProducts, resolveProduct } from '@/lib/repo';
 import { useAppMode, useCoupangSuggestEnabled } from '@/lib/settings';
-import CoupangRebuyCard from '@/components/CoupangRebuyCard';
-import CoupangSearchWidget from '@/components/CoupangSearchWidget';
-import { COUPANG_DISCLOSURE } from '@/lib/coupang';
+import CoupangRebuyCard, { imminentRebuyItems } from '@/components/CoupangRebuyCard';
 import { BarcodeInfo, Product } from '@/lib/types';
 
 export default function Dashboard() {
@@ -34,6 +32,8 @@ export default function Dashboard() {
   const coupangSuggest = useCoupangSuggestEnabled();
   const [rebuy, setRebuy] = useState<Product | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
+  // products가 바뀌면(목록 새로 받음) 임박 상품도 다시 고른다 — 캐시는 listProducts가 채운다
+  const imminent = useMemo(() => imminentRebuyItems(), [products]); // eslint-disable-line react-hooks/exhaustive-deps
   const [query, setQuery] = useState('');
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
   const [signalFilter, setSignalFilter] = useState<SignalKey | null>(null);
@@ -386,12 +386,12 @@ export default function Dashboard() {
             </Text>
           </View>
         }
-        // 가정용 목록 맨 아래: 쿠팡 공식 검색 위젯(로고 포함). 오른쪽 아래 버튼에 안 가리게 여백 위에 둔다
+        // 가정용 목록 맨 아래: 임박 상품이 차례로 입력되는 쿠팡 구매하기 카드(공식 위젯 포함).
+        // 오른쪽 아래 버튼에 안 가리게 목록 여백 위에 둔다. 임박 상품이 없으면 숨긴다.
         ListFooterComponent={
-          mode === 'home' && coupangSuggest && products.length > 0 ? (
+          mode === 'home' && coupangSuggest && imminent.length > 0 ? (
             <View className="mx-4 mt-4">
-              <CoupangSearchWidget />
-              <Text className="text-muted mt-1.5 text-center text-[11px]">{COUPANG_DISCLOSURE}</Text>
+              <CoupangRebuyCard items={imminent} />
             </View>
           ) : null
         }
@@ -428,7 +428,7 @@ export default function Dashboard() {
             <Text className="text-ink text-lg font-bold">{rebuy?.name} 다 드셨네요 👏</Text>
             <Text className="text-muted mb-4 mt-1 text-sm">떨어지기 전에 다시 채워 둘까요?</Text>
             {rebuy ? (
-              <CoupangRebuyCard name={rebuy.name} imageUri={rebuy.imageUri} onOpened={() => setRebuy(null)} />
+              <CoupangRebuyCard items={[{ name: rebuy.name, imageUri: rebuy.imageUri }]} onOpened={() => setRebuy(null)} />
             ) : null}
             <Pressable onPress={() => setRebuy(null)} className="mt-3 items-center py-2">
               <Text className="text-muted text-sm">괜찮아요</Text>

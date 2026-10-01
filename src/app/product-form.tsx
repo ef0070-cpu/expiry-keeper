@@ -36,8 +36,7 @@ import {
   saveProduct,
 } from '@/lib/repo';
 import { AppMode, useAppMode, useCoupangSuggestEnabled, useDateInputMethod, useDateOcrOrder } from '@/lib/settings';
-import CoupangRebuyCard from '@/components/CoupangRebuyCard';
-import CoupangSearchWidget from '@/components/CoupangSearchWidget';
+import CoupangRebuyCard, { imminentRebuyItems } from '@/components/CoupangRebuyCard';
 import { Product, ProductStatus } from '@/lib/types';
 
 export default function ProductForm() {
@@ -736,10 +735,13 @@ export default function ProductForm() {
         {/* 가정용: 이미 등록한 상품을 쿠팡에서 다시 찾아보기 (설정에서 끌 수 있음) */}
         {isEdit && mode === 'home' && coupangSuggest && name.trim() ? (
           <View className="mt-5">
-            <CoupangRebuyCard name={name} imageUri={imageUri} />
-            <View className="mt-3">
-              <CoupangSearchWidget />
-            </View>
+            {/* 이 상품을 먼저, 이어서 다른 임박 상품들이 차례로 입력된다 */}
+            <CoupangRebuyCard
+              items={[
+                { name: name.trim(), imageUri, expiryDate: isValidDateStr(expiryDate) ? expiryDate : undefined },
+                ...imminentRebuyItems().filter((it) => it.name.trim() !== name.trim()),
+              ]}
+            />
           </View>
         ) : null}
       </ScrollView>
