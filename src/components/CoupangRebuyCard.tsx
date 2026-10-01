@@ -1,4 +1,5 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import Animated, {
@@ -11,61 +12,50 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
-import CoupangSearchWidget from '@/components/CoupangSearchWidget';
 import Thumbnail from '@/components/Thumbnail';
 import { searchProductImageCandidates } from '@/lib/barcode-lookup';
 import { COUPANG_DISCLOSURE, openCoupangSearch } from '@/lib/coupang';
 import { daysUntil, ddayLabel } from '@/lib/dates';
-import { getCachedProducts } from '@/lib/repo';
 
-export interface RebuyItem {
-  name: string;
-  imageUri: string | null;
-  expiryDate?: string;
-}
+// 쿠팡 파트너스 검색 위젯이 쓰는 공식 로고(img1a.coupangcdn.com/.../logo-coupang.png)를 앱에 담았다
+const COUPANG_LOGO = require('../../assets/images/coupang-logo.png');
 
 // 상품명 → 웹 검색 첫 사진. 화면을 열 때마다 서버를 다시 부르지 않게 앱 실행 동안 기억한다.
 const webImageCache = new Map<string, string | null>();
 
-/** 가정용 보관 중 상품 중 유통기한 7일 이내(지난 것 포함)를 가까운 순으로 최대 5개. */
-export function imminentRebuyItems(): RebuyItem[] {
-  return getCachedProducts()
-    .filter((p) => p.mode === 'home' && p.status === 'active' && daysUntil(p.expiryDate) <= 7)
-    .sort((a, b) => a.expiryDate.localeCompare(b.expiryDate))
-    .slice(0, 5)
-    .map((p) => ({ name: p.name, imageUri: p.imageUri, expiryDate: p.expiryDate }));
-}
-
 /**
- * 쿠팡 구매하기 카드: 임박 상품 이름이 검색창에 한 글자씩 입력되며 차례로 바뀌고(사진·D-day도 함께),
- * [구매하기]는 지금 보이는 상품을 쿠팡에서 검색한다. 아래에는 쿠팡 공식 검색 위젯(로고)을 그대로 붙인다.
+ * 상세 화면 전용 쿠팡 구매하기 카드: 위에 쿠팡 공식 로고, 검색칸에 이 상품명이 한 글자씩 입력되고,
+ * [쿠팡에서 구매하기]는 이 상품을 쿠팡에서 검색한다. 내 사진이 없으면 웹 검색 첫 사진을 쓴다.
  * 실제 쿠팡 상품(사진·가격)은 파트너스 API 승인 후에만 — 쿠팡 페이지를 긁어 오면 약관 위반.
  * '동작 줄이기'를 켠 사용자에겐 타이핑·흔들림을 끈다.
  */
 export default function CoupangRebuyCard({
-  items,
-  onOpened,
+  name,
+  imageUri,
+  expiryDate,
 }: {
-  items: RebuyItem[];
-  onOpened?: () => void;
+  name: string;
+  imageUri: string | null;
+  expiryDate?: string;
 }) {
   const reduceMotion = useReducedMotion();
   const tilt = useSharedValue(0);
-  const [index, setIndex] = useState(0);
-  const item = items[index % Math.max(items.length, 1)];
-  const name = item?.name.trim() ?? '';
-  // 내 사진이 없으면(두부처럼 사진 없이 등록) 웹 검색 첫 사진으로 대신 보여 준다
-  const [, setWebTick] = useState(0);
+  const key = name.trim();
+  const [webImage, setWebImage] = useState<string | null>(() => webImageCache.get(key) ?? null);
 
   useEffect(() => {
-    if (!name || item?.imageUri || webImageCache.has(name)) return;
-    searchProductImageCandidates(name)
+    if (imageUri || !key || webImageCache.has(key)) return;
+    let cancelled = false;
+    searchProductImageCandidates(key)
       .then((urls) => {
-        webImageCache.set(name, urls[0] ?? null);
-        setWebTick((t) => t + 1);
+        webImageCache.set(key, urls[0] ?? null);
+        if (!cancelled) setWebImage(urls[0] ?? null);
       })
       .catch(() => {});
-  }, [name, item?.imageUri]);
+    return () => {
+      cancelled = true;
+    };
+  }, [imageUri, key]);
 
   useEffect(() => {
     if (reduceMotion) return;
@@ -86,50 +76,48 @@ export default function CoupangRebuyCard({
   }, [reduceMotion, tilt]);
 
   const cartStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${tilt.value}deg` }] }));
-
-  if (!item) return null;
-  const dday = item.expiryDate ? daysUntil(item.expiryDate) : null;
+  const dday = expiryDate ? daysUntil(expiryDate) : null;
 
   return (
     <Animated.View entering={reduceMotion ? undefined : FadeInDown.duration(400).springify()}>
-      <View className="rounded-2xl border bg-paper p-3" style={{ borderColor: '#F0C4C4' }}>
-        <View className="flex-row items-center">
-          <Thumbnail uri={item.imageUri ?? webImageCache.get(name) ?? null} size={56} radius={12} />
-          <View className="ml-3 flex-1">
-            <View className="flex-row items-center">
-              <Text className="text-muted text-xs">유통기한 임박</Text>
-              {dday !== null ? (
-                <Text className="text-primary ml-1.5 text-xs font-bold">{ddayLabel(dday)}</Text>
-              ) : null}
-            </View>
-            {/* 검색창처럼 보이는 칸에 상품명이 입력된다 */}
-            <View className="mt-1 flex-row items-center rounded-lg bg-bg px-2 py-1.5">
-              <MaterialCommunityIcons name="magnify" size={14} color="#888888" />
-              <TypingText
-                key={`${index}-${name}`}
-                text={name}
-                still={reduceMotion}
-                onDone={() => items.length > 1 && setIndex((i) => i + 1)}
-              />
+      <View className="overflow-hidden rounded-2xl border border-line bg-paper">
+        {/* 머리: 쿠팡 공식 로고 — 어디로 연결되는지 한눈에 */}
+        <View className="flex-row items-center justify-between border-b border-line px-4 py-2.5">
+          <Image source={COUPANG_LOGO} style={{ width: 75, height: 17 }} contentFit="contain" accessibilityLabel="쿠팡" />
+          <Text className="text-muted text-[11px]">쿠팡 파트너스</Text>
+        </View>
+
+        <View className="p-4">
+          <View className="flex-row items-center">
+            <Thumbnail uri={imageUri ?? webImage} size={56} radius={12} />
+            <View className="ml-3 flex-1">
+              <View className="flex-row items-center">
+                <Text className="text-ink text-base font-bold" numberOfLines={1}>
+                  {key}
+                </Text>
+                {dday !== null ? (
+                  <Text className="text-primary ml-2 text-xs font-bold">{ddayLabel(dday)}</Text>
+                ) : null}
+              </View>
+              {/* 검색칸처럼 보이는 줄에 상품명이 입력된다 */}
+              <View className="mt-1.5 flex-row items-center rounded-lg border border-line bg-bg px-2 py-1.5">
+                <MaterialCommunityIcons name="magnify" size={14} color="#888888" />
+                <TypingText text={key} still={reduceMotion} />
+              </View>
             </View>
           </View>
+
           <Pressable
-            onPress={() => {
-              openCoupangSearch(name);
-              onOpened?.();
-            }}
-            className="ml-2 flex-row items-center rounded-full bg-primary px-3 py-2 active:opacity-80"
+            onPress={() => openCoupangSearch(key)}
+            className="mt-3 flex-row items-center justify-center rounded-xl bg-primary py-3 active:opacity-80"
             accessibilityRole="link"
-            accessibilityLabel={`쿠팡에서 ${name} 구매하기`}
+            accessibilityLabel={`쿠팡에서 ${key} 구매하기`}
           >
             <Animated.View style={cartStyle}>
               <MaterialCommunityIcons name="cart-outline" size={18} color="#FFFFFF" />
             </Animated.View>
-            <Text className="text-paper ml-1 text-sm font-bold">구매하기</Text>
+            <Text className="text-paper ml-1.5 text-base font-bold">쿠팡에서 구매하기</Text>
           </Pressable>
-        </View>
-        <View className="mt-3">
-          <CoupangSearchWidget />
         </View>
       </View>
       <Text className="text-muted mt-1.5 text-center text-[11px]">{COUPANG_DISCLOSURE}</Text>
@@ -137,24 +125,17 @@ export default function CoupangRebuyCard({
   );
 }
 
-/** 한 글자씩 입력하는 효과. 다 치면 2초 멈춘 뒤 onDone(다음 상품으로) — 상품이 하나면 처음부터 다시. */
-function TypingText({ text, still, onDone }: { text: string; still: boolean; onDone: () => void }) {
+/** 한 글자씩 입력하는 효과: 다 치면 2초 멈췄다가 처음부터. still이면(동작 줄이기) 그냥 전체 표시. */
+function TypingText({ text, still }: { text: string; still: boolean }) {
   const [count, setCount] = useState(still ? text.length : 0);
   useEffect(() => {
     if (still) return;
-    if (count >= text.length) {
-      const t = setTimeout(() => {
-        onDone();
-        setCount(0);
-      }, 2000);
-      return () => clearTimeout(t);
-    }
-    const t = setTimeout(() => setCount((c) => c + 1), 150);
+    const t = setTimeout(() => setCount((c) => (c >= text.length ? 0 : c + 1)), count >= text.length ? 2000 : 150);
     return () => clearTimeout(t);
-  }, [count, text, still, onDone]);
+  }, [count, text, still]);
   return (
     <Text className="text-ink ml-1 flex-1 text-sm" numberOfLines={1} accessibilityLabel={text}>
-      {text.slice(0, count)}
+      {still ? text : text.slice(0, count)}
       {still ? '' : '▍'}
     </Text>
   );

@@ -4,7 +4,6 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'rea
 import {
   ActivityIndicator,
   Alert,
-  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -23,17 +22,12 @@ import { SIGNAL_ORDER, SIGNAL_TITLES, SIGNAL_BG, SignalKey, daysUntil, signalOf 
 import { cancelExpiryAlerts } from '@/lib/notifications';
 import { matchesSearch } from '@/lib/korean-search';
 import { deleteProduct, listProducts, resolveProduct } from '@/lib/repo';
-import { useAppMode, useCoupangSuggestEnabled } from '@/lib/settings';
-import CoupangRebuyCard, { imminentRebuyItems } from '@/components/CoupangRebuyCard';
+import { useAppMode } from '@/lib/settings';
 import { BarcodeInfo, Product } from '@/lib/types';
 
 export default function Dashboard() {
   const mode = useAppMode();
-  const coupangSuggest = useCoupangSuggestEnabled();
-  const [rebuy, setRebuy] = useState<Product | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
-  // products가 바뀌면(목록 새로 받음) 임박 상품도 다시 고른다 — 캐시는 listProducts가 채운다
-  const imminent = useMemo(() => imminentRebuyItems(), [products]); // eslint-disable-line react-hooks/exhaustive-deps
   const [query, setQuery] = useState('');
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
   const [signalFilter, setSignalFilter] = useState<SignalKey | null>(null);
@@ -173,12 +167,9 @@ export default function Dashboard() {
         load();
       } catch (e) {
         Alert.alert('처리 실패', e instanceof Error ? e.message : '알 수 없는 오류');
-        return;
       }
-      // 가정용에서 다 먹은 상품만 — 폐기한 상품에 다시 사라고 하면 거부감이 든다.
-      if (status === 'consumed' && mode === 'home' && coupangSuggest) setRebuy(p);
     },
-    [load, mode, coupangSuggest],
+    [load],
   );
 
   const showActions = useCallback(
@@ -386,15 +377,6 @@ export default function Dashboard() {
             </Text>
           </View>
         }
-        // 가정용 목록 맨 아래: 임박 상품이 차례로 입력되는 쿠팡 구매하기 카드(공식 위젯 포함).
-        // 오른쪽 아래 버튼에 안 가리게 목록 여백 위에 둔다. 임박 상품이 없으면 숨긴다.
-        ListFooterComponent={
-          mode === 'home' && coupangSuggest && imminent.length > 0 ? (
-            <View className="mx-4 mt-4">
-              <CoupangRebuyCard items={imminent} />
-            </View>
-          ) : null
-        }
         contentContainerStyle={{ paddingBottom: 120 }}
         refreshControl={
           <RefreshControl
@@ -415,27 +397,6 @@ export default function Dashboard() {
         label={mode === 'home' ? '상품추가' : undefined}
         accessibilityLabel={mode === 'home' ? '상품 추가' : '바코드 스캔'}
       />
-
-      {/* 소진 완료 직후: 아래에서 올라오는 쿠팡 다시 사기 안내 */}
-      <Modal
-        visible={!!rebuy}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setRebuy(null)}
-      >
-        <Pressable className="flex-1 justify-end bg-black/40" onPress={() => setRebuy(null)}>
-          <Pressable className="rounded-t-3xl bg-bg px-5 pb-8 pt-5" onPress={(e) => e.stopPropagation()}>
-            <Text className="text-ink text-lg font-bold">{rebuy?.name} 다 드셨네요 👏</Text>
-            <Text className="text-muted mb-4 mt-1 text-sm">떨어지기 전에 다시 채워 둘까요?</Text>
-            {rebuy ? (
-              <CoupangRebuyCard items={[{ name: rebuy.name, imageUri: rebuy.imageUri }]} onOpened={() => setRebuy(null)} />
-            ) : null}
-            <Pressable onPress={() => setRebuy(null)} className="mt-3 items-center py-2">
-              <Text className="text-muted text-sm">괜찮아요</Text>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
     </View>
   );
 }

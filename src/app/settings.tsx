@@ -232,9 +232,9 @@ export default function Settings() {
           <SectionTitle text="구매 추천" />
           <View className="flex-row items-center justify-between rounded-xl border border-line bg-paper p-4">
             <View className="flex-1 pr-3">
-              <Text className="text-ink text-base font-bold">쿠팡에서 다시 사기 보기</Text>
+              <Text className="text-ink text-base font-bold">쿠팡 구매하기 보기</Text>
               <Text className="text-muted mt-0.5 text-xs">
-                다 먹은 상품을 쿠팡에서 찾아볼 수 있게 링크를 보여 줘요. {COUPANG_DISCLOSURE}
+                상품 상세 화면에 쿠팡에서 구매할 수 있는 카드를 보여 줘요. {COUPANG_DISCLOSURE}
               </Text>
             </View>
             <Switch value={coupangSuggestEnabled} onValueChange={setCoupangSuggestEnabled} />
