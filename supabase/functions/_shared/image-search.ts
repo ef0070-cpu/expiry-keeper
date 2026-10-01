@@ -77,6 +77,25 @@ export async function searchProductImage(query: string): Promise<string | null> 
 export async function searchProductImageCandidates(query: string, limit = 6): Promise<string[]> {
   const naverId = Deno.env.get('NAVER_CLIENT_ID');
   const naverSecret = Deno.env.get('NAVER_CLIENT_SECRET');
+  // 1순위: 네이버 쇼핑 — "두부"처럼 바코드 없는 일반 상품명도 판매 상품 사진이 나온다.
+  // 이미지 검색은 일반 단어면 블로그·레시피 사진이 상위라 거르고 나면 비고, 남아도 블로그 서버가
+  // 앱에서의 직접 로드를 막아 빈 칸이 됐다. 쇼핑 사진(shopping-phinf)은 앱에서 바로 열린다.
+  if (naverId && naverSecret) {
+    try {
+      const res = await fetch(
+        `https://openapi.naver.com/v1/search/shop.json?query=${encodeURIComponent(query)}&display=${limit}`,
+        { headers: { 'X-Naver-Client-Id': naverId, 'X-Naver-Client-Secret': naverSecret } },
+      );
+      if (res.ok) {
+        const json = await res.json();
+        const items: { image?: string }[] = json?.items ?? [];
+        const urls = items.map((it) => it.image).filter((u): u is string => !!u);
+        if (urls.length > 0) return urls.slice(0, limit);
+      }
+    } catch {
+      // fall through to image search
+    }
+  }
   if (naverId && naverSecret) {
     try {
       const res = await fetch(
