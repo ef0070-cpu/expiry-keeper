@@ -84,7 +84,15 @@
           }
         }
       ],
-      "./plugins/withR8Optimize"
+      "./plugins/withR8Optimize",
+      [
+        "react-native-vision-camera",
+        {
+          "cameraPermissionText": "유통기한 날짜를 자동으로 읽기 위해 카메라를 사용합니다.",
+          "enableMicrophonePermission": false,
+          "enableFrameProcessors": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

@@ -18,6 +18,7 @@ import {
   View,
 } from 'react-native';
 import CandidatesModal from '@/components/CandidatesModal';
+import ExpiryLiveScanModal from '@/components/ExpiryLiveScanModal';
 import ImageCandidatesModal from '@/components/ImageCandidatesModal';
 import { hasImageSearchKeys, lookupBarcode, searchProductImageCandidates } from '@/lib/barcode-lookup';
 import { extractDateCandidates } from '@/lib/date-ocr';
@@ -69,6 +70,7 @@ export default function ProductForm() {
   const [imageCandidates, setImageCandidates] = useState<string[] | null>(null);
   const [showPhotoPicker, setShowPhotoPicker] = useState(false);
   const [ocrBusy, setOcrBusy] = useState(false);
+  const [liveScanVisible, setLiveScanVisible] = useState(false);
   const [manufactureCalcVisible, setManufactureCalcVisible] = useState(false);
   const [manufactureDate, setManufactureDate] = useState('');
   const [manufactureMonths, setManufactureMonths] = useState('6');
@@ -581,8 +583,20 @@ export default function ProductForm() {
         {/* 유통기한 + 수량 (한 줄 배치) */}
         <View className="mt-4 flex-row gap-3">
           <View className="flex-1">
-            <View className="flex-row items-center justify-between">
+            {/* 좁은 화면·넓은 글꼴에서 버튼이 옆 '수량'과 겹치지 않게 넘치면 다음 줄로 */}
+            <View className="flex-row flex-wrap items-center justify-between" style={{ rowGap: 4 }}>
               <Label text="유통기한 *" />
+              <View className="flex-row flex-wrap items-center" style={{ gap: 12 }}>
+              <Pressable
+                onPress={() => setLiveScanVisible(true)}
+                className="flex-row items-center"
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="카메라로 유통기한 자동 인식"
+              >
+                <MaterialCommunityIcons name="line-scan" size={15} color="#CC2222" />
+                <Text className="text-primary ml-1 text-xs font-medium">자동 인식</Text>
+              </Pressable>
               <Pressable
                 onPress={scanExpiryDatePhoto}
                 disabled={ocrBusy}
@@ -598,7 +612,26 @@ export default function ProductForm() {
                 )}
                 <Text className="text-primary ml-1 text-xs font-medium">사진으로 인식</Text>
               </Pressable>
+              </View>
             </View>
+            {liveScanVisible ? (
+              <ExpiryLiveScanModal
+                dateOcrOrder={dateOcrOrder}
+                onClose={() => setLiveScanVisible(false)}
+                onDetected={(date) => {
+                  setLiveScanVisible(false);
+                  // 지난 날짜는 제조일일 수 있어 바로 넣지 않고 확인받는다(사진 인식과 같은 규칙)
+                  if (date >= todayStr()) {
+                    setExpiryDate(date);
+                    return;
+                  }
+                  Alert.alert('지난 날짜예요', `${date}로 읽었어요. 이 날짜로 입력할까요?`, [
+                    { text: '다시 읽기', onPress: () => setLiveScanVisible(true) },
+                    { text: '입력', onPress: () => setExpiryDate(date) },
+                  ]);
+                }}
+              />
+            ) : null}
             {dateInputMethod === 'text' ? (
               <TextInput
                 className="text-ink rounded-xl border border-line bg-paper px-3 py-2.5 text-base"

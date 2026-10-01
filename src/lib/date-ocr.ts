@@ -145,3 +145,65 @@ export function extractDateCandidates(
   const desc = [...found].filter((d) => isPlausibleYear(d, referenceDate)).sort().reverse();
   return [...desc.filter((d) => d >= referenceDate), ...desc.filter((d) => d < referenceDate)];
 }
+
+// ---------- 실시간 자동 인식(카메라 미리보기) ----------
+
+export interface Frame {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+interface Size {
+  width: number;
+  height: number;
+}
+
+/** 화면 위 사각형(x,y,w,h)을 캡처 이미지 픽셀 좌표로. 미리보기가 이미지를 가운데 맞춰 꽉 채운다
+ * (cover)고 보고, 이미지가 옆으로 누운 크기로 오면 화면 방향에 맞춰 돌려 본다. padRatio만큼
+ * 사방으로 넓혀 손떨림·화각 차이를 흡수한다. */
+export function viewRectToImage(
+  rect: { x: number; y: number; width: number; height: number },
+  view: Size,
+  image: Size,
+  padRatio = 0,
+): Frame {
+  const portrait = view.height >= view.width;
+  const imgW = portrait === image.height >= image.width ? image.width : image.height;
+  const imgH = imgW === image.width ? image.height : image.width;
+  const s = Math.max(view.width / imgW, view.height / imgH);
+  const ox = (view.width - imgW * s) / 2;
+  const oy = (view.height - imgH * s) / 2;
+  const padX = rect.width * padRatio;
+  const padY = rect.height * padRatio;
+  return {
+    left: (rect.x - padX - ox) / s,
+    top: (rect.y - padY - oy) / s,
+    right: (rect.x + rect.width + padX - ox) / s,
+    bottom: (rect.y + rect.height + padY - oy) / s,
+  };
+}
+
+/** 인식된 글자 줄 중 가운데 점이 region 안에 있는 줄만 이어 붙인다 — 사각형 밖의 제조일·로트
+ * 번호가 섞이면 엉뚱한 날짜가 잡힌다. */
+export function textInRegion(lines: { text: string; frame: Frame }[], region: Frame): string {
+  return lines
+    .filter(({ frame: f }) => {
+      const cx = (f.left + f.right) / 2;
+      const cy = (f.top + f.bottom) / 2;
+      return cx >= region.left && cx <= region.right && cy >= region.top && cy <= region.bottom;
+    })
+    .map((l) => l.text)
+    .join('\n');
+}
+
+/** 최근 읽은 결과(null = 못 읽음)에서 확정할 날짜. 최근 3번 중 2번 이상 같은 날짜면 확정 —
+ * '2번 연속'은 흔들린 한 장에 처음부터 다시 세야 해서 느렸다. 오인식 한 번으로는 확정되지 않는다. */
+export function stableDate(recent: (string | null)[]): string | null {
+  const last = recent.slice(-3).filter((d): d is string => !!d);
+  for (const d of last) {
+    if (last.filter((x) => x === d).length >= 2) return d;
+  }
+  return null;
+}

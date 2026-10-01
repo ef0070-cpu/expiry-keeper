@@ -1,4 +1,10 @@
-import { extractDateCandidates, extractExpiryDateFromText } from './date-ocr';
+import {
+  extractDateCandidates,
+  extractExpiryDateFromText,
+  stableDate,
+  textInRegion,
+  viewRectToImage,
+} from './date-ocr';
 
 const REF = '2026-01-01'; // 오늘 날짜에 결과가 좌우되지 않도록 고정한 기준일
 
@@ -68,6 +74,32 @@ console.assert(extractDateCandidates('숫자 없음', 'ymd', REF).length === 0, 
   console.assert(extractDateCandidates('26.12.31', 'ymd', R2)[0] === '2026-12-31', '2자리 연도 실패');
   console.assert(extractDateCandidates('5.9.2026', 'dmy', R2)[0] === '2026-09-05', '한 자리 일-월-연 실패');
   console.assert(extractDateCandidates('31.12.2026', 'dmy', R2)[0] === '2026-12-31', '일-월-연 실패');
+}
+
+// 실시간 자동 인식: 사각형 안 글자만 본다 — 사진 전체를 읽으면 제조일·로트 숫자가 섞여 오인식
+{
+  // 미리보기 300x400(세로), 캡처 3000x4000 — 배율 0.1
+  const r = viewRectToImage({ x: 50, y: 150, width: 200, height: 100 }, { width: 300, height: 400 }, { width: 3000, height: 4000 });
+  console.assert(r.left === 500 && r.top === 1500 && r.right === 2500 && r.bottom === 2500, '화면→이미지 좌표 변환 실패');
+  // 캡처가 가로로 누운 크기(4000x3000)로 와도 같은 결과
+  const r2 = viewRectToImage({ x: 50, y: 150, width: 200, height: 100 }, { width: 300, height: 400 }, { width: 4000, height: 3000 });
+  console.assert(r2.left === 500 && r2.bottom === 2500, '누운 이미지 크기 보정 실패');
+  const lines = [
+    { text: '제조일 2026.01.05', frame: { left: 600, top: 800, right: 2400, bottom: 900 } },
+    { text: '2026.12.31 까지', frame: { left: 700, top: 1900, right: 2300, bottom: 2100 } },
+    { text: 'LOT 2029.03.01', frame: { left: 600, top: 3500, right: 2400, bottom: 3600 } },
+  ];
+  console.assert(extractExpiryDateFromText(textInRegion(lines, r), 'ymd', REF) === '2026-12-31', '사각형 밖 숫자가 섞이면 안 됨');
+}
+// 확정 규칙: 최근 3번 중 2번 같은 날짜 — 흔들린 한 장(null)이 끼어도 확정, 서로 다르면 보류
+{
+  console.assert(stableDate(['2026-12-31', null, '2026-12-31']) === '2026-12-31', '사이에 못 읽은 장이 있어도 확정');
+  console.assert(stableDate(['2026-12-31', '2026-12-30']) === null, '서로 다르면 확정 안 함');
+  console.assert(stableDate(['2026-12-31']) === null, '한 번만 읽힌 건 확정 안 함');
+  console.assert(
+    stableDate(['2026-01-01', '2026-01-01', null, '2026-06-30', '2026-07-01']) === null,
+    '오래된 결과(3번 전)는 세지 않음',
+  );
 }
 
 console.log('date-ocr selfcheck OK');
