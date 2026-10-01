@@ -4,6 +4,7 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'rea
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -23,12 +24,13 @@ import { cancelExpiryAlerts } from '@/lib/notifications';
 import { matchesSearch } from '@/lib/korean-search';
 import { deleteProduct, listProducts, resolveProduct } from '@/lib/repo';
 import { useAppMode, useCoupangSuggestEnabled } from '@/lib/settings';
-import { COUPANG_DISCLOSURE, openCoupangSearch } from '@/lib/coupang';
+import CoupangRebuyCard from '@/components/CoupangRebuyCard';
 import { BarcodeInfo, Product } from '@/lib/types';
 
 export default function Dashboard() {
   const mode = useAppMode();
   const coupangSuggest = useCoupangSuggestEnabled();
+  const [rebuy, setRebuy] = useState<Product | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [query, setQuery] = useState('');
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
@@ -172,17 +174,7 @@ export default function Dashboard() {
         return;
       }
       // 가정용에서 다 먹은 상품만 — 폐기한 상품에 다시 사라고 하면 거부감이 든다.
-      if (status === 'consumed' && mode === 'home' && coupangSuggest) {
-        Alert.alert(
-          `${p.name} 다 드셨네요`,
-          `쿠팡에서 다시 살까요?\n\n${COUPANG_DISCLOSURE}`,
-          [
-            { text: '괜찮아요', style: 'cancel' },
-            { text: '쿠팡에서 보기', onPress: () => openCoupangSearch(p.name) },
-          ],
-          { cancelable: true },
-        );
-      }
+      if (status === 'consumed' && mode === 'home' && coupangSuggest) setRebuy(p);
     },
     [load, mode, coupangSuggest],
   );
@@ -412,6 +404,27 @@ export default function Dashboard() {
         label={mode === 'home' ? '상품추가' : undefined}
         accessibilityLabel={mode === 'home' ? '상품 추가' : '바코드 스캔'}
       />
+
+      {/* 소진 완료 직후: 아래에서 올라오는 쿠팡 다시 사기 안내 */}
+      <Modal
+        visible={!!rebuy}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setRebuy(null)}
+      >
+        <Pressable className="flex-1 justify-end bg-black/40" onPress={() => setRebuy(null)}>
+          <Pressable className="rounded-t-3xl bg-bg px-5 pb-8 pt-5" onPress={(e) => e.stopPropagation()}>
+            <Text className="text-ink text-lg font-bold">{rebuy?.name} 다 드셨네요 👏</Text>
+            <Text className="text-muted mb-4 mt-1 text-sm">떨어지기 전에 다시 채워 둘까요?</Text>
+            {rebuy ? (
+              <CoupangRebuyCard name={rebuy.name} imageUri={rebuy.imageUri} onOpened={() => setRebuy(null)} />
+            ) : null}
+            <Pressable onPress={() => setRebuy(null)} className="mt-3 items-center py-2">
+              <Text className="text-muted text-sm">괜찮아요</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
