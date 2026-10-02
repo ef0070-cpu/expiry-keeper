@@ -96,6 +96,7 @@ export default function RootLayout() {
           <Stack.Screen name="recipe-video" options={{ title: '레시피 영상' }} />
           <Stack.Screen name="settings" options={{ title: '설정' }} />
           <Stack.Screen name="premium" options={{ title: '유료 이용' }} />
+          <Stack.Screen name="licenses" options={{ title: '오픈소스 라이선스' }} />
           <Stack.Screen name="csv-import" options={{ title: '엑셀·CSV로 가져오기' }} />
         </Stack.Protected>
         <Stack.Protected guard={authed && mode === 'retail'}>

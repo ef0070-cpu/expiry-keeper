@@ -309,6 +309,8 @@ export default function Settings() {
         ) : (
           <LinkRow icon="flask-outline" label="실험실" onPress={() => setLabsModalVisible(true)} />
         )}
+        <View className="h-px bg-line" />
+        <LinkRow icon="license" label="오픈소스 라이선스" onPress={() => router.push('/licenses')} />
       </View>
 
       {isCloudMode ? (
