@@ -93,3 +93,23 @@ export async function rescheduleAllExpiryAlerts(): Promise<void> {
     // 재예약 실패는 무시 (다음 상품 저장 시 다시 예약됨)
   }
 }
+
+/** 이벤트 무료 이용 종료 7일 전 09:00 안내. until이 null이면(이벤트 아님) 예약을 지우기만 한다. */
+export async function scheduleTrialEndingAlert(until: string | null): Promise<void> {
+  try {
+    await Notifications.cancelScheduledNotificationAsync('promo-ending');
+    if (!until) return;
+    const end = new Date(until);
+    const date = new Date(end.getFullYear(), end.getMonth(), end.getDate() - 7, 9, 0, 0);
+    if (date.getTime() <= Date.now()) return;
+    if (!(await ensureNotificationPermission())) return;
+    await ensureChannel();
+    await Notifications.scheduleNotificationAsync({
+      identifier: 'promo-ending',
+      content: { title: '유통기한 매니저', body: '이벤트 무료 이용이 7일 뒤 끝나요. 계속 쓰려면 매장용 구독을 확인해 주세요.' },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date, channelId: 'expiry' },
+    });
+  } catch {
+    // 알림 실패는 무시
+  }
+}

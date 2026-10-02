@@ -6,6 +6,7 @@ import { Alert, Modal, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { captureRef } from 'react-native-view-shot';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
+import { bumpMonthlyUsage, withinMonthlyLimit } from '@/lib/entitlement';
 import { PRICE_TAG_MAKER_HTML } from '@/lib/price-tag-maker-html';
 
 const BASE_URL = 'https://price-tag-maker.expiry-keeper.local/';
@@ -75,8 +76,16 @@ export default function PriceTagMaker() {
         tagsList?: unknown[];
       };
       if (msg.type !== 'requestNativeCapture' || !msg.kind) return;
-      hydratedRef.current = false;
-      setCaptureRequest({ id: Date.now(), kind: msg.kind, tagsList: msg.tagsList ?? [] });
+      const kind = msg.kind;
+      withinMonthlyLimit('priceTag').then((ok) => {
+        if (!ok) {
+          finishCapture(false, '이번 달 무료 가격표를 모두 썼어요');
+          router.push('/premium?reason=priceTag');
+          return;
+        }
+        hydratedRef.current = false;
+        setCaptureRequest({ id: Date.now(), kind, tagsList: msg.tagsList ?? [] });
+      });
     } catch {
       // 이 WebView가 보낼 수 있는 다른 메시지 타입은 없음 — 무시
     }
@@ -113,6 +122,7 @@ export default function PriceTagMaker() {
     try {
       const uri = await captureRef(captureWrapperRef, { format: 'png', quality: 1, result: 'tmpfile' });
       await deliverOutput(captureRequest.kind, uri);
+      await bumpMonthlyUsage('priceTag');
       finishCapture(true);
     } catch (e) {
       finishCapture(false, e instanceof Error ? e.message : '캡처에 실패했습니다.');

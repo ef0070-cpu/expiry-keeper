@@ -12,6 +12,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { withinTeamLimit } from '@/lib/entitlement';
+import { useAppMode } from '@/lib/settings';
 import { isCloudMode, supabase } from '@/lib/supabase';
 import {
   createTeam,
@@ -28,6 +30,7 @@ import { Team, TeamMember } from '@/lib/types';
 export default function TeamScreen() {
   const router = useRouter();
   const { code: inviteCode } = useLocalSearchParams<{ code?: string }>();
+  const mode = useAppMode();
   const [loading, setLoading] = useState(true);
   const [team, setTeam] = useState<Team | null>(null);
   const [members, setMembers] = useState<TeamMember[]>([]);
@@ -81,6 +84,11 @@ export default function TeamScreen() {
       const name = teamName.trim();
       if (!name) {
         Alert.alert('입력 확인', '팀(매장) 이름을 입력해 주세요.');
+        return;
+      }
+      // 매장 무료는 혼자 사용 — 팀을 새로 만드는 것만 막는다(유료화 전에 만든 팀·팀원은 그대로, 가정용 가족 공유는 무료)
+      if (mode === 'retail' && !(await withinTeamLimit())) {
+        router.push('/premium?reason=team');
         return;
       }
       const t = await createTeam(name);

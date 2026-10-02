@@ -8,7 +8,9 @@ import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, Switch, Text, T
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COUPANG_DISCLOSURE } from '@/lib/coupang';
 import { ddayLabel } from '@/lib/dates';
+import { useEntitlement, usePlanConfig } from '@/lib/entitlement';
 import { rescheduleAllExpiryAlerts } from '@/lib/notifications';
+import { maxAlertCount } from '@/lib/plan-limits';
 import {
   ALERT_OFFSETS,
   AppMode,
@@ -40,6 +42,8 @@ import { isCloudMode, supabase } from '@/lib/supabase';
 export default function Settings() {
   const mode = useAppMode();
   const { count, hour, minute } = useAlertSettings();
+  const entitlement = useEntitlement();
+  const planConfig = usePlanConfig();
   const dateInputMethod = useDateInputMethod();
   const dateOcrOrder = useDateOcrOrder();
   const scanHapticEnabled = useScanHapticEnabled();
@@ -84,6 +88,11 @@ export default function Settings() {
   };
 
   const changeCount = (delta: number) => {
+    // 매장 무료는 알림 2회까지(스위치 켜졌을 때). 이미 더 많이 설정해 둔 값은 줄이지 않는다.
+    if (delta > 0 && mode === 'retail' && count >= maxAlertCount(entitlement.retailPremium, planConfig)) {
+      router.push('/premium?reason=alerts');
+      return;
+    }
     const next = Math.min(7, Math.max(1, count + delta));
     if (next === count) return;
     setAlertSettings({ count: next });
@@ -244,6 +253,16 @@ export default function Settings() {
 
       <SectionTitle text="기능" />
       <View className="overflow-hidden rounded-xl border border-line bg-paper">
+        {isCloudMode ? (
+          <>
+            <LinkRow
+              icon="crown-outline"
+              label={mode === 'home' ? '광고 제거' : '유료 이용·이벤트 코드'}
+              onPress={() => router.push('/premium')}
+            />
+            <View className="h-px bg-line" />
+          </>
+        ) : null}
         <LinkRow
           icon="chart-box-outline"
           label="소진·폐기 통계"

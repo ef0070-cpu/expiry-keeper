@@ -24,9 +24,11 @@ import { extractDateCandidates } from '@/lib/date-ocr';
 import { errorMessage } from '@/lib/errors';
 import { deleteLocalPhotoIfOwned, persistLocalPhoto } from '@/lib/local-photo';
 import { addMonths, autoFormatDate, formatDate, isValidDateStr, todayStr } from '@/lib/dates';
+import { withinProductLimit } from '@/lib/entitlement';
 import { cancelExpiryAlerts, scheduleExpiryAlerts } from '@/lib/notifications';
 import {
   deleteProduct,
+  getCachedActiveProducts,
   getCachedCategories,
   getCachedProduct,
   getProduct,
@@ -296,6 +298,14 @@ export default function ProductForm() {
   };
 
   const doSave = async () => {
+    // 매장 무료 한도는 새 상품 추가에만 — 기존 상품 수정·수량 합치기는 한도를 넘어도 막지 않는다
+    if (!isEdit && productMode === 'retail') {
+      const active = await listProducts('active').catch(() => getCachedActiveProducts());
+      if (!(await withinProductLimit(active.length))) {
+        router.push('/premium?reason=products');
+        return;
+      }
+    }
     setBusy(true);
     try {
       const product: Product = {

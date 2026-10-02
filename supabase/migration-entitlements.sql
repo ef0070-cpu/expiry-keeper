@@ -46,13 +46,6 @@ returns boolean language sql security definer stable set search_path = public as
                  where t.email = lower((select u.email from auth.users u where u.id = uid)));
 $$;
 
-create or replace function public.has_retail_premium(uid uuid)
-returns boolean language sql security definer stable set search_path = public as $$
-  select public.is_tester(uid)
-      or exists (select 1 from public.entitlements e
-                 where e.user_id = uid and (e.retail_lifetime or e.retail_until > now()));
-$$;
-
 -- 내 권한 = 내 행 + 테스터 + (팀장의 매장 권한 승계)
 create or replace function public.get_my_entitlement()
 returns table (ad_free boolean, retail_until timestamptz, retail_lifetime boolean, retail_source text)
@@ -121,42 +114,12 @@ begin
 end;
 $$;
 
--- 팀 참여: 팀장이 매장 유료가 아니면 새 팀원을 받지 않는다(기존 팀원은 유지)
-create or replace function public.join_team_by_code(code text)
-returns table (id uuid, name text, invite_code text)
-language plpgsql security definer
-set search_path = public
-as $$
-declare
-  found_team public.teams;
-begin
-  if auth.uid() is null then
-    raise exception '로그인이 필요합니다';
-  end if;
-  if exists (select 1 from public.team_members m where m.user_id = auth.uid()) then
-    raise exception '이미 팀에 소속되어 있습니다. 먼저 팀을 나가주세요.';
-  end if;
-
-  select * into found_team from public.teams t where t.invite_code = upper(trim(code));
-  if not found then
-    raise exception '초대 코드가 올바르지 않습니다';
-  end if;
-  if (select c.paywall_enabled from public.app_config c where c.id = 1)
-     and not public.has_retail_premium(found_team.owner_id) then
-    raise exception '팀장이 매장용 구독 중일 때만 팀에 참여할 수 있어요';
-  end if;
-
-  insert into public.team_members (team_id, user_id, email)
-  values (found_team.id, auth.uid(), (select u.email from auth.users u where u.id = auth.uid()));
-
-  return query select found_team.id, found_team.name, found_team.invite_code;
-end;
-$$;
-
-revoke execute on function public.is_tester(uuid), public.has_retail_premium(uuid) from anon, authenticated;
+-- 팀 참여 제한은 서버에 두지 않는다: 팀은 가정용(가족 공유)과 매장용을 구분하지 않아 서버에서 막으면
+-- 가족 공유까지 막힌다 → 매장 모드 팀 화면에서만 막는다(team.tsx).
+revoke execute on function public.is_tester(uuid) from public, anon, authenticated;
 
 -- 유료화 스위치·무료 한도 숫자 (사장님이 Table Editor에서 바꾸면 앱 재빌드 없이 적용)
---  paywall_enabled=false 면 매장용 한도·팀 참여 제한을 모두 끈다(출시 초기 무료 운영)
+--  paywall_enabled=false 면 매장용 한도·팀 제한을 모두 끈다(출시 초기 무료 운영)
 create table if not exists public.app_config (
   id int primary key default 1 check (id = 1),
   paywall_enabled boolean not null default false,

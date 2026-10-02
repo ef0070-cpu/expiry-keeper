@@ -12,6 +12,7 @@ import {
   setOrderCartQuantity,
   writeOrderCart,
 } from '@/lib/order-repo';
+import { bumpMonthlyUsage, withinMonthlyLimit } from '@/lib/entitlement';
 import { buildOrderShareText } from '@/lib/order-share';
 import { OrderCart, OrderProduct } from '@/lib/order-types';
 
@@ -80,6 +81,10 @@ export default function OrderCartScreen() {
   };
 
   const share = async () => {
+    if (!(await withinMonthlyLimit('order'))) {
+      router.push('/premium?reason=order');
+      return;
+    }
     const text = buildOrderShareText(cart, products, storeName, new Date());
     try {
       const result = await Share.share({ message: text });
@@ -87,6 +92,7 @@ export default function OrderCartScreen() {
       // 띄운 시점에 곧바로 resolve됨) — sharedAction이면 전달 시도가 이뤄진 것으로 보고 비운다.
       // iOS는 사용자가 취소하면 dismissedAction이 와서 이 분기를 안 타 장바구니가 보존된다.
       if (result.action === Share.sharedAction) {
+        await bumpMonthlyUsage('order');
         await clearOrderCart();
         setCart({});
       }

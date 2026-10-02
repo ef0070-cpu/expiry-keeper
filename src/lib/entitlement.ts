@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react';
 import {
   DEFAULT_CONFIG,
   FREE,
+  canAddProduct,
+  canUseMonthly,
   monthKey,
   toEntitlement,
   toPlanConfig,
@@ -109,4 +111,22 @@ export async function getMonthlyUsage(kind: MonthlyKind): Promise<number> {
 
 export async function bumpMonthlyUsage(kind: MonthlyKind): Promise<void> {
   await AsyncStorage.setItem(usageKey(kind), String((await getMonthlyUsage(kind)) + 1));
+}
+
+/** 매장 월 한도(발주서·가격표) 안인가 — 스위치 꺼짐·유료면 항상 true */
+export async function withinMonthlyLimit(kind: MonthlyKind): Promise<boolean> {
+  await load();
+  return canUseMonthly(await getMonthlyUsage(kind), current().retailPremium, config);
+}
+
+/** 매장 상품을 하나 더 등록할 수 있는가(지금 관리 중인 개수 기준) */
+export async function withinProductLimit(activeCount: number): Promise<boolean> {
+  await load();
+  return canAddProduct(activeCount, current().retailPremium, config);
+}
+
+/** 매장 팀을 새로 만들 수 있는가(무료는 혼자 사용) */
+export async function withinTeamLimit(): Promise<boolean> {
+  await load();
+  return current().retailPremium || !config.paywallEnabled;
 }

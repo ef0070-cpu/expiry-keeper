@@ -15,6 +15,7 @@ import {
   syncOrderStores,
 } from '@/lib/order-repo';
 import { clearEntitlement, refreshEntitlement } from '@/lib/entitlement';
+import { scheduleTrialEndingAlert } from '@/lib/notifications';
 import { isCloudMode, supabase } from '@/lib/supabase';
 
 // Expo Go는 원격 푸시를 지원하지 않는다는 경고 — 이 앱은 로컬 알림만 쓰므로 해당 없음
@@ -42,14 +43,14 @@ export default function RootLayout() {
       setReady(true);
       if (data.session) {
         syncOrderStoreData();
-        refreshEntitlement();
+        refreshEntitlement().then((e) => scheduleTrialEndingAlert(e.retailSource === 'promo' ? e.retailUntil : null));
       }
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
       if (s) {
         syncOrderStoreData();
-        refreshEntitlement();
+        refreshEntitlement().then((e) => scheduleTrialEndingAlert(e.retailSource === 'promo' ? e.retailUntil : null));
       } else {
         syncTriggeredRef.current = false;
         clearEntitlement();
@@ -90,6 +91,7 @@ export default function RootLayout() {
           <Stack.Screen name="recipes" options={{ title: '레시피 추천' }} />
           <Stack.Screen name="recipe-video" options={{ title: '레시피 영상' }} />
           <Stack.Screen name="settings" options={{ title: '설정' }} />
+          <Stack.Screen name="premium" options={{ title: '유료 이용' }} />
           <Stack.Screen name="csv-import" options={{ title: '엑셀·CSV로 가져오기' }} />
         </Stack.Protected>
         <Stack.Protected guard={authed && mode === 'retail'}>
