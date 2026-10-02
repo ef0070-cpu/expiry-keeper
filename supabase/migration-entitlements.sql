@@ -141,7 +141,8 @@ begin
   if not found then
     raise exception '초대 코드가 올바르지 않습니다';
   end if;
-  if not public.has_retail_premium(found_team.owner_id) then
+  if (select c.paywall_enabled from public.app_config c where c.id = 1)
+     and not public.has_retail_premium(found_team.owner_id) then
     raise exception '팀장이 매장용 구독 중일 때만 팀에 참여할 수 있어요';
   end if;
 
@@ -153,3 +154,17 @@ end;
 $$;
 
 revoke execute on function public.is_tester(uuid), public.has_retail_premium(uuid) from anon, authenticated;
+
+-- 유료화 스위치·무료 한도 숫자 (사장님이 Table Editor에서 바꾸면 앱 재빌드 없이 적용)
+--  paywall_enabled=false 면 매장용 한도·팀 참여 제한을 모두 끈다(출시 초기 무료 운영)
+create table if not exists public.app_config (
+  id int primary key default 1 check (id = 1),
+  paywall_enabled boolean not null default false,
+  product_limit int not null default 30,
+  monthly_limit int not null default 5,
+  alert_limit int not null default 2
+);
+insert into public.app_config (id) values (1) on conflict do nothing;
+alter table public.app_config enable row level security;
+drop policy if exists "app_config read" on public.app_config;
+create policy "app_config read" on public.app_config for select using (true);

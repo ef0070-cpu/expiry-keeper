@@ -1,11 +1,17 @@
-import { canAddProduct, canUseMonthly, maxAlertCount, monthKey, toEntitlement } from './plan-limits';
+import { DEFAULT_CONFIG, canAddProduct, canUseMonthly, maxAlertCount, monthKey, toEntitlement, toPlanConfig } from './plan-limits';
 
-console.assert(canAddProduct(29, false) === true, '무료 29개 → 추가 가능');
-console.assert(canAddProduct(30, false) === false, '무료 30개 → 추가 불가');
-console.assert(canAddProduct(500, true) === true, '유료는 무제한');
-console.assert(canUseMonthly(4, false) === true && canUseMonthly(5, false) === false, '월 5회');
-console.assert(canUseMonthly(99, true) === true, '유료 월 무제한');
-console.assert(maxAlertCount(false) === 2 && maxAlertCount(true) === 7, '알림 상한');
+const ON = { ...DEFAULT_CONFIG, paywallEnabled: true };
+console.assert(canAddProduct(29, false, ON) === true, '무료 29개 → 추가 가능');
+console.assert(canAddProduct(30, false, ON) === false, '무료 30개 → 추가 불가');
+console.assert(canAddProduct(500, true, ON) === true, '유료는 무제한');
+console.assert(canAddProduct(500, false, DEFAULT_CONFIG) === true, '스위치 꺼짐 → 누구나 무제한');
+console.assert(canUseMonthly(4, false, ON) === true && canUseMonthly(5, false, ON) === false, '월 5회');
+console.assert(canUseMonthly(99, true, ON) === true, '유료 월 무제한');
+console.assert(canUseMonthly(99, false, DEFAULT_CONFIG) === true, '스위치 꺼짐 → 월 무제한');
+console.assert(maxAlertCount(false, ON) === 2 && maxAlertCount(true, ON) === 7, '알림 상한');
+console.assert(maxAlertCount(false, DEFAULT_CONFIG) === 7, '스위치 꺼짐 → 알림 7회');
+console.assert(canAddProduct(39, false, { ...ON, productLimit: 40 }) === true, '서버에서 바꾼 한도 숫자 반영');
+console.assert(toPlanConfig({ paywall_enabled: true, product_limit: 50, monthly_limit: 10, alert_limit: 3 }).productLimit === 50, '서버 행 변환');
 console.assert(monthKey(new Date(2026, 0, 31, 23, 59)) === '2026-01', '현지 달력 월');
 const now = new Date('2026-10-02T00:00:00Z');
 const row = (o: object) => ({ ad_free: false, retail_until: null, retail_lifetime: false, retail_source: null, ...o });

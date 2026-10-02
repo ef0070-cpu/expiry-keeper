@@ -1,4 +1,36 @@
+import { Directory, File, Paths } from 'expo-file-system';
 import { supabase } from './supabase';
+
+// 올리기 전에 긴 변 800px·JPEG 70%로 줄인다(원본 1장 수 MB → 약 100~150KB). 무료 서버 저장 공간 1GB·
+// 전송량이 사용자 수의 한계라서. 사진 처리 모듈이 없는 예전 개발용 앱에서도 죽지 않게 늦게 불러오고,
+// 줄이기에 실패하면 원본을 그대로 올린다(사진 저장 자체가 실패하는 것보다 낫다).
+const MAX_SIDE = 800;
+let Manipulator: typeof import('expo-image-manipulator') | null = null;
+try {
+  Manipulator = require('expo-image-manipulator');
+} catch {
+  Manipulator = null;
+}
+
+async function shrinkForUpload(uri: string): Promise<string> {
+  if (!Manipulator) return uri;
+  try {
+    // 사진 처리 모듈은 기기 안 파일만 읽으므로 웹 사진은 먼저 내려받는다
+    const local = uri.startsWith('http')
+      ? (await File.downloadFileAsync(uri, new Directory(Paths.cache), { idempotent: true })).uri
+      : uri;
+    const { ImageManipulator, SaveFormat } = Manipulator;
+    let image = await ImageManipulator.manipulate(local).renderAsync();
+    if (Math.max(image.width, image.height) > MAX_SIDE) {
+      const size = image.width >= image.height ? { width: MAX_SIDE } : { height: MAX_SIDE };
+      image = await ImageManipulator.manipulate(image).resize(size).renderAsync();
+    }
+    const saved = await image.saveAsync({ compress: 0.7, format: SaveFormat.JPEG });
+    return saved.uri;
+  } catch {
+    return uri;
+  }
+}
 
 /**
  * 로컬 사진(file:// 또는 content:// URI)을 Supabase Storage 버킷에 올리고 공개 URL을 돌려준다.
@@ -24,7 +56,7 @@ export async function uploadPhotoToBucket(
     const userId = auth.session?.user.id;
     if (!userId) return null;
     const fullPath = `${userId}/${path}`;
-    const res = await fetch(uri);
+    const res = await fetch(await shrinkForUpload(uri));
     const buffer = await res.arrayBuffer();
     const { error } = await supabase.storage
       .from(bucket)
