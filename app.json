@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "유통기한 매니저",
+    "name": "유통기한 지킴이",
     "slug": "expiry-keeper",
     "version": "1.0.0",
     "orientation": "default",
