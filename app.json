@@ -99,7 +99,8 @@
           "androidAppId": "ca-app-pub-9764423893666665~3171270388",
           "delayAppMeasurementInit": true
         }
-      ]
+      ],
+      "expo-iap"
     ],
     "experiments": {
       "typedRoutes": true,

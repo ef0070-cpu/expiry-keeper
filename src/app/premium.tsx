@@ -1,15 +1,16 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { LIFETIME, MONTHLY, buy, getPrice, restorePurchases } from '@/lib/billing';
 import { refreshEntitlement, useEntitlement, usePlanConfig } from '@/lib/entitlement';
 import { scheduleTrialEndingAlert } from '@/lib/notifications';
 import { useAppMode } from '@/lib/settings';
 import { supabase } from '@/lib/supabase';
 
 // 유료 안내·이벤트 코드 입력. 결제 문구는 docs/monetization.md 3-1·3-2(법무 점검 대상) 그대로.
-// 가격은 플레이 콘솔에 등록한 값을 결제 모듈에서 받아 보여 준다(앱에 금액을 박지 않음 — 결제 연결 전엔 "준비 중").
+// 가격은 플레이 콘솔에 등록한 값을 결제 모듈에서 받아 보여 준다(앱에 금액을 박지 않음 — 못 받으면 "준비 중").
 const PACKAGE = 'com.shlab.expirykeeper';
 
 const REASON_TEXT: Record<string, string> = {
@@ -32,7 +33,30 @@ export default function Premium() {
   const cfg = usePlanConfig();
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
-  const price: string | null = null; // 결제 연결(Task 5) 후 스토어 가격 문자열
+  const [price, setPrice] = useState<string | null>(null); // 플레이 콘솔에 등록된 현지 가격
+  const [restoring, setRestoring] = useState(false);
+  const productKey = mode === 'home' ? LIFETIME : MONTHLY;
+
+  useEffect(() => {
+    getPrice(productKey).then(setPrice);
+  }, [productKey]);
+
+  const purchase = async () => {
+    try {
+      await buy(productKey);
+    } catch (e) {
+      // 사용자가 결제창을 닫은 경우도 여기로 온다 — 그때는 조용히
+      const msg = e instanceof Error ? e.message : '';
+      if (!/cancel/i.test(msg)) Alert.alert('결제', msg || '결제를 진행하지 못했어요.');
+    }
+  };
+
+  const restore = async () => {
+    setRestoring(true);
+    const n = await restorePurchases();
+    setRestoring(false);
+    Alert.alert('구매 복원', n > 0 ? '구매 내역을 다시 적용했어요.' : '복원할 구매 내역이 없어요.');
+  };
 
   const redeem = async () => {
     if (!supabase || busy) return;
@@ -94,8 +118,9 @@ export default function Premium() {
             '같은 구글 계정이면 휴대폰을 바꿔도 [구매 복원]으로 다시 적용됩니다.',
             '결제 즉시 광고 제거가 적용되어, 구매 후 7일 이내라도 이용을 시작한 경우 청약철회가 제한될 수 있습니다. 결제 후 48시간 이내에는 구글 플레이에서 직접 환불 요청할 수 있습니다.',
           ]}
-          buttonLabel="구매하기"
+          buttonLabel={ent.adFree ? '구매 완료' : '구매하기'}
           disabled={!price || ent.adFree}
+          onPress={purchase}
         />
       ) : (
         <PlanCard
@@ -108,14 +133,16 @@ export default function Premium() {
             '가격이 오르면 결제일 30일 전까지 알리고 동의를 받습니다. 동의하지 않으면 자동 결제되지 않습니다.',
             '구독이 끝나도 등록한 상품·발주서·가격표는 지워지지 않습니다(새로 추가만 무료 한도 적용).',
           ]}
-          buttonLabel="구독하기"
-          disabled={!price}
+          buttonLabel={ent.retailSource === 'subscription' && ent.retailPremium ? '구독 중' : '구독하기'}
+          disabled={!price || (ent.retailSource === 'subscription' && ent.retailPremium)}
+          onPress={purchase}
         />
       )}
 
       <View className="mt-3 overflow-hidden rounded-xl border border-line bg-paper">
-        <Pressable className="px-4 py-3.5" disabled>
-          <Text className="text-muted text-sm">구매 복원 (준비 중)</Text>
+        <Pressable className="flex-row items-center px-4 py-3.5" disabled={restoring} onPress={restore}>
+          <Text className="text-ink flex-1 text-sm">구매 복원</Text>
+          {restoring ? <ActivityIndicator size="small" /> : null}
         </Pressable>
         {mode === 'retail' ? (
           <>
@@ -173,12 +200,14 @@ function PlanCard({
   notes,
   buttonLabel,
   disabled,
+  onPress,
 }: {
   title: string;
   price: string;
   notes: string[];
   buttonLabel: string;
   disabled: boolean;
+  onPress: () => void;
 }) {
   return (
     <View className="rounded-xl border border-line bg-paper p-4">
@@ -194,6 +223,7 @@ function PlanCard({
       <Pressable
         className={`mt-2 items-center rounded-lg py-3 ${disabled ? 'bg-line' : 'bg-primary'}`}
         disabled={disabled}
+        onPress={onPress}
       >
         <Text className="text-sm font-bold text-white">{buttonLabel}</Text>
       </Pressable>

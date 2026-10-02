@@ -14,6 +14,7 @@ import {
   syncOrderCatalog,
   syncOrderStores,
 } from '@/lib/order-repo';
+import { restorePurchases } from '@/lib/billing';
 import { clearEntitlement, refreshEntitlement } from '@/lib/entitlement';
 import { markInstalled } from '@/lib/interstitial';
 import { scheduleTrialEndingAlert } from '@/lib/notifications';
@@ -44,6 +45,7 @@ export default function RootLayout() {
       setReady(true);
       if (data.session) {
         syncOrderStoreData();
+        restorePurchases(); // 확정 못 한 결제 재확인·구독 갱신 반영
         refreshEntitlement().then((e) => scheduleTrialEndingAlert(e.retailSource === 'promo' ? e.retailUntil : null));
       }
     });
