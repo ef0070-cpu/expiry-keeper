@@ -14,6 +14,7 @@ import {
   syncOrderCatalog,
   syncOrderStores,
 } from '@/lib/order-repo';
+import { clearEntitlement, refreshEntitlement } from '@/lib/entitlement';
 import { isCloudMode, supabase } from '@/lib/supabase';
 
 // Expo Go는 원격 푸시를 지원하지 않는다는 경고 — 이 앱은 로컬 알림만 쓰므로 해당 없음
@@ -39,12 +40,20 @@ export default function RootLayout() {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
       setReady(true);
-      if (data.session) syncOrderStoreData();
+      if (data.session) {
+        syncOrderStoreData();
+        refreshEntitlement();
+      }
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
-      if (s) syncOrderStoreData();
-      else syncTriggeredRef.current = false;
+      if (s) {
+        syncOrderStoreData();
+        refreshEntitlement();
+      } else {
+        syncTriggeredRef.current = false;
+        clearEntitlement();
+      }
     });
     syncOrderCatalog();
     dedupeOrderProductsByBarcode();
