@@ -55,3 +55,4 @@ example
 
 # git worktrees for isolated feature work
 .claude/worktrees/
+.private/
