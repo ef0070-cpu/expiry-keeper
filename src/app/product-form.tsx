@@ -25,6 +25,7 @@ import { errorMessage } from '@/lib/errors';
 import { deleteLocalPhotoIfOwned, persistLocalPhoto } from '@/lib/local-photo';
 import { addMonths, autoFormatDate, formatDate, isValidDateStr, todayStr } from '@/lib/dates';
 import { withinProductLimit } from '@/lib/entitlement';
+import { maybeShowInterstitial } from '@/lib/interstitial';
 import { cancelExpiryAlerts, scheduleExpiryAlerts } from '@/lib/notifications';
 import {
   deleteProduct,
@@ -325,6 +326,7 @@ export default function ProductForm() {
       await saveProduct(product);
       await scheduleExpiryAlerts(product);
       router.dismissAll();
+      if (!isEdit && productMode === 'home') maybeShowInterstitial(); // 가정용 새 상품 저장 직후에만
     } catch (e) {
       Alert.alert('저장 실패', e instanceof Error ? e.message : '알 수 없는 오류');
     } finally {

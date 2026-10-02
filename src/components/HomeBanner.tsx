@@ -1,5 +1,6 @@
 import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useEntitlement } from '@/lib/entitlement';
 
 // 애드몹 배너(가정용 메인 목록 하단 고정). 개발 중(__DEV__)엔 구글 테스트 광고만 —
 // 실제 광고 ID로 테스트하다 본인이 누르면 무효 클릭으로 계정이 정지될 수 있다.
@@ -17,9 +18,15 @@ try {
 /** 이 앱에 광고 모듈이 들어 있는가 — 없으면 배너가 안 그려지니 상품추가 버튼도 원래 자리에 둔다 */
 export const adsAvailable = Ads !== null;
 
+/** 배너가 실제로 보이는가 — 광고 모듈이 있고 광고 제거(평생 결제·테스터)가 아닐 때 */
+export function useAdsVisible(): boolean {
+  return adsAvailable && !useEntitlement().adFree;
+}
+
 export default function HomeBanner() {
   const insets = useSafeAreaInsets();
-  if (!Ads) return null;
+  const visible = useAdsVisible();
+  if (!Ads || !visible) return null;
   const { BannerAd, BannerAdSize, TestIds } = Ads;
   return (
     // 하단 안내바 높이만큼 아래를 띄워 배너가 안내바에 겹치지 않게

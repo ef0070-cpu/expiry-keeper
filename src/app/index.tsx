@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import Chip from '@/components/Chip';
 import Fab from '@/components/Fab';
-import HomeBanner, { adsAvailable } from '@/components/HomeBanner';
+import HomeBanner, { useAdsVisible } from '@/components/HomeBanner';
 import ProductCard from '@/components/ProductCard';
 import HeaderIcon from '@/components/HeaderIcon';
 import SummaryHeader from '@/components/SummaryHeader';
@@ -28,6 +28,7 @@ import { BarcodeInfo, Product } from '@/lib/types';
 
 export default function Dashboard() {
   const mode = useAppMode();
+  const adsVisible = useAdsVisible();
   const [products, setProducts] = useState<Product[]>([]);
   const [query, setQuery] = useState('');
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
@@ -400,7 +401,7 @@ export default function Dashboard() {
         icon={mode === 'home' ? 'plus' : 'barcode-scan'}
         label={mode === 'home' ? '상품추가' : undefined}
         accessibilityLabel={mode === 'home' ? '상품 추가' : '바코드 스캔'}
-        bottom={mode === 'home' && adsAvailable ? 24 : undefined}
+        bottom={mode === 'home' && adsVisible ? 24 : undefined}
       />
       </View>
       {mode === 'home' ? <HomeBanner /> : null}

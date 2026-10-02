@@ -15,6 +15,7 @@ import {
   syncOrderStores,
 } from '@/lib/order-repo';
 import { clearEntitlement, refreshEntitlement } from '@/lib/entitlement';
+import { markInstalled } from '@/lib/interstitial';
 import { scheduleTrialEndingAlert } from '@/lib/notifications';
 import { isCloudMode, supabase } from '@/lib/supabase';
 
@@ -58,6 +59,7 @@ export default function RootLayout() {
     });
     syncOrderCatalog();
     dedupeOrderProductsByBarcode();
+    markInstalled();
     return () => sub.subscription.unsubscribe();
   }, []);
 
