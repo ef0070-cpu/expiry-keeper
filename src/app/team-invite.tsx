@@ -18,7 +18,7 @@ import { Team } from '@/lib/types';
 
 function buildInviteMessage(team: Team): string {
   const link = Linking.createURL('team', { queryParams: { code: team.inviteCode } });
-  return `[유통기한 지킴이] '${team.name}' 팀에 초대합니다.\n초대 코드: ${team.inviteCode}\n아래 링크로 바로 참여하세요.\n${link}`;
+  return `[유통기한 매니저] '${team.name}' 팀에 초대합니다.\n초대 코드: ${team.inviteCode}\n아래 링크로 바로 참여하세요.\n${link}`;
 }
 
 function InviteRow({
