@@ -15,8 +15,25 @@ function normalize(text: string): string {
  */
 export type SearchTier = 0 | 1 | 2 | 3 | 4;
 
-function candidatesOf(p: OrderProduct): string[] {
-  return [p.name, p.brand, ...(p.aliases ?? [])].filter((s) => s.trim().length > 0);
+type Candidate = { raw: string; norm: string; jamo: string };
+
+// 상품별 후보 문자열의 정규화·자모 분해 결과. 매 키 입력마다 상품 수×후보 수만큼 다시 분해하던 게
+// 검색 비용의 큰 몫이었다 — 상품 객체가 바뀌지 않는 한(목록 갱신 전까지) 재사용한다.
+const candidateCache = new WeakMap<OrderProduct, Candidate[]>();
+
+function candidatesOf(p: OrderProduct): Candidate[] {
+  let c = candidateCache.get(p);
+  if (!c) {
+    c = [p.name, p.brand, ...(p.aliases ?? [])]
+      .filter((s) => s.trim().length > 0)
+      .map((raw) => {
+        const norm = normalize(raw);
+        return { raw, norm, jamo: disassemble(norm) };
+      })
+      .filter((x) => x.norm);
+    candidateCache.set(p, c);
+  }
+  return c;
 }
 
 /** 여러 후보 문자열(상품명/브랜드/별칭) 중 query와 가장 잘 맞는 등급을 찾는다. 등급과 함께
@@ -24,7 +41,7 @@ function candidatesOf(p: OrderProduct): string[] {
  * "ㅂㅂㅂ"에 대해 "비비빅"이 "비비빅 흑임자"보다) 문자열이 더 정확한 일치이기 때문이다.
  * 초성/자모 등급은 기존 matchesSearch(초성+완성형 혼합, target 맨 앞부터)에 더해,
  * 완전히 자모 단위로 풀어낸 문자열끼리의 부분일치(중성 포함)까지 본다. */
-function deterministicTier(candidates: string[], query: string): { tier: SearchTier; len: number } | null {
+function deterministicTier(candidates: Candidate[], query: string): { tier: SearchTier; len: number } | null {
   const q = normalize(query);
   if (!q) return null;
   const qJamo = disassemble(q);
@@ -36,13 +53,11 @@ function deterministicTier(candidates: string[], query: string): { tier: SearchT
     }
   };
 
-  for (const raw of candidates) {
-    const t = normalize(raw);
-    if (!t) continue;
+  for (const { raw, norm: t, jamo } of candidates) {
     if (t === q) consider(0, t.length);
     else if (t.startsWith(q)) consider(1, t.length);
     else if (t.includes(q)) consider(2, t.length);
-    else if (matchesSearch(raw, query) || disassemble(t).includes(qJamo)) consider(3, t.length);
+    else if (matchesSearch(raw, query) || jamo.includes(qJamo)) consider(3, t.length);
   }
   return best;
 }
@@ -95,7 +110,8 @@ export function searchOrderProducts(
     else unmatchedIds.add(p.id);
   }
 
-  if (unmatchedIds.size > 0) {
+  // 오타 허용은 위 등급에 하나도 안 걸렸을 때만 — 결과가 있는데도 매번 돌리면 입력마다 비용만 든다.
+  if (scored.length === 0 && unmatchedIds.size > 0) {
     const fuse = fuseIndex ?? new Fuse(products.filter((p) => unmatchedIds.has(p.id)), FUSE_OPTIONS);
     for (const result of fuse.search(q)) {
       if (!unmatchedIds.has(result.item.id)) continue;

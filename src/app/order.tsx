@@ -937,13 +937,7 @@ export default function Order() {
               style={{ gap: 4 }}
             >
               <MaterialCommunityIcons name="magnify" size={20} color="#888888" />
-              <TextInput
-                className="text-ink ml-1 flex-1 py-2.5 text-base"
-                placeholder="상품명·바코드로 검색하세요"
-                placeholderTextColor="#BBBBBB"
-                value={query}
-                onChangeText={setQuery}
-              />
+              <SearchInput value={query} onCommit={setQuery} />
               <Pressable
                 onPress={() => router.push('/scan?mode=order-search')}
                 className="h-11 w-11 items-center justify-center rounded-lg active:bg-bg"
@@ -1764,6 +1758,54 @@ const AddToFridgeModal = memo(function AddToFridgeModal({
         </Pressable>
       </Pressable>
     </Modal>
+  );
+});
+
+// 검색창 글자는 이 안에서만 관리하고(타자마다 발주 화면 전체를 다시 그리지 않게), 입력이 잠깐 멈추면
+// 그때 검색어로 넘긴다 — 한 글자마다 전체 상품을 검색하느라 입력(특히 한글 조합)이 밀리던 문제.
+// 바코드 스캔·지우기처럼 바깥에서 검색어를 바꾸면 그 값으로 맞춘다.
+const SearchInput = memo(function SearchInput({
+  value,
+  onCommit,
+}: {
+  value: string;
+  onCommit: (q: string) => void;
+}) {
+  const [text, setText] = useState(value);
+  const lastCommittedRef = useRef(value);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (value === lastCommittedRef.current) return;
+    lastCommittedRef.current = value;
+    if (timerRef.current) clearTimeout(timerRef.current);
+    setText(value);
+  }, [value]);
+
+  useEffect(
+    () => () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    },
+    [],
+  );
+
+  const onChangeText = (t: string) => {
+    setText(t);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      lastCommittedRef.current = t;
+      onCommit(t);
+    }, 150);
+  };
+
+  return (
+    <TextInput
+      className="text-ink ml-1 flex-1 py-2.5 text-base"
+      placeholder="상품명·바코드로 검색하세요"
+      placeholderTextColor="#BBBBBB"
+      value={text}
+      onChangeText={onChangeText}
+    />
   );
 });
 
