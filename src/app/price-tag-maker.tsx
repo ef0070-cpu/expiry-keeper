@@ -36,6 +36,7 @@ export default function PriceTagMaker() {
   const captureWebViewRef = useRef<WebView>(null);
   const captureWrapperRef = useRef<View>(null);
   const hydratedRef = useRef(false);
+  const mainLoadedRef = useRef(false);
   const [captureRequest, setCaptureRequest] = useState<CaptureRequest | null>(null);
 
   const finishCapture = (ok: boolean, message?: string) => {
@@ -66,6 +67,15 @@ export default function PriceTagMaker() {
     await Sharing.shareAsync(fileUri, { mimeType: 'image/png', dialogTitle: '가격표 공유' });
   };
 
+  // 폰 뒤로 가기: 웹 화면이 열린 창(설정·크게 보기·알림)부터 닫게 하고, 닫을 창이 없으면 웹이 'exit'를
+  // 보내 handleMainMessage에서 나간다. 웹이 아직 안 떴으면 바로 나간다.
+  const handleBack = () => {
+    if (!mainLoadedRef.current) return router.back();
+    mainWebViewRef.current?.injectJavaScript(
+      `window.__handleBack ? window.__handleBack() : window.ReactNativeWebView.postMessage('{"type":"exit"}'); true;`
+    );
+  };
+
   /** 원래 보이는 WebView가 저장/카톡 전송 버튼을 누르면 보내는 요청만 받는다 — 이 WebView
    * 자체는 전혀 건드리지 않고, 아래 캡처 전용 WebView를 새로 띄운다. */
   const handleMainMessage = (event: WebViewMessageEvent) => {
@@ -75,6 +85,7 @@ export default function PriceTagMaker() {
         kind?: 'save' | 'share';
         tagsList?: unknown[];
       };
+      if (msg.type === 'exit') return router.back();
       if (msg.type !== 'requestNativeCapture' || !msg.kind) return;
       const kind = msg.kind;
       withinMonthlyLimit('priceTag').then((ok) => {
@@ -135,7 +146,7 @@ export default function PriceTagMaker() {
        * 헤더까지 함께 가려지기 때문. 아래 SafeAreaView 헤더가 이를 대체한다. */}
       <Stack.Screen options={{ title: '가격표 만들기', headerShown: false }} />
       {/* onRequestClose가 없으면 안드로이드 뒤로 가기 버튼·제스처가 이 Modal에 막혀 아무 반응이 없었다 */}
-      <Modal visible transparent={false} animationType="none" onRequestClose={() => router.back()}>
+      <Modal visible transparent={false} animationType="none" onRequestClose={handleBack}>
         <SafeAreaView edges={['top']} style={{ backgroundColor: '#FFFFFF' }}>
           <View
             style={{
@@ -172,6 +183,7 @@ export default function PriceTagMaker() {
             domStorageEnabled
             startInLoadingState
             onMessage={handleMainMessage}
+            onLoadEnd={() => (mainLoadedRef.current = true)}
           />
         </SafeAreaView>
       </Modal>

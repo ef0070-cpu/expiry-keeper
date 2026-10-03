@@ -851,6 +851,17 @@
       const [previewModalTag, setPreviewModalTag] = useState(null);
       const [dialog, setDialog] = useState({ isOpen: false, title: '', message: '', isConfirm: false, onConfirm: null });
 
+      // 폰 뒤로 가기(내비게이션 바): RN이 이 함수를 부른다. 열린 창(알림 > 크게 보기 > 설정)부터 하나씩
+      // 닫고, 열린 창이 없을 때만 RN에 exit를 보내 가격표 화면을 나가게 한다.
+      useEffect(() => {
+        window.__handleBack = () => {
+          if (dialog.isOpen) setDialog({ ...dialog, isOpen: false });
+          else if (previewModalTag) setPreviewModalTag(null);
+          else if (isSettingsOpen) setIsSettingsOpen(false);
+          else window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'exit' }));
+        };
+      }, [dialog, previewModalTag, isSettingsOpen]);
+
       const showModalAlert = (msg, title = '알림') => {
         setDialog({ isOpen: true, title, message: msg, isConfirm: false, onConfirm: null });
       };
