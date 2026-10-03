@@ -166,6 +166,8 @@ export default function PriceTagMaker() {
             style={{ flex: 1 }}
             originWhitelist={originWhitelist}
             onShouldStartLoadWithRequest={onShouldStartLoadWithRequest}
+            // 폰 "글자 크기" 설정(예: 130%)이 웹 글자에만 곱해져 기기마다 가격표 글자 크기가 달라지던 문제 — 항상 100%로 고정
+            textZoom={100}
             javaScriptEnabled
             domStorageEnabled
             startInLoadingState
@@ -195,6 +197,8 @@ export default function PriceTagMaker() {
             style={{ width: CAPTURE_WIDTH, height: CAPTURE_HEIGHT }}
             originWhitelist={originWhitelist}
             onShouldStartLoadWithRequest={onShouldStartLoadWithRequest}
+            // 폰 "글자 크기" 설정(예: 130%)이 웹 글자에만 곱해져 기기마다 가격표 글자 크기가 달라지던 문제 — 항상 100%로 고정
+            textZoom={100}
             javaScriptEnabled
             domStorageEnabled
             onLoadEnd={handleCaptureLoadEnd}
