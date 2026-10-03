@@ -1,4 +1,5 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Application from 'expo-application';
 import Constants from 'expo-constants';
 import * as Linking from 'expo-linking';
 import * as Notifications from 'expo-notifications';
@@ -346,9 +347,10 @@ export default function Settings() {
       ) : null}
 
       <Text className="text-muted mt-6 text-center text-xs">
-        {/* 빌드 번호는 EAS가 원격으로 올려서(appVersionSource: remote) 여기서 읽을 수 없다 —
-            ponytail: 빌드 번호까지 보이려면 expo-application(nativeBuildVersion) 추가 후 재빌드 */}
-        버전 {Constants.expoConfig?.version ?? '?'}
+        {/* 버전 이름(app.json)은 출시마다 안 바꿔 늘 같다 — EAS가 원격으로 올리는 빌드 번호(versionCode)를
+            설치된 앱에서 직접 읽어 함께 보여 준다(expo-application은 원래 알림 모듈 의존성으로 들어 있음) */}
+        버전 {Application.nativeApplicationVersion ?? Constants.expoConfig?.version}
+        {Application.nativeBuildVersion ? ` (빌드 ${Application.nativeBuildVersion})` : ''}
       </Text>
 
       {/* Open Food Facts 이미지는 CC BY-SA 3.0이라 출처 표시가 라이선스 조건이다. */}
