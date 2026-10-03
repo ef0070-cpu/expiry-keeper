@@ -47,20 +47,30 @@ export default function PhotoSourceSheet({
     }
     setSearching(true);
     try {
-      // 바코드 사진·상품명 검색을 동시에. 미리 사진을 전부 내려받아 비교하던 단계(dedupeByImage)는
+      // 바코드 사진·상품명 검색을 동시에 시작하되, 바코드 조회(약 1.2초)가 상품명 검색(약 0.35초)보다
+      // 훨씬 느려 둘 다 기다리면 그만큼 늦게 뜬다 — 상품명 결과가 오면 바로 띄우고, 바코드 사진은
+      // 도착하는 대로 맨 앞에 끼운다. 미리 사진을 전부 내려받아 비교하던 단계(dedupeByImage)는
       // 원본 크기 사진을 다 받느라 느려서 뺐다 — 같은 주소만 합치고, 못 여는 사진은 목록이 스스로 숨긴다.
       const code = web.barcode?.trim();
-      const [info, found] = await Promise.all([
-        code ? lookupBarcode(code) : Promise.resolve(null),
-        searchProductImageCandidates(name),
-      ]);
-      const shown = [...new Set([...(info?.imageUrl ? [info.imageUrl] : []), ...found])];
-      if (shown.length === 0) {
-        Alert.alert('검색 결과 없음', '사진을 찾지 못했습니다. 직접 촬영해 주세요.');
+      const barcodePhoto = code
+        ? lookupBarcode(code).then((info) => info?.imageUrl ?? null, () => null)
+        : Promise.resolve(null);
+      const found = await searchProductImageCandidates(name);
+      if (found.length === 0) {
+        const photo = await barcodePhoto;
+        if (!photo) {
+          Alert.alert('검색 결과 없음', '사진을 찾지 못했습니다. 직접 촬영해 주세요.');
+          return;
+        }
+        onClose();
+        setCandidates([photo]);
         return;
       }
       onClose();
-      setCandidates(shown);
+      setCandidates(found);
+      barcodePhoto.then((photo) => {
+        if (photo) setCandidates((prev) => (prev && !prev.includes(photo) ? [photo, ...prev] : prev));
+      });
     } finally {
       setSearching(false);
     }
