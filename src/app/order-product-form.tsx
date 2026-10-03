@@ -3,7 +3,7 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import * as Linking from 'expo-linking';
 import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -30,7 +30,13 @@ import {
   newId,
   saveOrderProduct,
 } from '@/lib/order-repo';
-import { deletePhotoCandidate, reportOrderProductIssue } from '@/lib/order-report';
+import {
+  type CatalogFields,
+  deletePhotoCandidate,
+  getOrderCatalogRow,
+  proposeOrderProductFix,
+  reportOrderProductIssue,
+} from '@/lib/order-report';
 import { errorMessage } from '@/lib/errors';
 import { takePickedBarcode } from '@/lib/scan-pick';
 import { clearSubmittedPhotoCandidate } from '@/lib/photo-candidates';
@@ -73,6 +79,8 @@ export default function OrderProductForm() {
   const [showPhotoPicker, setShowPhotoPicker] = useState(false);
   const [removingPhoto, setRemovingPhoto] = useState(false);
   const [referencePrice, setReferencePrice] = useState<number | null>(null);
+  // 수정 화면을 열 때 불러온 값 — 이번에 직접 바꾼 칸만 공용 수정 제안 대상으로 본다
+  const loadedRef = useRef<OrderProduct | null>(null);
 
   useEffect(() => {
     listOrderCategories().then((list) => {
@@ -83,6 +91,7 @@ export default function OrderProductForm() {
     if (params.id) {
       getOrderProduct(params.id).then((p) => {
         if (!p) return;
+        loadedRef.current = p;
         setName(p.name);
         setImageUri(p.imageUri);
         setBrand(p.brand);
@@ -276,7 +285,17 @@ export default function OrderProductForm() {
         status,
         ...(aliases.length > 0 ? { aliases } : {}),
       };
+      const proposal = await buildFixProposal(loadedRef.current, product);
+      let propose = false;
+      if (proposal) {
+        const choice = await askFixProposal(proposal.lines);
+        if (choice === 'cancel') return;
+        propose = choice === 'propose';
+      }
       await saveOrderProduct(product);
+      if (proposal && propose) {
+        proposeOrderProductFix(proposal.barcode, product.name, proposal.original, proposal.proposed).catch(() => {});
+      }
       router.back();
     } catch (e) {
       Alert.alert('저장 실패', errorMessage(e));
@@ -698,4 +717,67 @@ function StatusOption({
       </Text>
     </Pressable>
   );
+}
+
+/**
+ * 공용 상품(바코드 있음)을 고쳤을 때 공용 목록에 올릴 수정 제안을 만든다. 대상은 상품명·브랜드·가격·
+ * 바코드이고, 이번 수정에서 직접 바꾼 칸 중 공용 값과 다른 것만 담는다(가격은 매장마다 달라서,
+ * 원래부터 공용 값과 다른 칸까지 물으면 저장할 때마다 질문이 뜬다). 공용 목록에 없거나 오프라인이면 null.
+ */
+async function buildFixProposal(
+  loaded: OrderProduct | null,
+  next: OrderProduct,
+): Promise<{ barcode: string; original: CatalogFields; proposed: CatalogFields; lines: string[] } | null> {
+  if (!loaded?.barcode) return null;
+  const changed = {
+    name: next.name !== loaded.name,
+    brand: next.brand !== loaded.brand,
+    price: next.price !== loaded.price,
+    barcode: (next.barcode ?? '') !== loaded.barcode,
+  };
+  if (!changed.name && !changed.brand && !changed.price && !changed.barcode) return null;
+  const row = await getOrderCatalogRow(loaded.barcode).catch(() => null);
+  if (!row) return null;
+
+  const original: CatalogFields = {};
+  const proposed: CatalogFields = {};
+  const lines: string[] = [];
+  const won = (n: number | null) => (n == null ? '없음' : `${n.toLocaleString()}원`);
+  if (changed.name && next.name !== row.name) {
+    original.name = row.name;
+    proposed.name = next.name;
+    lines.push(`상품명: ${row.name} → ${next.name}`);
+  }
+  if (changed.brand && next.brand !== row.brand) {
+    original.brand = row.brand;
+    proposed.brand = next.brand;
+    lines.push(`브랜드: ${row.brand || '없음'} → ${next.brand || '없음'}`);
+  }
+  if (changed.price && next.price > 0 && next.price !== row.price) {
+    if (row.price != null) original.price = row.price;
+    proposed.price = next.price;
+    lines.push(`가격: ${won(row.price)} → ${won(next.price)}`);
+  }
+  if (changed.barcode && next.barcode) {
+    original.barcode = loaded.barcode;
+    proposed.barcode = next.barcode;
+    lines.push(`바코드: ${loaded.barcode} → ${next.barcode}`);
+  }
+  return lines.length > 0 ? { barcode: loaded.barcode, original, proposed, lines } : null;
+}
+
+/** 공용 수정 제안 여부를 묻는다. 바깥을 눌러 닫으면 취소(저장 안 함). */
+function askFixProposal(lines: string[]): Promise<'cancel' | 'local' | 'propose'> {
+  return new Promise((resolve) => {
+    Alert.alert(
+      '다른 사장님들께도 제안할까요?',
+      `${lines.join('\n')}\n\n제안하면 확인을 거쳐 모든 사용자의 공용 상품 정보에 반영돼요. 그 전까지는 내 폰에만 적용돼요.`,
+      [
+        { text: '취소', style: 'cancel', onPress: () => resolve('cancel') },
+        { text: '내 폰에만 저장', onPress: () => resolve('local') },
+        { text: '제안하고 저장', onPress: () => resolve('propose') },
+      ],
+      { cancelable: true, onDismiss: () => resolve('cancel') },
+    );
+  });
 }

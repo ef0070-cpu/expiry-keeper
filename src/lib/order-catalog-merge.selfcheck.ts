@@ -1,4 +1,4 @@
-import { mergeCatalogIntoProducts } from './order-catalog-merge';
+import { applyBarcodeMoves, mergeCatalogIntoProducts } from './order-catalog-merge';
 import type { OrderProduct } from './order-types';
 
 const base: OrderProduct = {
@@ -79,6 +79,24 @@ const base: OrderProduct = {
   console.assert(items[0].price === 1000, 'price가 null이면 기존 로컬 값을 유지해야 함');
   console.assert(items[0].category === '바', 'category가 null이면 기존 로컬 값을 유지해야 함');
   console.assert(items[0].brand === '', 'brand는 null이면 빈 문자열로 정규화됨(name과 동일 규칙)');
+}
+
+
+// 6) 승인된 바코드 변경: 예전 바코드 상품을 새 바코드로 옮기고, 새 바코드가 이미 있으면 건드리지 않음
+{
+  const old = { ...base, id: 'a', barcode: 'OLD' };
+  const other = { ...base, id: 'b', barcode: 'X' };
+  const r = applyBarcodeMoves([old, other], [{ old_barcode: 'OLD', new_barcode: 'NEW' }]);
+  console.assert(r.items[0].barcode === 'NEW' && r.moved.length === 1, '예전 바코드 상품이 새 바코드로 옮겨져야 함');
+  console.assert(r.items[1].barcode === 'X', '관계없는 상품은 그대로');
+  const merged = mergeCatalogIntoProducts(
+    r.items,
+    [{ barcode: 'NEW', name: '기존이름', brand: null, price: null, category: null, image_uri: null }],
+    new Set(),
+  );
+  console.assert(merged.items.length === 2 && merged.newBarcodes.length === 0, '옮긴 뒤엔 새 바코드가 신규로 중복 추가되면 안 됨');
+  const already = applyBarcodeMoves([old, { ...base, id: 'c', barcode: 'NEW' }], [{ old_barcode: 'OLD', new_barcode: 'NEW' }]);
+  console.assert(already.moved.length === 0 && already.items[0].barcode === 'OLD', '새 바코드 상품이 이미 있으면 옮기지 않음');
 }
 
 console.log('order-catalog-merge selfcheck OK');

@@ -59,6 +59,45 @@ export async function deletePhotoCandidate(barcode: string, photoUri: string): P
   await supabase.from('barcode_catalog').update({ image_uri: null }).eq('barcode', barcode);
 }
 
+export type CatalogFields = { name?: string; brand?: string; price?: number; barcode?: string };
+
+/** 공용 목록(order_catalog)에 있는 이 바코드의 현재 값. 없거나 오프라인이면 null. */
+export async function getOrderCatalogRow(
+  barcode: string,
+): Promise<{ name: string; brand: string; price: number | null } | null> {
+  if (!supabase) return null;
+  const { data } = await supabase
+    .from('order_catalog')
+    .select('name, brand, price')
+    .eq('barcode', barcode)
+    .maybeSingle();
+  return data ? { name: data.name, brand: data.brand ?? '', price: data.price } : null;
+}
+
+/**
+ * 공용 상품의 상품명·브랜드·가격·바코드 수정 제안(kind='fix', pending)을 접수한다. 바꾸자는 칸만
+ * proposed에 담는다 — 사장님이 Table Editor에서 status를 approved로 바꾸면 서버 트리거가
+ * 공용 목록에 반영한다(migration-order-fix-proposals.sql).
+ */
+export async function proposeOrderProductFix(
+  barcode: string,
+  name: string,
+  original: CatalogFields,
+  proposed: CatalogFields,
+): Promise<void> {
+  if (!supabase) throw new Error('로그인이 필요합니다.');
+  const { error } = await supabase.from('order_product_reports').insert({
+    kind: 'fix',
+    status: 'pending',
+    barcode,
+    name,
+    original,
+    proposed,
+    message: '수정 제안 (앱에서 제출)',
+  });
+  if (error) throw error;
+}
+
 /**
  * 사용자가 새로 등록한 발주 상품을 카탈로그 반영 제안(kind='new')으로 접수한다.
  * 정보 오류 신고와 달리 사람이 직접 값을 입력해 등록한 상품이라 위험이 낮으므로 즉시 승인 처리해

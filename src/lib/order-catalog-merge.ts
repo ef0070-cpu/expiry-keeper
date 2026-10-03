@@ -74,3 +74,29 @@ export function mergeCatalogIntoProducts(
 
   return { items: next, changed, newBarcodes, updatedBarcodes };
 }
+
+export type BarcodeMove = { old_barcode: string; new_barcode: string };
+
+/**
+ * 공용 목록에서 승인된 바코드 변경(order_barcode_moves)을 로컬 상품에 적용한다. IO 없는 순수 함수.
+ * 안 옮기면 예전 바코드 상품은 그대로 남고, 새 바코드 상품이 신규로 하나 더 생겨 중복된다.
+ * 이미 새 바코드 상품이 로컬에 있으면 옮기지 않는다(중복은 dedupe가 정리) — 그대로 둔다.
+ */
+export function applyBarcodeMoves(
+  items: OrderProduct[],
+  moves: BarcodeMove[],
+): { items: OrderProduct[]; moved: OrderProduct[] } {
+  if (moves.length === 0) return { items, moved: [] };
+  const to = new Map(moves.map((m) => [m.old_barcode, m.new_barcode]));
+  const have = new Set(items.map((p) => p.barcode).filter(Boolean));
+  const moved: OrderProduct[] = [];
+  const next = items.map((p) => {
+    const nb = p.barcode ? to.get(p.barcode) : undefined;
+    if (!nb || have.has(nb)) return p;
+    have.add(nb);
+    const updated = { ...p, barcode: nb };
+    moved.push(updated);
+    return updated;
+  });
+  return { items: next, moved };
+}

@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { upsertBarcodeCatalog } from './barcode-catalog';
-import { mergeCatalogIntoProducts, type OrderCatalogRow } from './order-catalog-merge';
-import { reportOrderProductIssue, submitNewOrderProduct } from './order-report';
+import { applyBarcodeMoves, mergeCatalogIntoProducts, type BarcodeMove, type OrderCatalogRow } from './order-catalog-merge';
+import { submitNewOrderProduct } from './order-report';
 import {
   getSubmittedPhotoCandidates,
   recordSubmittedPhotoCandidate,
@@ -87,7 +87,7 @@ export async function listOrderProductsByBarcode(barcode: string): Promise<Order
  * 대표 사진이 되려면 다른 사용자의 좋아요를 받아야 한다.
  */
 export async function saveOrderProduct(rawP: OrderProduct): Promise<OrderProduct> {
-  const { p, isNew, categoryChanged, priceChanged } = await withProductsLock(async () => {
+  const { p, isNew, categoryChanged, priceChanged, oldBarcode } = await withProductsLock(async () => {
     const items = await listOrderProducts();
     // 신규 등록인데 같은 바코드의 상품이 이미 있으면 새로 만들지 않고 그 상품을 갱신한다 —
     // 그렇지 않으면 같은 바코드를 여러 번 등록할 때마다(재스캔, 중복 탭 등) id만 다른 중복
@@ -101,11 +101,15 @@ export async function saveOrderProduct(rawP: OrderProduct): Promise<OrderProduct
     const isNew = idx < 0;
     const categoryChanged = !isNew && items[idx].category !== p.category;
     const priceChanged = !isNew && items[idx].price !== p.price;
+    const oldBarcode = !isNew && items[idx].barcode !== p.barcode ? items[idx].barcode : null;
     if (isNew) items.push(p);
     else items[idx] = p;
     await writeOrderProducts(items);
-    return { p, isNew, categoryChanged, priceChanged };
+    return { p, isNew, categoryChanged, priceChanged, oldBarcode };
   });
+  // 바코드를 고쳐 저장하면 예전 바코드는 공용 목록에 그대로 있어, 다음 동기화가 그 상품을 신규로
+  // 다시 만들어 중복됐다 — 예전 바코드를 "삭제함"으로 기록해 막는다.
+  if (oldBarcode) await recordRemovedBarcode(oldBarcode);
   upsertBarcodeCatalog(p.barcode, p.name, p.imageUri).catch(() => {});
   if (isNew) {
     submitNewOrderProduct(p).catch(() => {});
@@ -134,11 +138,11 @@ export async function saveOrderProduct(rawP: OrderProduct): Promise<OrderProduct
   if (p.barcode && p.brand.trim()) {
     recordBrandOverride(p.barcode, p.brand).catch(() => {});
   }
-  // 가격 수정은 매장마다 실제로 다를 수 있어(가맹점별 판매가 차이) 대표값으로 만들지 않는다.
-  // 로컬 오버라이드만 남겨 동기화가 내 가격을 덮어쓰지 못하게 하고, 참고용 신고만 접수한다.
+  // 가격 수정은 매장마다 실제로 다를 수 있어(가맹점별 판매가 차이) 로컬 오버라이드로 남겨 동기화가
+  // 내 가격을 덮어쓰지 못하게 한다. 공용 값으로 올릴지는 저장 화면의 "제안하고 저장"이 정한다
+  // (예전엔 가격만 바꿔도 신고가 자동 제출됐다).
   if (priceChanged && p.barcode) {
     recordPriceOverride(p.barcode, p.price).catch(() => {});
-    reportOrderProductIssue(p, '가격 수정 (앱에서 자동 제출됨)').catch(() => {});
   }
   pushOrderProduct(p).catch(() => {});
   return p;
@@ -694,13 +698,16 @@ export function seedDefaultOrderProducts(): Promise<number> {
 export async function syncOrderCatalog(): Promise<void> {
   if (!supabase) return;
   try {
-    const { data, error } = await supabase
-      .from('order_catalog')
-      .select('barcode, name, brand, price, category, image_uri');
+    const [{ data, error }, movesRes] = await Promise.all([
+      supabase.from('order_catalog').select('barcode, name, brand, price, category, image_uri'),
+      // 승인된 바코드 변경(수정 제안). 표가 아직 없는 서버면 오류 — 그땐 옮길 것 없음으로 본다.
+      supabase.from('order_barcode_moves').select('old_barcode, new_barcode'),
+    ]);
     if (error || !data) return;
+    const moves = (movesRes.data ?? []) as BarcodeMove[];
 
-    const { changed, newBarcodes, updatedBarcodes } = await withProductsLock(async () => {
-      const [items, removedBarcodes, categoryOverrides, priceOverrides, brandOverrides, nameOverrides, photoOverrides] =
+    const { changed, newBarcodes, updatedBarcodes, moved } = await withProductsLock(async () => {
+      const [rawItems, removedBarcodes, categoryOverrides, priceOverrides, brandOverrides, nameOverrides, photoOverrides] =
         await Promise.all([
           listOrderProducts(),
           getRemovedBarcodes(),
@@ -735,14 +742,14 @@ export async function syncOrderCatalog(): Promise<void> {
           ? { ...withName, image_uri: photoOverrides.get(row.barcode)! }
           : withName;
       });
-      const { items: merged, changed, newBarcodes, updatedBarcodes } = mergeCatalogIntoProducts(
-        items,
-        rows,
-        removedBarcodes,
-      );
-      if (changed) await writeOrderProducts(merged);
-      return { changed, newBarcodes, updatedBarcodes };
+      const { items, moved } = applyBarcodeMoves(rawItems, moves);
+      const merged = mergeCatalogIntoProducts(items, rows, removedBarcodes);
+      const changed = merged.changed || moved.length > 0;
+      if (changed) await writeOrderProducts(merged.items);
+      return { changed, newBarcodes: merged.newBarcodes, updatedBarcodes: merged.updatedBarcodes, moved };
     });
+    // 옮긴 상품은 클라우드 사본(order_products)도 새 바코드로 맞춘다 — 다른 기기 pull이 예전 값으로 되돌리지 않게
+    for (const p of moved) pushOrderProduct(p).catch(() => {});
     if (changed) await dedupeOrderProductsByBarcode();
     if (newBarcodes.length || updatedBarcodes.length) {
       const badges = await getCatalogUpdateBadges();
