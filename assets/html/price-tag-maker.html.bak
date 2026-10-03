@@ -157,6 +157,9 @@
     ];
 
     const MM_TO_PX = 3.7795275591; // 1mm ≈ 3.78px (96DPI)
+    // 가격표 글자 배율. 예전엔 폰 "글자 크기" 설정(textZoom)이 웹 글자에 곱해져 기기마다 달랐다 —
+    // 앱은 textZoom을 100으로 고정하고, 기준 디자인(글자 크기 130% 폰에서 보이던 모습)을 여기서 재현한다.
+    const TEXT_SCALE = 1.3;
     const MAX_PRICE_DIGITS = 7;
     const A4_WIDTH_PX = 794;
     const A4_HEIGHT_PX = 1123;
@@ -453,7 +456,7 @@
       // 어림값을 상한으로 두고 실제로 안 들어가면 더 줄인다.
       const nameMaxWidthPx = Math.max(20, widthPx - Math.round(16 * baseScale));
       const nameFontSize = fontReady
-        ? fitFontSizeToWidth(productName, fontFamily, boldWeight, nameMaxWidthPx, getNameFontSize(productName))
+        ? fitFontSizeToWidth(productName, fontFamily, boldWeight, nameMaxWidthPx / TEXT_SCALE, getNameFontSize(productName))
         : getNameFontSize(productName);
 
       const containerStyle = {
@@ -473,7 +476,7 @@
             <div className="relative flex flex-col justify-between overflow-hidden" style={{ height: (heightPx - bannerHeightPx) + 'px', padding: `${Math.max(3, Math.round(6 * baseScale))}px`, backgroundImage: "url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMiIgY3k9IjIiIHI9IjEiIGZpbGw9IiNlNWU3ZWIiLz48L3N2Zz4=')" }}>
               {showOriginal && (
                 <div className="relative inline-block" style={{ marginLeft: '4px' }}>
-                  <span className="text-gray-500" style={{ fontSize: Math.max(10, Math.round(16 * baseScale)) + 'px', zIndex: 10, fontWeight: semiBoldWeight }}>{formattedOriginal}{currency}</span>
+                  <span className="text-gray-500" style={{ fontSize: TEXT_SCALE * Math.max(10, Math.round(16 * baseScale)) + 'px', zIndex: 10, fontWeight: semiBoldWeight }}>{formattedOriginal}{currency}</span>
                   <svg style={{ position: 'absolute', top: '1px', left: '-4px', width: (100 * baseScale) + 'px', height: (60 * baseScale) + 'px', pointerEvents: 'none', zIndex: 20 }} viewBox="0 0 110 70">
                     <polyline points="0,13 68,13 90,60" fill="none" stroke="#dc2626" strokeWidth="4" strokeLinejoin="round" />
                     <polygon points="90,60 79,47 98,52" fill="#dc2626" />
@@ -481,17 +484,17 @@
                 </div>
               )}
               <div className="text-right truncate w-full mt-auto" style={{ zIndex: 30 }}>
-                <span className="text-black truncate block" style={{ fontSize: priceFontSize + 'px', lineHeight: 1.1, fontWeight: boldWeight }}>{formattedDiscount}<span style={{ fontSize: currencyFontSize + 'px', marginLeft: '2px', fontWeight: semiBoldWeight }}>{currency}</span></span>
+                <span className="text-black truncate block" style={{ fontSize: TEXT_SCALE * priceFontSize + 'px', lineHeight: 1.1, fontWeight: boldWeight }}>{formattedDiscount}<span style={{ fontSize: TEXT_SCALE * currencyFontSize + 'px', marginLeft: '2px', fontWeight: semiBoldWeight }}>{currency}</span></span>
               </div>
               {discountRate > 0 && (
                 <div className="flex flex-col items-center justify-center text-white whitespace-nowrap" style={{ position: 'absolute', top: '6px', right: '6px', width: Math.max(32, Math.round(50 * baseScale)) + 'px', height: Math.max(32, Math.round(50 * baseScale)) + 'px', backgroundColor: '#dc2626', borderRadius: '9999px', border: `${Math.max(1.5, Math.round(2.5 * baseScale))}px solid #000`, zIndex: 10, transform: 'rotate(12deg)' }}>
-                  <span style={{ fontSize: Math.max(8, Math.round(11 * baseScale)) + 'px', fontWeight: boldWeight }}>SALE</span>
-                  <span style={{ fontSize: Math.max(8, Math.round(11 * baseScale)) + 'px', lineHeight: 1.1, fontWeight: semiBoldWeight }}>{discountRate}%</span>
+                  <span style={{ fontSize: TEXT_SCALE * Math.max(8, Math.round(11 * baseScale)) + 'px', fontWeight: boldWeight }}>SALE</span>
+                  <span style={{ fontSize: TEXT_SCALE * Math.max(8, Math.round(11 * baseScale)) + 'px', lineHeight: 1.1, fontWeight: semiBoldWeight }}>{discountRate}%</span>
                 </div>
               )}
             </div>
             <div className="flex items-center justify-center bg-[#001c55] text-white px-1 overflow-hidden" style={{ height: bannerHeightPx + 'px', borderTop: `${Math.max(2, Math.round(3 * baseScale))}px solid #000`, zIndex: 20 }}>
-              <span className="text-center truncate" style={{ fontSize: nameFontSize + 'px', lineHeight: 1.1, fontWeight: boldWeight }}>{productName || '\u00A0'}</span>
+              <span className="text-center truncate" style={{ fontSize: TEXT_SCALE * nameFontSize + 'px', lineHeight: 1.1, fontWeight: boldWeight }}>{productName || '\u00A0'}</span>
             </div>
           </div>
         );
@@ -501,14 +504,14 @@
         return (
           <div onClick={onClick} className={`relative flex flex-col bg-white overflow-hidden transition-transform hover:brightness-95 ${showCutGuide ? 'cut-guide' : ''}`} style={{ ...containerStyle, border: `${Math.max(2, Math.round(3 * baseScale))}px solid #000` }}>
             <div className="flex items-center justify-between bg-black text-white px-2 overflow-hidden gap-1" style={{ height: bannerHeightPx + 'px' }}>
-              <span className="truncate font-bold" style={{ fontSize: nameFontSize + 'px', lineHeight: 1.1, fontWeight: boldWeight }}>{productName || '\u00A0'}</span>
-              {discountRate > 0 && <span className="bg-red-600 text-white font-black px-1.5 py-0.5 rounded text-[10px] whitespace-nowrap flex-shrink-0" style={{ fontSize: Math.max(8, Math.round(10 * baseScale)) + 'px' }}>-{discountRate}%</span>}
+              <span className="truncate font-bold" style={{ fontSize: TEXT_SCALE * nameFontSize + 'px', lineHeight: 1.1, fontWeight: boldWeight }}>{productName || '\u00A0'}</span>
+              {discountRate > 0 && <span className="bg-red-600 text-white font-black px-1.5 py-0.5 rounded text-[10px] whitespace-nowrap flex-shrink-0" style={{ fontSize: TEXT_SCALE * Math.max(8, Math.round(10 * baseScale)) + 'px' }}>-{discountRate}%</span>}
             </div>
             <div className="relative flex-1 p-2 flex flex-col justify-between overflow-hidden">
-              {showOriginal && <div className="text-gray-400 font-medium truncate" style={{ fontSize: Math.max(10, Math.round(14 * baseScale)) + 'px', textDecoration: 'line-through', fontWeight: semiBoldWeight }}>{formattedOriginal}{currency}</div>}
+              {showOriginal && <div className="text-gray-400 font-medium truncate" style={{ fontSize: TEXT_SCALE * Math.max(10, Math.round(14 * baseScale)) + 'px', textDecoration: 'line-through', fontWeight: semiBoldWeight }}>{formattedOriginal}{currency}</div>}
               <div className="text-right mt-auto truncate w-full">
-                <span className="text-black" style={{ fontSize: priceFontSize + 'px', fontWeight: boldWeight, lineHeight: 1.1 }}>{formattedDiscount}</span>
-                <span className="text-black" style={{ fontSize: currencyFontSize + 'px', fontWeight: semiBoldWeight, marginLeft: '2px' }}>{currency}</span>
+                <span className="text-black" style={{ fontSize: TEXT_SCALE * priceFontSize + 'px', fontWeight: boldWeight, lineHeight: 1.1 }}>{formattedDiscount}</span>
+                <span className="text-black" style={{ fontSize: TEXT_SCALE * currencyFontSize + 'px', fontWeight: semiBoldWeight, marginLeft: '2px' }}>{currency}</span>
               </div>
             </div>
           </div>
@@ -519,16 +522,16 @@
         return (
           <div onClick={onClick} className={`relative flex flex-col bg-white overflow-hidden transition-transform hover:brightness-95 ${showCutGuide ? 'cut-guide' : ''}`} style={{ ...containerStyle, border: `${Math.max(2, Math.round(3.5 * baseScale))}px solid #dc2626` }}>
             <div className="flex items-center justify-center gap-1 bg-[#facc15] text-[#991b1b] px-1 border-b-2 border-[#dc2626] overflow-hidden" style={{ height: bannerHeightPx + 'px' }}>
-              <span style={{ fontSize: nameFontSize + 'px', lineHeight: 1.1, fontFamily: emojiFontFamily, flexShrink: 0 }}>🔥</span>
-              <span className="text-center truncate font-black" style={{ fontSize: nameFontSize + 'px', lineHeight: 1.1, fontWeight: boldWeight }}>{productName || '\u00A0'}</span>
+              <span style={{ fontSize: TEXT_SCALE * nameFontSize + 'px', lineHeight: 1.1, fontFamily: emojiFontFamily, flexShrink: 0 }}>🔥</span>
+              <span className="text-center truncate font-black" style={{ fontSize: TEXT_SCALE * nameFontSize + 'px', lineHeight: 1.1, fontWeight: boldWeight }}>{productName || '\u00A0'}</span>
             </div>
             <div className="relative flex-1 p-2 flex flex-col justify-between overflow-hidden">
-              {showOriginal && <div className="text-gray-400 font-bold truncate" style={{ fontSize: Math.max(10, Math.round(14 * baseScale)) + 'px', textDecoration: 'line-through', fontWeight: semiBoldWeight }}>{formattedOriginal}{currency}</div>}
+              {showOriginal && <div className="text-gray-400 font-bold truncate" style={{ fontSize: TEXT_SCALE * Math.max(10, Math.round(14 * baseScale)) + 'px', textDecoration: 'line-through', fontWeight: semiBoldWeight }}>{formattedOriginal}{currency}</div>}
               <div className="text-right mt-auto truncate w-full">
-                <span className="text-[#dc2626]" style={{ fontSize: priceFontSize + 'px', fontWeight: boldWeight, lineHeight: 1.1 }}>{formattedDiscount}</span>
-                <span className="text-[#dc2626]" style={{ fontSize: currencyFontSize + 'px', fontWeight: semiBoldWeight, marginLeft: '2px' }}>{currency}</span>
+                <span className="text-[#dc2626]" style={{ fontSize: TEXT_SCALE * priceFontSize + 'px', fontWeight: boldWeight, lineHeight: 1.1 }}>{formattedDiscount}</span>
+                <span className="text-[#dc2626]" style={{ fontSize: TEXT_SCALE * currencyFontSize + 'px', fontWeight: semiBoldWeight, marginLeft: '2px' }}>{currency}</span>
               </div>
-              {discountRate > 0 && <div className="absolute top-2 right-2 bg-red-600 text-yellow-300 font-black rounded-full px-2 py-0.5 whitespace-nowrap" style={{ fontSize: Math.max(9, Math.round(11 * baseScale)) + 'px' }}>{discountRate}% 특가</div>}
+              {discountRate > 0 && <div className="absolute top-2 right-2 bg-red-600 text-yellow-300 font-black rounded-full px-2 py-0.5 whitespace-nowrap" style={{ fontSize: TEXT_SCALE * Math.max(9, Math.round(11 * baseScale)) + 'px' }}>{discountRate}% 특가</div>}
             </div>
           </div>
         );
@@ -538,15 +541,15 @@
         return (
           <div onClick={onClick} className={`relative flex flex-col bg-slate-950 text-white overflow-hidden transition-transform hover:brightness-110 ${showCutGuide ? 'cut-guide' : ''}`} style={{ ...containerStyle, border: `${Math.max(2, Math.round(2.5 * baseScale))}px solid #00f0ff` }}>
             <div className="flex items-center justify-center bg-black border-b-2 border-[#00f0ff] px-1 overflow-hidden" style={{ height: bannerHeightPx + 'px' }}>
-              <span className="text-[#00f0ff] text-center truncate tracking-wider" style={{ fontSize: nameFontSize + 'px', lineHeight: 1.1, fontWeight: boldWeight }}>{productName || '\u00A0'}</span>
+              <span className="text-[#00f0ff] text-center truncate tracking-wider" style={{ fontSize: TEXT_SCALE * nameFontSize + 'px', lineHeight: 1.1, fontWeight: boldWeight }}>{productName || '\u00A0'}</span>
             </div>
             <div className="relative flex-1 p-2 flex flex-col justify-between bg-slate-900 overflow-hidden">
-              {showOriginal && <div className="text-slate-400 font-medium truncate" style={{ fontSize: Math.max(10, Math.round(13 * baseScale)) + 'px', textDecoration: 'line-through', fontWeight: semiBoldWeight }}>{formattedOriginal}{currency}</div>}
+              {showOriginal && <div className="text-slate-400 font-medium truncate" style={{ fontSize: TEXT_SCALE * Math.max(10, Math.round(13 * baseScale)) + 'px', textDecoration: 'line-through', fontWeight: semiBoldWeight }}>{formattedOriginal}{currency}</div>}
               <div className="text-right mt-auto truncate w-full">
-                <span className="text-[#ff0055]" style={{ fontSize: priceFontSize + 'px', fontWeight: boldWeight, lineHeight: 1.1, textShadow: '0 0 6px rgba(255,0,85,0.6)' }}>{formattedDiscount}</span>
-                <span className="text-[#ff0055]" style={{ fontSize: currencyFontSize + 'px', fontWeight: semiBoldWeight, marginLeft: '2px' }}>{currency}</span>
+                <span className="text-[#ff0055]" style={{ fontSize: TEXT_SCALE * priceFontSize + 'px', fontWeight: boldWeight, lineHeight: 1.1, textShadow: '0 0 6px rgba(255,0,85,0.6)' }}>{formattedDiscount}</span>
+                <span className="text-[#ff0055]" style={{ fontSize: TEXT_SCALE * currencyFontSize + 'px', fontWeight: semiBoldWeight, marginLeft: '2px' }}>{currency}</span>
               </div>
-              {discountRate > 0 && <div className="absolute top-2 right-2 bg-[#ff0055] text-white font-bold rounded whitespace-nowrap" style={{ padding: '2px 5px', fontSize: Math.max(9, Math.round(10 * baseScale)) + 'px', fontWeight: boldWeight }}>-{discountRate}%</div>}
+              {discountRate > 0 && <div className="absolute top-2 right-2 bg-[#ff0055] text-white font-bold rounded whitespace-nowrap" style={{ padding: '2px 5px', fontSize: TEXT_SCALE * Math.max(9, Math.round(10 * baseScale)) + 'px', fontWeight: boldWeight }}>-{discountRate}%</div>}
             </div>
           </div>
         );
@@ -556,16 +559,16 @@
         return (
           <div onClick={onClick} className={`relative flex flex-col bg-[#f4f7f4] overflow-hidden transition-transform hover:brightness-95 ${showCutGuide ? 'cut-guide' : ''}`} style={{ ...containerStyle, border: `${Math.max(2, Math.round(2.5 * baseScale))}px solid #2e5a36` }}>
             <div className="flex items-center justify-center gap-1 bg-[#2e5a36] text-white px-1 overflow-hidden" style={{ height: bannerHeightPx + 'px' }}>
-              <span style={{ fontSize: nameFontSize + 'px', lineHeight: 1.1, fontFamily: emojiFontFamily, flexShrink: 0 }}>🌿</span>
-              <span className="text-center truncate" style={{ fontSize: nameFontSize + 'px', lineHeight: 1.1, fontWeight: boldWeight }}>{productName || '\u00A0'}</span>
+              <span style={{ fontSize: TEXT_SCALE * nameFontSize + 'px', lineHeight: 1.1, fontFamily: emojiFontFamily, flexShrink: 0 }}>🌿</span>
+              <span className="text-center truncate" style={{ fontSize: TEXT_SCALE * nameFontSize + 'px', lineHeight: 1.1, fontWeight: boldWeight }}>{productName || '\u00A0'}</span>
             </div>
             <div className="relative flex-1 p-2 flex flex-col justify-between overflow-hidden">
-              {showOriginal && <div className="text-stone-400 truncate" style={{ fontSize: Math.max(10, Math.round(13 * baseScale)) + 'px', textDecoration: 'line-through', fontWeight: semiBoldWeight }}>{formattedOriginal}{currency}</div>}
+              {showOriginal && <div className="text-stone-400 truncate" style={{ fontSize: TEXT_SCALE * Math.max(10, Math.round(13 * baseScale)) + 'px', textDecoration: 'line-through', fontWeight: semiBoldWeight }}>{formattedOriginal}{currency}</div>}
               <div className="text-right mt-auto truncate w-full">
-                <span className="text-[#1b4322]" style={{ fontSize: priceFontSize + 'px', fontWeight: boldWeight, lineHeight: 1.1 }}>{formattedDiscount}</span>
-                <span className="text-[#1b4322]" style={{ fontSize: currencyFontSize + 'px', fontWeight: semiBoldWeight, marginLeft: '2px' }}>{currency}</span>
+                <span className="text-[#1b4322]" style={{ fontSize: TEXT_SCALE * priceFontSize + 'px', fontWeight: boldWeight, lineHeight: 1.1 }}>{formattedDiscount}</span>
+                <span className="text-[#1b4322]" style={{ fontSize: TEXT_SCALE * currencyFontSize + 'px', fontWeight: semiBoldWeight, marginLeft: '2px' }}>{currency}</span>
               </div>
-              {discountRate > 0 && <div className="absolute top-2 right-2 bg-[#d97706] text-white font-bold rounded-full flex items-center justify-center whitespace-nowrap" style={{ width: Math.max(28, Math.round(34 * baseScale)) + 'px', height: Math.max(28, Math.round(34 * baseScale)) + 'px', fontSize: Math.max(9, Math.round(10 * baseScale)) + 'px' }}>{discountRate}%</div>}
+              {discountRate > 0 && <div className="absolute top-2 right-2 bg-[#d97706] text-white font-bold rounded-full flex items-center justify-center whitespace-nowrap" style={{ width: Math.max(28, Math.round(34 * baseScale)) + 'px', height: Math.max(28, Math.round(34 * baseScale)) + 'px', fontSize: TEXT_SCALE * Math.max(9, Math.round(10 * baseScale)) + 'px' }}>{discountRate}%</div>}
             </div>
           </div>
         );
@@ -575,15 +578,15 @@
         return (
           <div onClick={onClick} className={`relative flex flex-col bg-[#fffaf5] overflow-hidden transition-transform hover:brightness-95 ${showCutGuide ? 'cut-guide' : ''}`} style={{ ...containerStyle, border: `${Math.max(2, Math.round(2.5 * baseScale))}px solid #f43f5e`, borderRadius: '6px' }}>
             <div className="flex items-center justify-center bg-[#ffe4e6] text-[#9f1239] border-b border-[#f43f5e] px-1 overflow-hidden" style={{ height: bannerHeightPx + 'px' }}>
-              <span className="text-center truncate" style={{ fontSize: nameFontSize + 'px', lineHeight: 1.1, fontWeight: boldWeight }}>{productName || '\u00A0'}</span>
+              <span className="text-center truncate" style={{ fontSize: TEXT_SCALE * nameFontSize + 'px', lineHeight: 1.1, fontWeight: boldWeight }}>{productName || '\u00A0'}</span>
             </div>
             <div className="relative flex-1 p-2 flex flex-col justify-between overflow-hidden">
-              {showOriginal && <div className="text-rose-300 truncate" style={{ fontSize: Math.max(10, Math.round(13 * baseScale)) + 'px', textDecoration: 'line-through', fontWeight: semiBoldWeight }}>{formattedOriginal}{currency}</div>}
+              {showOriginal && <div className="text-rose-300 truncate" style={{ fontSize: TEXT_SCALE * Math.max(10, Math.round(13 * baseScale)) + 'px', textDecoration: 'line-through', fontWeight: semiBoldWeight }}>{formattedOriginal}{currency}</div>}
               <div className="text-right mt-auto truncate w-full">
-                <span className="text-[#be123c]" style={{ fontSize: priceFontSize + 'px', fontWeight: boldWeight, lineHeight: 1.1 }}>{formattedDiscount}</span>
-                <span className="text-[#be123c]" style={{ fontSize: currencyFontSize + 'px', fontWeight: semiBoldWeight, marginLeft: '2px' }}>{currency}</span>
+                <span className="text-[#be123c]" style={{ fontSize: TEXT_SCALE * priceFontSize + 'px', fontWeight: boldWeight, lineHeight: 1.1 }}>{formattedDiscount}</span>
+                <span className="text-[#be123c]" style={{ fontSize: TEXT_SCALE * currencyFontSize + 'px', fontWeight: semiBoldWeight, marginLeft: '2px' }}>{currency}</span>
               </div>
-              {discountRate > 0 && <div className="absolute top-2 right-2 bg-[#f43f5e] text-white flex items-center justify-center rounded-lg px-1.5 py-0.5 whitespace-nowrap" style={{ fontSize: Math.max(9, Math.round(10 * baseScale)) + 'px', fontWeight: boldWeight }}>★ {discountRate}% OFF</div>}
+              {discountRate > 0 && <div className="absolute top-2 right-2 bg-[#f43f5e] text-white flex items-center justify-center rounded-lg px-1.5 py-0.5 whitespace-nowrap" style={{ fontSize: TEXT_SCALE * Math.max(9, Math.round(10 * baseScale)) + 'px', fontWeight: boldWeight }}>★ {discountRate}% OFF</div>}
             </div>
           </div>
         );
@@ -593,15 +596,15 @@
         return (
           <div onClick={onClick} className={`relative flex flex-col bg-[#1c1917] text-[#fef08a] overflow-hidden transition-transform hover:brightness-110 ${showCutGuide ? 'cut-guide' : ''}`} style={{ ...containerStyle, border: `${Math.max(2, Math.round(2.5 * baseScale))}px solid #eab308` }}>
             <div className="flex items-center justify-center bg-[#292524] border-b border-[#eab308] px-1 overflow-hidden" style={{ height: bannerHeightPx + 'px' }}>
-              <span className="text-[#fef08a] text-center truncate tracking-widest" style={{ fontSize: nameFontSize + 'px', lineHeight: 1.1, fontWeight: boldWeight }}>{productName || '\u00A0'}</span>
+              <span className="text-[#fef08a] text-center truncate tracking-widest" style={{ fontSize: TEXT_SCALE * nameFontSize + 'px', lineHeight: 1.1, fontWeight: boldWeight }}>{productName || '\u00A0'}</span>
             </div>
             <div className="relative flex-1 p-2 flex flex-col justify-between overflow-hidden">
-              {showOriginal && <div className="text-stone-500 truncate" style={{ fontSize: Math.max(10, Math.round(13 * baseScale)) + 'px', textDecoration: 'line-through', fontWeight: semiBoldWeight }}>{formattedOriginal}{currency}</div>}
+              {showOriginal && <div className="text-stone-500 truncate" style={{ fontSize: TEXT_SCALE * Math.max(10, Math.round(13 * baseScale)) + 'px', textDecoration: 'line-through', fontWeight: semiBoldWeight }}>{formattedOriginal}{currency}</div>}
               <div className="text-right mt-auto truncate w-full">
-                <span className="text-[#eab308]" style={{ fontSize: priceFontSize + 'px', fontWeight: boldWeight, lineHeight: 1.1 }}>{formattedDiscount}</span>
-                <span className="text-[#eab308]" style={{ fontSize: currencyFontSize + 'px', fontWeight: semiBoldWeight, marginLeft: '2px' }}>{currency}</span>
+                <span className="text-[#eab308]" style={{ fontSize: TEXT_SCALE * priceFontSize + 'px', fontWeight: boldWeight, lineHeight: 1.1 }}>{formattedDiscount}</span>
+                <span className="text-[#eab308]" style={{ fontSize: TEXT_SCALE * currencyFontSize + 'px', fontWeight: semiBoldWeight, marginLeft: '2px' }}>{currency}</span>
               </div>
-              {discountRate > 0 && <div className="absolute top-2 right-2 border border-[#eab308] text-[#eab308] px-1.5 py-0.5 rounded whitespace-nowrap" style={{ fontSize: Math.max(8, Math.round(9 * baseScale)) + 'px', fontWeight: boldWeight }}>SPECIAL {discountRate}%</div>}
+              {discountRate > 0 && <div className="absolute top-2 right-2 border border-[#eab308] text-[#eab308] px-1.5 py-0.5 rounded whitespace-nowrap" style={{ fontSize: TEXT_SCALE * Math.max(8, Math.round(9 * baseScale)) + 'px', fontWeight: boldWeight }}>SPECIAL {discountRate}%</div>}
             </div>
           </div>
         );
@@ -611,16 +614,16 @@
         return (
           <div onClick={onClick} className={`relative flex flex-col bg-[#facc15] overflow-hidden transition-transform hover:brightness-95 ${showCutGuide ? 'cut-guide' : ''}`} style={{ ...containerStyle, border: `${Math.max(3, Math.round(3.5 * baseScale))}px solid #dc2626` }}>
             <div className="flex items-center justify-center gap-1 bg-[#dc2626] text-white px-1 overflow-hidden" style={{ height: bannerHeightPx + 'px' }}>
-              <span style={{ fontSize: nameFontSize + 'px', lineHeight: 1.1, fontFamily: emojiFontFamily, flexShrink: 0 }}>💥</span>
-              <span className="text-center truncate font-black" style={{ fontSize: nameFontSize + 'px', lineHeight: 1.1, fontWeight: boldWeight }}>{productName || '\u00A0'}</span>
+              <span style={{ fontSize: TEXT_SCALE * nameFontSize + 'px', lineHeight: 1.1, fontFamily: emojiFontFamily, flexShrink: 0 }}>💥</span>
+              <span className="text-center truncate font-black" style={{ fontSize: TEXT_SCALE * nameFontSize + 'px', lineHeight: 1.1, fontWeight: boldWeight }}>{productName || '\u00A0'}</span>
             </div>
             <div className="relative flex-1 p-2 flex flex-col justify-between overflow-hidden">
-              {showOriginal && <div className="text-red-900/60 font-bold truncate" style={{ fontSize: Math.max(10, Math.round(13 * baseScale)) + 'px', textDecoration: 'line-through', fontWeight: semiBoldWeight }}>{formattedOriginal}{currency}</div>}
+              {showOriginal && <div className="text-red-900/60 font-bold truncate" style={{ fontSize: TEXT_SCALE * Math.max(10, Math.round(13 * baseScale)) + 'px', textDecoration: 'line-through', fontWeight: semiBoldWeight }}>{formattedOriginal}{currency}</div>}
               <div className="text-right mt-auto truncate w-full">
-                <span className="text-[#dc2626]" style={{ fontSize: priceFontSize + 'px', fontWeight: boldWeight, lineHeight: 1.1 }}>{formattedDiscount}</span>
-                <span className="text-[#dc2626]" style={{ fontSize: currencyFontSize + 'px', fontWeight: semiBoldWeight, marginLeft: '2px' }}>{currency}</span>
+                <span className="text-[#dc2626]" style={{ fontSize: TEXT_SCALE * priceFontSize + 'px', fontWeight: boldWeight, lineHeight: 1.1 }}>{formattedDiscount}</span>
+                <span className="text-[#dc2626]" style={{ fontSize: TEXT_SCALE * currencyFontSize + 'px', fontWeight: semiBoldWeight, marginLeft: '2px' }}>{currency}</span>
               </div>
-              {discountRate > 0 && <div className="absolute top-1 right-1 bg-black text-[#facc15] font-black rounded-md px-1.5 py-0.5 transform rotate-6 whitespace-nowrap" style={{ fontSize: Math.max(9, Math.round(11 * baseScale)) + 'px' }}>파격 -{discountRate}%</div>}
+              {discountRate > 0 && <div className="absolute top-1 right-1 bg-black text-[#facc15] font-black rounded-md px-1.5 py-0.5 transform rotate-6 whitespace-nowrap" style={{ fontSize: TEXT_SCALE * Math.max(9, Math.round(11 * baseScale)) + 'px' }}>파격 -{discountRate}%</div>}
             </div>
           </div>
         );
@@ -630,15 +633,15 @@
         return (
           <div onClick={onClick} className={`relative flex flex-col bg-[#e7d7c1] overflow-hidden transition-transform hover:brightness-95 ${showCutGuide ? 'cut-guide' : ''}`} style={{ ...containerStyle, border: `${Math.max(2, Math.round(2.5 * baseScale))}px dashed #78350f` }}>
             <div className="flex items-center justify-center bg-[#78350f] text-[#fef3c7] px-1 overflow-hidden" style={{ height: bannerHeightPx + 'px' }}>
-              <span className="text-center truncate" style={{ fontSize: nameFontSize + 'px', lineHeight: 1.1, fontWeight: boldWeight }}>{productName || '\u00A0'}</span>
+              <span className="text-center truncate" style={{ fontSize: TEXT_SCALE * nameFontSize + 'px', lineHeight: 1.1, fontWeight: boldWeight }}>{productName || '\u00A0'}</span>
             </div>
             <div className="relative flex-1 p-2 flex flex-col justify-between overflow-hidden">
-              {showOriginal && <div className="text-[#92400e]/60 truncate" style={{ fontSize: Math.max(10, Math.round(13 * baseScale)) + 'px', textDecoration: 'line-through', fontWeight: semiBoldWeight }}>{formattedOriginal}{currency}</div>}
+              {showOriginal && <div className="text-[#92400e]/60 truncate" style={{ fontSize: TEXT_SCALE * Math.max(10, Math.round(13 * baseScale)) + 'px', textDecoration: 'line-through', fontWeight: semiBoldWeight }}>{formattedOriginal}{currency}</div>}
               <div className="text-right mt-auto truncate w-full">
-                <span className="text-[#451a03]" style={{ fontSize: priceFontSize + 'px', fontWeight: boldWeight, lineHeight: 1.1 }}>{formattedDiscount}</span>
-                <span className="text-[#451a03]" style={{ fontSize: currencyFontSize + 'px', fontWeight: semiBoldWeight, marginLeft: '2px' }}>{currency}</span>
+                <span className="text-[#451a03]" style={{ fontSize: TEXT_SCALE * priceFontSize + 'px', fontWeight: boldWeight, lineHeight: 1.1 }}>{formattedDiscount}</span>
+                <span className="text-[#451a03]" style={{ fontSize: TEXT_SCALE * currencyFontSize + 'px', fontWeight: semiBoldWeight, marginLeft: '2px' }}>{currency}</span>
               </div>
-              {discountRate > 0 && <div className="absolute top-2 right-2 bg-[#b45309] text-white rounded px-1.5 py-0.5 whitespace-nowrap" style={{ fontSize: Math.max(8, Math.round(9 * baseScale)) + 'px', fontWeight: boldWeight }}>{discountRate}% 할인</div>}
+              {discountRate > 0 && <div className="absolute top-2 right-2 bg-[#b45309] text-white rounded px-1.5 py-0.5 whitespace-nowrap" style={{ fontSize: TEXT_SCALE * Math.max(8, Math.round(9 * baseScale)) + 'px', fontWeight: boldWeight }}>{discountRate}% 할인</div>}
             </div>
           </div>
         );
@@ -648,11 +651,11 @@
         return (
           <div onClick={onClick} className={`relative flex flex-col bg-white overflow-hidden transition-transform hover:brightness-95 ${showCutGuide ? 'cut-guide' : ''}`} style={{ ...containerStyle, border: `${Math.max(2, Math.round(2 * baseScale))}px solid #334155` }}>
             <div className="flex items-center justify-between bg-slate-800 text-white px-2 overflow-hidden gap-1" style={{ height: bannerHeightPx + 'px' }}>
-              <span className="truncate" style={{ fontSize: nameFontSize + 'px', lineHeight: 1.1, fontWeight: boldWeight }}>{productName || '\u00A0'}</span>
+              <span className="truncate" style={{ fontSize: TEXT_SCALE * nameFontSize + 'px', lineHeight: 1.1, fontWeight: boldWeight }}>{productName || '\u00A0'}</span>
               <span className="text-[9px] opacity-75 flex-shrink-0">STORE</span>
             </div>
             <div className="relative flex-1 p-2 flex flex-col justify-between overflow-hidden">
-              {showOriginal && <div className="text-slate-400 truncate" style={{ fontSize: Math.max(10, Math.round(13 * baseScale)) + 'px', textDecoration: 'line-through', fontWeight: semiBoldWeight }}>{formattedOriginal}{currency}</div>}
+              {showOriginal && <div className="text-slate-400 truncate" style={{ fontSize: TEXT_SCALE * Math.max(10, Math.round(13 * baseScale)) + 'px', textDecoration: 'line-through', fontWeight: semiBoldWeight }}>{formattedOriginal}{currency}</div>}
               <div className="flex items-end justify-between mt-auto">
                 <svg className="w-10 h-4 opacity-75 flex-shrink-0" viewBox="0 0 50 20">
                   <rect x="0" y="0" width="3" height="20" fill="#000"/>
@@ -667,11 +670,11 @@
                   <rect x="40" y="0" width="4" height="20" fill="#000"/>
                 </svg>
                 <div className="text-right truncate w-full pl-2">
-                  <span className="text-slate-900" style={{ fontSize: priceFontSize + 'px', fontWeight: boldWeight, lineHeight: 1.1 }}>{formattedDiscount}</span>
-                  <span className="text-slate-900" style={{ fontSize: currencyFontSize + 'px', fontWeight: semiBoldWeight, marginLeft: '2px' }}>{currency}</span>
+                  <span className="text-slate-900" style={{ fontSize: TEXT_SCALE * priceFontSize + 'px', fontWeight: boldWeight, lineHeight: 1.1 }}>{formattedDiscount}</span>
+                  <span className="text-slate-900" style={{ fontSize: TEXT_SCALE * currencyFontSize + 'px', fontWeight: semiBoldWeight, marginLeft: '2px' }}>{currency}</span>
                 </div>
               </div>
-              {discountRate > 0 && <div className="absolute top-2 right-2 bg-blue-600 text-white px-1.5 py-0.5 rounded font-bold whitespace-nowrap" style={{ fontSize: Math.max(8, Math.round(9 * baseScale)) + 'px' }}>-{discountRate}%</div>}
+              {discountRate > 0 && <div className="absolute top-2 right-2 bg-blue-600 text-white px-1.5 py-0.5 rounded font-bold whitespace-nowrap" style={{ fontSize: TEXT_SCALE * Math.max(8, Math.round(9 * baseScale)) + 'px' }}>-{discountRate}%</div>}
             </div>
           </div>
         );
@@ -681,15 +684,15 @@
         return (
           <div onClick={onClick} className={`relative flex flex-col bg-amber-50 overflow-hidden transition-transform hover:brightness-95 ${showCutGuide ? 'cut-guide' : ''}`} style={{ ...containerStyle, border: `${Math.max(3, Math.round(3 * baseScale))}px solid #000` }}>
             <div className="flex items-center justify-center bg-yellow-400 border-b-2 border-black px-1 overflow-hidden" style={{ height: bannerHeightPx + 'px', backgroundImage: 'repeating-linear-gradient(-45deg, #facc15, #facc15 8px, #000 8px, #000 11px)' }}>
-              <span className="bg-black text-white px-2 py-0.5 rounded text-center truncate w-[90%]" style={{ fontSize: Math.max(9, nameFontSize - 2) + 'px', lineHeight: 1.1, fontWeight: boldWeight }}>{productName || '\u00A0'}</span>
+              <span className="bg-black text-white px-2 py-0.5 rounded text-center truncate w-[90%]" style={{ fontSize: TEXT_SCALE * Math.max(9, nameFontSize - 2) + 'px', lineHeight: 1.1, fontWeight: boldWeight }}>{productName || '\u00A0'}</span>
             </div>
             <div className="relative flex-1 p-2 flex flex-col justify-between overflow-hidden">
-              {showOriginal && <div className="text-gray-500 font-bold truncate" style={{ fontSize: Math.max(10, Math.round(13 * baseScale)) + 'px', textDecoration: 'line-through', fontWeight: semiBoldWeight }}>{formattedOriginal}{currency}</div>}
+              {showOriginal && <div className="text-gray-500 font-bold truncate" style={{ fontSize: TEXT_SCALE * Math.max(10, Math.round(13 * baseScale)) + 'px', textDecoration: 'line-through', fontWeight: semiBoldWeight }}>{formattedOriginal}{currency}</div>}
               <div className="text-right mt-auto truncate w-full">
-                <span className="text-black" style={{ fontSize: priceFontSize + 'px', fontWeight: boldWeight, lineHeight: 1.1 }}>{formattedDiscount}</span>
-                <span className="text-black" style={{ fontSize: currencyFontSize + 'px', fontWeight: semiBoldWeight, marginLeft: '2px' }}>{currency}</span>
+                <span className="text-black" style={{ fontSize: TEXT_SCALE * priceFontSize + 'px', fontWeight: boldWeight, lineHeight: 1.1 }}>{formattedDiscount}</span>
+                <span className="text-black" style={{ fontSize: TEXT_SCALE * currencyFontSize + 'px', fontWeight: semiBoldWeight, marginLeft: '2px' }}>{currency}</span>
               </div>
-              {discountRate > 0 && <div className="absolute top-2 right-2 bg-red-500 text-white font-black border border-black rounded shadow-[2px_2px_0_0_#000] px-1 py-0.5 whitespace-nowrap" style={{ fontSize: Math.max(9, Math.round(10 * baseScale)) + 'px' }}>SALE {discountRate}%</div>}
+              {discountRate > 0 && <div className="absolute top-2 right-2 bg-red-500 text-white font-black border border-black rounded shadow-[2px_2px_0_0_#000] px-1 py-0.5 whitespace-nowrap" style={{ fontSize: TEXT_SCALE * Math.max(9, Math.round(10 * baseScale)) + 'px' }}>SALE {discountRate}%</div>}
             </div>
           </div>
         );
@@ -699,15 +702,15 @@
         return (
           <div onClick={onClick} className={`relative flex flex-col bg-white overflow-hidden transition-transform hover:brightness-95 ${showCutGuide ? 'cut-guide' : ''}`} style={{ ...containerStyle, border: `${Math.max(2, Math.round(2.5 * baseScale))}px solid #1e3a8a` }}>
             <div className="flex items-center justify-center bg-[#1e3a8a] text-[#fef08a] px-1 overflow-hidden" style={{ height: bannerHeightPx + 'px' }}>
-              <span className="text-center truncate" style={{ fontSize: nameFontSize + 'px', lineHeight: 1.1, fontWeight: boldWeight }}>{productName || '\u00A0'}</span>
+              <span className="text-center truncate" style={{ fontSize: TEXT_SCALE * nameFontSize + 'px', lineHeight: 1.1, fontWeight: boldWeight }}>{productName || '\u00A0'}</span>
             </div>
             <div className="relative flex-1 p-2 flex flex-col justify-between bg-blue-50/40 overflow-hidden">
-              {showOriginal && <div className="text-blue-400 truncate" style={{ fontSize: Math.max(10, Math.round(13 * baseScale)) + 'px', textDecoration: 'line-through', fontWeight: semiBoldWeight }}>{formattedOriginal}{currency}</div>}
+              {showOriginal && <div className="text-blue-400 truncate" style={{ fontSize: TEXT_SCALE * Math.max(10, Math.round(13 * baseScale)) + 'px', textDecoration: 'line-through', fontWeight: semiBoldWeight }}>{formattedOriginal}{currency}</div>}
               <div className="text-right mt-auto truncate w-full">
-                <span className="text-[#1e3a8a]" style={{ fontSize: priceFontSize + 'px', fontWeight: boldWeight, lineHeight: 1.1 }}>{formattedDiscount}</span>
-                <span className="text-[#1e3a8a]" style={{ fontSize: currencyFontSize + 'px', fontWeight: semiBoldWeight, marginLeft: '2px' }}>{currency}</span>
+                <span className="text-[#1e3a8a]" style={{ fontSize: TEXT_SCALE * priceFontSize + 'px', fontWeight: boldWeight, lineHeight: 1.1 }}>{formattedDiscount}</span>
+                <span className="text-[#1e3a8a]" style={{ fontSize: TEXT_SCALE * currencyFontSize + 'px', fontWeight: semiBoldWeight, marginLeft: '2px' }}>{currency}</span>
               </div>
-              {discountRate > 0 && <div className="absolute top-2 right-2 bg-[#facc15] text-[#1e3a8a] font-bold px-1.5 py-0.5 rounded border border-[#1e3a8a] whitespace-nowrap" style={{ fontSize: Math.max(8, Math.round(9 * baseScale)) + 'px' }}>{discountRate}% OFF</div>}
+              {discountRate > 0 && <div className="absolute top-2 right-2 bg-[#facc15] text-[#1e3a8a] font-bold px-1.5 py-0.5 rounded border border-[#1e3a8a] whitespace-nowrap" style={{ fontSize: TEXT_SCALE * Math.max(8, Math.round(9 * baseScale)) + 'px' }}>{discountRate}% OFF</div>}
             </div>
           </div>
         );
@@ -720,10 +723,10 @@
           <div onClick={onClick} className={`relative flex flex-col overflow-hidden transition-transform hover:brightness-95 ${showCutGuide ? 'cut-guide' : ''}`} style={{ ...containerStyle, backgroundColor: t.bg, border: `${Math.max(2, Math.round(2.5 * baseScale))}px solid ${t.border}` }}>
             {t.layout === 'top' && (
               <div className="flex items-center justify-center gap-1 px-1 border-b-2 overflow-hidden" style={{ height: bannerHeightPx + 'px', backgroundColor: t.headerBg, borderColor: t.border }}>
-                <span style={{ fontSize: nameFontSize + 'px', lineHeight: 1.1, fontFamily: emojiFontFamily, flexShrink: 0, color: t.headerText }}>
+                <span style={{ fontSize: TEXT_SCALE * nameFontSize + 'px', lineHeight: 1.1, fontFamily: emojiFontFamily, flexShrink: 0, color: t.headerText }}>
                   {t.emoji}
                 </span>
-                <span className="truncate text-center" style={{ fontSize: nameFontSize + 'px', lineHeight: 1.1, fontWeight: boldWeight, color: t.headerText }}>
+                <span className="truncate text-center" style={{ fontSize: TEXT_SCALE * nameFontSize + 'px', lineHeight: 1.1, fontWeight: boldWeight, color: t.headerText }}>
                   {productName || '\u00A0'}
                 </span>
               </div>
@@ -731,20 +734,20 @@
             
             <div className="relative flex-1 p-2 flex flex-col justify-between overflow-hidden">
               {showOriginal && (
-                <div className="truncate" style={{ color: t.origText, fontSize: Math.max(10, Math.round(13 * baseScale)) + 'px', textDecoration: 'line-through', fontWeight: semiBoldWeight }}>
+                <div className="truncate" style={{ color: t.origText, fontSize: TEXT_SCALE * Math.max(10, Math.round(13 * baseScale)) + 'px', textDecoration: 'line-through', fontWeight: semiBoldWeight }}>
                   {formattedOriginal}{currency}
                 </div>
               )}
               <div className="text-right mt-auto truncate w-full">
-                <span style={{ color: t.priceText, fontSize: priceFontSize + 'px', fontWeight: boldWeight, lineHeight: 1.1 }}>
+                <span style={{ color: t.priceText, fontSize: TEXT_SCALE * priceFontSize + 'px', fontWeight: boldWeight, lineHeight: 1.1 }}>
                   {formattedDiscount}
                 </span>
-                <span style={{ color: t.priceText, fontSize: currencyFontSize + 'px', fontWeight: semiBoldWeight, marginLeft: '2px' }}>
+                <span style={{ color: t.priceText, fontSize: TEXT_SCALE * currencyFontSize + 'px', fontWeight: semiBoldWeight, marginLeft: '2px' }}>
                   {currency}
                 </span>
               </div>
               {discountRate > 0 && (
-                <div className="absolute top-2 right-2 flex items-center justify-center rounded px-1.5 py-0.5 shadow-sm whitespace-nowrap" style={{ backgroundColor: t.badgeBg, color: t.badgeText, fontSize: Math.max(9, Math.round(10 * baseScale)) + 'px', fontWeight: boldWeight }}>
+                <div className="absolute top-2 right-2 flex items-center justify-center rounded px-1.5 py-0.5 shadow-sm whitespace-nowrap" style={{ backgroundColor: t.badgeBg, color: t.badgeText, fontSize: TEXT_SCALE * Math.max(9, Math.round(10 * baseScale)) + 'px', fontWeight: boldWeight }}>
                   -{discountRate}%
                 </div>
               )}
@@ -752,10 +755,10 @@
 
             {t.layout === 'bottom' && (
               <div className="flex items-center justify-center gap-1 px-1 border-t-2 overflow-hidden" style={{ height: bannerHeightPx + 'px', backgroundColor: t.headerBg, borderColor: t.border }}>
-                <span style={{ fontSize: nameFontSize + 'px', lineHeight: 1.1, fontFamily: emojiFontFamily, flexShrink: 0, color: t.headerText }}>
+                <span style={{ fontSize: TEXT_SCALE * nameFontSize + 'px', lineHeight: 1.1, fontFamily: emojiFontFamily, flexShrink: 0, color: t.headerText }}>
                   {t.emoji}
                 </span>
-                <span className="truncate text-center" style={{ fontSize: nameFontSize + 'px', lineHeight: 1.1, fontWeight: boldWeight, color: t.headerText }}>
+                <span className="truncate text-center" style={{ fontSize: TEXT_SCALE * nameFontSize + 'px', lineHeight: 1.1, fontWeight: boldWeight, color: t.headerText }}>
                   {productName || '\u00A0'}
                 </span>
               </div>
