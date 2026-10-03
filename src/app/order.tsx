@@ -23,6 +23,7 @@ import {
   clearFridgeSection,
   addOrderCategory,
   addStore,
+  needsOrderSetup,
   assignToFridgeSection,
   CatalogUpdateBadge,
   clearAllCatalogUpdateBadges,
@@ -95,6 +96,7 @@ export default function Order() {
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [categoryInput, setCategoryInput] = useState('');
   const [showCategoryInput, setShowCategoryInput] = useState(false);
+  const [categoryEditMode, setCategoryEditMode] = useState(false);
   const [seeding, setSeeding] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [lastAdd, setLastAdd] = useState<{ id: string; name: string } | null>(null);
@@ -268,6 +270,8 @@ export default function Order() {
     } finally {
       setSyncing(false);
     }
+    // 매장 동기화까지 끝난 뒤에 판단해야 재설치한 기존 사용자(서버에 매장 있음)에게 안 뜬다
+    if (await needsOrderSetup()) router.push('/order-setup');
   }, [loadCatalog]);
 
   useFocusEffect(
@@ -789,8 +793,11 @@ export default function Order() {
         >
           <MaterialCommunityIcons name="storefront-outline" size={16} color="#1A1A1A" />
           <Text className="text-ink ml-1.5 text-sm font-medium">
-            {stores.find((s) => s.id === activeStoreId)?.name ?? '매장 선택 안 함'}
+            {stores.find((s) => s.id === activeStoreId)?.name ??
+              (stores.length > 0 ? '매장 선택' : '매장 추가하기')}
           </Text>
+          {/* 매장 이름이 버튼인 줄 몰라 매장 추가·변경을 못 찾았다 — 무엇을 하는 버튼인지 글자로 보인다 */}
+          <Text className="text-muted ml-1.5 text-xs">매장 관리</Text>
           <MaterialCommunityIcons name="chevron-down" size={16} color="#888888" />
         </Pressable>
 
@@ -999,14 +1006,23 @@ export default function Order() {
               {categories.map((c) => (
                 <Chip
                   key={c}
-                  label={c}
-                  active={selectedCategory === c}
-                  onPress={() => setSelectedCategory(c)}
+                  label={categoryEditMode ? `✎ ${c}` : c}
+                  active={!categoryEditMode && selectedCategory === c}
+                  onPress={() => (categoryEditMode ? onLongPressCategory(c) : setSelectedCategory(c))}
                   onLongPress={() => onLongPressCategory(c)}
                 />
               ))}
-              <Chip label="+" active={false} onPress={() => setShowCategoryInput(true)} />
+              {/* "+"만으론 무엇을 추가하는지, 길게 누르기는 있는 줄도 몰랐다 — 글자로 보이는 추가·편집 버튼 */}
+              <Chip label="+ 카테고리" active={false} onPress={() => setShowCategoryInput(true)} />
+              <Chip
+                label={categoryEditMode ? '편집 끝' : '편집'}
+                active={categoryEditMode}
+                onPress={() => setCategoryEditMode((v) => !v)}
+              />
             </View>
+            {categoryEditMode ? (
+              <Text className="text-muted text-xs">이름을 고치거나 지울 카테고리를 누르세요</Text>
+            ) : null}
             {showCategoryInput || editingCategory ? (
               <View className="flex-row gap-2">
                 <TextInput
@@ -1140,10 +1156,10 @@ export default function Order() {
                         onPress={() => setShowFridgeSectionModal(true)}
                         className="flex-row items-center self-start rounded-full border border-dashed border-line bg-paper px-3 py-1.5 active:opacity-70"
                         accessibilityRole="button"
-                        accessibilityLabel="냉동고 구역 추가하기"
+                        accessibilityLabel="냉동고 구역 관리"
                       >
                         <MaterialCommunityIcons name="plus" size={16} color="#888888" />
-                        <Text className="text-muted ml-0.5 text-sm font-medium">구역추가</Text>
+                        <Text className="text-muted ml-0.5 text-sm font-medium">구역 관리</Text>
                       </Pressable>
                     </ScrollView>
                   </>
@@ -1350,7 +1366,7 @@ const QuickOrderHelpModal = memo(function QuickOrderHelpModal({
   // 처음 쓰는 사람 기준: 무엇을 하는 화면인지 → 시작 순서 → 버튼 설명 순으로 보여 준다
   const steps = [
     '위쪽 매장 버튼을 눌러 내 매장을 고르거나 새로 추가해요',
-    "'+ 구역추가'로 냉동고 칸을 만들어요 (예: 600바-1, 콘류)",
+    "'구역 관리'에서 냉동고 칸을 만들어요 (예: 600바-1, 콘류)",
     "'+ 상품 진열하기'로 그 칸에 있는 상품을 실제 진열 순서대로 넣어요",
     '발주할 상품을 탭해서 담아요 (한 번 탭 = 1박스)',
     "아래 '발주 내역 확인'에서 수량을 보고 '공유하기'로 보내요",

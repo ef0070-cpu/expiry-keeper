@@ -44,7 +44,7 @@ const ACTIVE_STORE_KEY = 'activeStoreId:v1';
 
 export type CatalogUpdateBadge = 'new' | 'updated';
 
-const DEFAULT_CATEGORIES = ['바', '콘', '튜브', '샌드/기타', '홈/컵'];
+export const DEFAULT_CATEGORIES = ['바', '콘', '튜브', '샌드/기타', '홈/컵'];
 
 // ---------- 카탈로그 ----------
 
@@ -447,7 +447,7 @@ export async function setActiveStoreId(id: string | null): Promise<void> {
 // 매장마다 실제 냉동고 구성이 달라 구역 목록도 매장별로 따로 관리한다. 아직 이 저장소가 없는
 // 매장(신규 매장, 또는 이 기능 이전부터 쓰던 기존 매장)은 DEFAULT_FRIDGE_SECTIONS로 시작한다.
 
-const DEFAULT_FRIDGE_SECTIONS: FridgeSection[] = [
+export const DEFAULT_FRIDGE_SECTIONS: FridgeSection[] = [
   '600바-1',
   '600바-2',
   '800바/1000바',
@@ -1034,4 +1034,26 @@ async function runDedupe(): Promise<void> {
   }
   const keeperIds = new Set(idRemap.values());
   for (const p of next) if (keeperIds.has(p.id)) pushOrderProduct(p).catch(() => {});
+}
+
+// ---------- 처음 시작 안내(매장·카테고리·구역) ----------
+// 매장·카테고리·냉동고 구역 기능이 화면 곳곳에 숨어 있어 처음 쓰는 사장님이 헤맸다 — 매장이 하나도
+// 없는 사용자가 발주 관리에 처음 들어오면 한 번만 3단계 안내(order-setup)를 띄운다.
+const ORDER_SETUP_DONE_KEY = 'orderSetupDone:v1';
+
+export async function needsOrderSetup(): Promise<boolean> {
+  if (await AsyncStorage.getItem(ORDER_SETUP_DONE_KEY)) return false;
+  return (await listStores()).length === 0;
+}
+
+export async function markOrderSetupDone(): Promise<void> {
+  await AsyncStorage.setItem(ORDER_SETUP_DONE_KEY, '1');
+}
+
+export async function setOrderCategories(items: string[]): Promise<void> {
+  await writeOrderCategories(items);
+}
+
+export async function setFridgeSections(storeId: string, sections: FridgeSection[]): Promise<void> {
+  await writeFridgeSections(storeId, sections);
 }

@@ -104,6 +104,7 @@ export default function RootLayout() {
           <Stack.Screen name="order-product-form" options={{ title: '발주 상품' }} />
           <Stack.Screen name="order-csv-import" options={{ title: '발주 상품 가져오기' }} />
           <Stack.Screen name="margin-calculator" options={{ title: '원가 계산기' }} />
+          <Stack.Screen name="order-setup" options={{ title: '발주 관리 시작하기' }} />
           <Stack.Screen
             name="order-cart"
             options={{
