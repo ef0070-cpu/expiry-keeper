@@ -35,7 +35,7 @@ const PROVIDER_LABEL: Record<Provider, string> = {
 function loginFailureHint(provider: Provider | null): string {
   const other = provider === 'google' ? '카카오 로그인' : provider === 'kakao' ? '구글 로그인' : '다른 로그인 방법';
   const workspaceNote =
-    provider === 'google' ? '\n\n회사 Workspace 계정입니다. 개인 구글 계정 또는 다른 접속 방법으로 시도해주세요.' : '';
+    provider === 'google' ? '\n\n회사(Workspace) 계정이라면 개인 구글 계정 또는 다른 접속 방법으로 시도해주세요.' : '';
   return `${workspaceNote}\n\n대신 ${other}을 이용해주세요.`;
 }
 

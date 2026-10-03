@@ -84,7 +84,6 @@
           }
         }
       ],
-      "./plugins/withR8Optimize",
       [
         "react-native-vision-camera",
         {
