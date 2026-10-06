@@ -18,4 +18,7 @@ const row = (o: object) => ({ ad_free: false, retail_until: null, retail_lifetim
 console.assert(toEntitlement(row({ retail_until: '2026-10-01T00:00:00Z', retail_source: 'promo' }), now).retailPremium === false, '만료된 이벤트');
 console.assert(toEntitlement(row({ retail_until: '2027-04-01T00:00:00Z', retail_source: 'promo' }), now).retailPremium === true, '진행 중 이벤트');
 console.assert(toEntitlement(row({ ad_free: true, retail_lifetime: true }), now).retailPremium === true, '테스터 평생');
+console.assert(toEntitlement(row({ retail_until: '2026-11-01T00:00:00Z', retail_source: 'subscription' }), now).adFree === true, '매장 구독자는 가정용 광고도 제거');
+console.assert(toEntitlement(row({ retail_until: '2026-10-01T00:00:00Z', retail_source: 'subscription' }), now).adFree === false, '구독이 끝나면 광고 제거도 끝');
+console.assert(toEntitlement(row({ ad_free: true }), now).adFree === true && toEntitlement(row({ ad_free: true }), now).retailPremium === false, '평생 광고 제거만 산 사람은 매장 유료 아님');
 console.log('plan-limits selfcheck OK');

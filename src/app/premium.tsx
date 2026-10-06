@@ -118,7 +118,7 @@ export default function Premium() {
             '같은 구글 계정이면 휴대폰을 바꿔도 [구매 복원]으로 다시 적용됩니다.',
             '결제 즉시 광고 제거가 적용되어, 구매 후 7일 이내라도 이용을 시작한 경우 청약철회가 제한될 수 있습니다. 결제 후 48시간 이내에는 구글 플레이에서 직접 환불 요청할 수 있습니다.',
           ]}
-          buttonLabel={ent.adFree ? '구매 완료' : '구매하기'}
+          buttonLabel={ent.adFree ? (ent.retailPremium ? '매장 이용권에 포함' : '구매 완료') : '구매하기'}
           disabled={!price || ent.adFree}
           onPress={purchase}
         />

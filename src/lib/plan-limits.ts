@@ -17,9 +17,11 @@ export const FREE: Entitlement = { adFree: false, retailPremium: false, retailUn
 
 export function toEntitlement(r: EntitlementRow, now = new Date()): Entitlement {
   const until = r.retail_until ? new Date(r.retail_until) : null;
+  const retailPremium = r.retail_lifetime || (until !== null && until > now);
   return {
-    adFree: r.ad_free,
-    retailPremium: r.retail_lifetime || (until !== null && until > now),
+    // 매장 유료(구독·이벤트·테스터·팀장 권한 상속) 사용자는 가정용 광고 제거도 함께 — 같은 사장님이 집에서도 쓰니까
+    adFree: r.ad_free || retailPremium,
+    retailPremium,
     retailUntil: r.retail_lifetime ? null : r.retail_until,
     retailSource: r.retail_source === 'subscription' || r.retail_source === 'promo' ? r.retail_source : null,
   };
