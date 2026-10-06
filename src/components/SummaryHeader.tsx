@@ -46,12 +46,12 @@ function SummaryHeader({ products, activeSignal, onSelectSignal }: Props) {
 
 export default memo(SummaryHeader);
 
-// 카드 안에서만 괄호 앞뒤로 두 줄 표기한다. SIGNAL_TITLES(index.tsx 섹션 제목에도 쓰임)는
-// 한 줄 문구 그대로 두고, 여기서만 표시용으로 나눈다.
-const SIGNAL_LABEL_LINES: Record<SignalKey, string[]> = {
-  red: ['만료·7일 이내'],
-  yellow: ['임박', '(한달 이내)'],
-  green: ['여유있음', '(한달 이상)'],
+// 카드에는 짧은 이름 한 줄만 — 두 줄(괄호 기간 설명)이면 카드가 너무 커 목록이 밀려났다. 기간 설명은
+// 아래 목록 구역 제목(SIGNAL_TITLES, 예: "임박 (한달 이내)")에 그대로 있다.
+const SIGNAL_SHORT_LABEL: Record<SignalKey, string> = {
+  red: '만료·7일 이내',
+  yellow: '임박',
+  green: '여유있음',
 };
 
 function SignalStat({
@@ -75,7 +75,7 @@ function SignalStat({
       accessibilityLabel={`${label} ${value}개`}
       accessibilityHint={active ? '누르면 필터를 해제해요' : '누르면 이 상품만 보여요'}
       accessibilityState={{ selected: active }}
-      className={`relative flex-1 items-center rounded-xl border py-3 active:opacity-70 ${
+      className={`relative flex-1 items-center rounded-xl border py-2 active:opacity-70 ${
         active ? `${SIGNAL_BG[signalKey]} border-transparent` : 'border-line bg-paper'
       }`}
     >
@@ -84,17 +84,12 @@ function SignalStat({
           <MaterialCommunityIcons name="filter-outline" size={12} color="#888888" />
         </View>
       ) : null}
-      <Text className={`text-xl font-bold ${active ? 'text-paper' : SIGNAL_TEXT[signalKey]}`}>
+      <Text className={`text-lg font-bold leading-6 ${active ? 'text-paper' : SIGNAL_TEXT[signalKey]}`}>
         {value}
       </Text>
-      {SIGNAL_LABEL_LINES[signalKey].map((line, i) => (
-        <Text
-          key={line}
-          className={`text-xs ${i === 0 ? 'mt-0.5' : ''} ${active ? 'text-paper' : 'text-muted'}`}
-        >
-          {line}
-        </Text>
-      ))}
+      <Text className={`text-xs ${active ? 'text-paper' : 'text-muted'}`} numberOfLines={1}>
+        {SIGNAL_SHORT_LABEL[signalKey]}
+      </Text>
     </Pressable>
   );
 }

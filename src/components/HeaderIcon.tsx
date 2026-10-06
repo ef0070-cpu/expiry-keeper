@@ -21,8 +21,10 @@ export default function HeaderIcon({
       accessibilityRole="button"
       accessibilityLabel={label}
     >
-      <MaterialCommunityIcons name={icon} size={27} color={color} />
-      <Text className="mt-0.5 text-[10px] leading-none" style={{ color }}>
+      {/* 작아서 잘 안 보인다는 의견으로 키움(27→31, 10→11px). 제목 옆 폭이 빠듯해 글자는 폰 글자 크기를
+          최대 1.3배까지만 따라가게 한다(더 크면 제목과 겹침) */}
+      <MaterialCommunityIcons name={icon} size={31} color={color} />
+      <Text className="mt-0.5 text-[11px] leading-none" style={{ color }} maxFontSizeMultiplier={1.3}>
         {label}
       </Text>
     </Pressable>
