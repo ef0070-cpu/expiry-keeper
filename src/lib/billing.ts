@@ -43,7 +43,7 @@ function listen() {
   });
 }
 
-/** 플레이 콘솔에 등록한 현지 가격 문자열(예: ₩2,900). 못 받으면 null. */
+/** 플레이 콘솔에 등록한 현지 가격 문자열(예: ₩1,900). 못 받으면 null. */
 export async function getPrice(key: ProductKey): Promise<string | null> {
   if (!(await connect()) || !Iap) return null;
   try {
