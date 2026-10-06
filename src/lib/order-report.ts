@@ -39,24 +39,43 @@ export async function reportOrderProductIssue(
   if (error) throw error;
 
   if (isCopyright && product.barcode && product.imageUri) {
-    await deletePhotoCandidate(product.barcode, product.imageUri);
+    // 남이 올린 사진도 신고 즉시 내린다(통지-삭제) — 서버 함수가 방금 남긴 이 신고 기록을 확인하고 지운다
+    const { error: removeError } = await supabase.rpc('remove_photo_for_copyright', {
+      target_barcode: product.barcode,
+      target_uri: product.imageUri,
+    });
+    if (removeError) throw removeError;
   }
 }
 
 /**
  * 이 바코드의 사진 후보(photoUri와 일치하는 것)를 즉시 삭제한다. 관리자 승인 없이 바로 반영되며,
- * 대표 사진 재계산은 DB 트리거가 알아서 다음 순위 후보(있으면)로 넘긴다. 저작권 신고의 즉시삭제
- * 경로와 "사진 제거" 버튼이 함께 쓴다.
+ * 대표 사진 재계산은 DB 트리거가 알아서 다음 순위 후보(있으면)로 넘긴다. "사진 제거" 버튼과 사진 후보
+ * 목록의 삭제가 쓴다 — 서버가 자기가 올린 사진만 지우게 막으므로(남의 사진은 0행), 남의 사진이면
+ * 안내 문구로 알린다. 서버에 없는(기기에만 있는) 사진이면 그냥 통과한다.
  */
 export async function deletePhotoCandidate(barcode: string, photoUri: string): Promise<void> {
   if (!supabase) throw new Error('로그인이 필요합니다.');
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('order_catalog_photos')
     .delete()
     .eq('barcode', barcode)
-    .eq('photo_uri', photoUri);
+    .eq('photo_uri', photoUri)
+    .select('id');
   if (error) throw error;
-  await supabase.from('barcode_catalog').update({ image_uri: null }).eq('barcode', barcode);
+  if (!data || data.length === 0) {
+    const { data: others } = await supabase
+      .from('order_catalog_photos')
+      .select('id')
+      .eq('barcode', barcode)
+      .eq('photo_uri', photoUri)
+      .limit(1);
+    if (others && others.length > 0) {
+      throw new Error('내가 올린 사진만 지울 수 있어요. 잘못된 사진이면 "정보 오류 신고"로 알려 주세요.');
+    }
+    return;
+  }
+  await supabase.from('barcode_catalog').update({ image_uri: null }).eq('barcode', barcode).eq('image_uri', photoUri);
 }
 
 export type CatalogFields = { name?: string; brand?: string; price?: number; barcode?: string };

@@ -2182,7 +2182,7 @@ const StoreSwitcherModal = memo(function StoreSwitcherModal({
           className="w-full rounded-2xl bg-paper p-4"
           style={{ maxHeight: '70%' }}
         >
-          <Text className="text-ink mb-2 text-base font-bold">매장 선택</Text>
+          <Text className="text-ink mb-2 text-base font-bold">매장 관리</Text>
 
           <Pressable
             onPress={() => onSelect(null)}
