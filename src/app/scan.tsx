@@ -5,7 +5,6 @@ import * as Linking from 'expo-linking';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   LayoutChangeEvent,
   Modal,
@@ -15,7 +14,6 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { lookupBarcode } from '@/lib/barcode-lookup';
 import { listOrderProductsByBarcode } from '@/lib/order-repo';
 import { listProductsByBarcode } from '@/lib/repo';
 import { setPickedBarcode } from '@/lib/scan-pick';
@@ -37,7 +35,6 @@ const VALID_LENGTHS: Record<string, number[]> = {
 export default function Scan() {
   const params = useLocalSearchParams<{ mode?: string }>();
   const [permission, requestPermission] = useCameraPermissions();
-  const [looking, setLooking] = useState(false);
   const [manualEntryVisible, setManualEntryVisible] = useState(false);
   const [manualBarcode, setManualBarcode] = useState('');
   const [torchOn, setTorchOn] = useState(false);
@@ -135,13 +132,8 @@ export default function Scan() {
 
     if (params.mode === 'order') {
       // 발주 모드: 카탈로그에 이미 있으면 검색어만 채우고, 없으면 신규 등록 화면으로 보낸다.
-      setLooking(true);
-      const [info, duplicates] = await Promise.all([
-        lookupBarcode(data),
-        listOrderProductsByBarcode(data),
-      ]);
-      setLooking(false);
-
+      // 상품명·사진 조회는 등록 화면이 열린 뒤 뒤에서 한다(lookup=1) — 여기서 기다리지 않는다.
+      const duplicates = await listOrderProductsByBarcode(data);
       if (duplicates.length > 0) {
         router.dismissTo({
           pathname: '/order',
@@ -152,37 +144,18 @@ export default function Scan() {
 
       router.replace({
         pathname: '/order-product-form',
-        params: { barcode: data, prefillName: info.name ?? '', prefillImage: info.imageUrl ?? '' },
+        params: { barcode: data, lookup: '1' },
       });
       return;
     }
 
-    setLooking(true);
-    // 상품 정보 조회와 동시에 같은 바코드로 이미 등록된(보관중) 상품이 있는지 확인한다
-    const [info, duplicates] = await Promise.all([
-      lookupBarcode(data),
-      listProductsByBarcode(data),
-    ]);
-
-    if (duplicates.length > 0) {
-      router.replace({
-        pathname: '/product-duplicates',
-        params: {
-          barcode: data,
-          prefillName: info.name ?? '',
-          prefillImage: info.imageUrl ?? '',
-        },
-      });
-      return;
-    }
-
+    // 같은 바코드로 이미 등록된(보관중) 상품이 있는지만 확인(기기 안이라 즉시)하고 바로 넘어간다.
+    // 상품명·사진 조회(1~3초)는 등록 화면이 열린 뒤 뒤에서 채운다(lookup=1) — 예전엔 여기서
+    // "상품을 조회하는 중입니다"로 그만큼 기다렸다.
+    const duplicates = await listProductsByBarcode(data);
     router.replace({
-      pathname: '/product-form',
-      params: {
-        barcode: data,
-        prefillName: info.name ?? '',
-        prefillImage: info.imageUrl ?? '',
-      },
+      pathname: duplicates.length > 0 ? '/product-duplicates' : '/product-form',
+      params: { barcode: data, lookup: '1' },
     });
   };
 
@@ -313,12 +286,6 @@ export default function Scan() {
         <Text className="text-paper mt-5 text-base font-medium">
           바코드를 사각형 안에 맞춰 주세요
         </Text>
-        {looking ? (
-          <View className="mt-4 flex-row items-center rounded-full bg-ink/70 px-4 py-2">
-            <ActivityIndicator color="#FFFFFF" size="small" />
-            <Text className="text-paper ml-2 text-sm">상품 정보 조회 중...</Text>
-          </View>
-        ) : null}
       </View>
 
       {/* 직접 입력 (검색 모드에서는 의미가 없으므로 숨김) */}

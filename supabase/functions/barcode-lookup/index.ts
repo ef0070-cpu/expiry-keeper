@@ -3,13 +3,16 @@ import { searchProductImage } from '../_shared/image-search.ts';
 
 type BarcodeInfo = { name: string | null; imageUrl: string | null };
 
+// 조회처 한 곳이 느려도(해외 서버·정부 API) 전체 응답이 끌려가지 않게 각각 이 시간까지만 기다린다
+const LOOKUP_TIMEOUT_MS = 2500;
+
 const containsHangul = (s: string) => /[가-힣]/.test(s);
 
 async function lookupOpenFoodFacts(barcode: string): Promise<BarcodeInfo> {
   try {
     const res = await fetch(
       `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(barcode)}.json`,
-      { headers: { 'User-Agent': 'ExpiryKeeper/1.0 (Android)' } },
+      { headers: { 'User-Agent': 'ExpiryKeeper/1.0 (Android)' }, signal: AbortSignal.timeout(LOOKUP_TIMEOUT_MS) },
     );
     if (!res.ok) return { name: null, imageUrl: null };
     const json = await res.json();
@@ -34,6 +37,7 @@ async function lookupFoodSafetyKorea(barcode: string): Promise<BarcodeInfo> {
   try {
     const res = await fetch(
       `https://openapi.foodsafetykorea.go.kr/api/${key}/C005/json/1/1/BAR_CD=${encodeURIComponent(barcode)}`,
+      { signal: AbortSignal.timeout(LOOKUP_TIMEOUT_MS) },
     );
     if (!res.ok) return { name: null, imageUrl: null };
     const json = await res.json();
@@ -58,7 +62,10 @@ async function lookupNaverShopping(barcode: string): Promise<BarcodeInfo> {
   try {
     const res = await fetch(
       `https://openapi.naver.com/v1/search/shop.json?query=${encodeURIComponent(barcode)}&display=5`,
-      { headers: { 'X-Naver-Client-Id': clientId, 'X-Naver-Client-Secret': clientSecret } },
+      {
+        headers: { 'X-Naver-Client-Id': clientId, 'X-Naver-Client-Secret': clientSecret },
+        signal: AbortSignal.timeout(LOOKUP_TIMEOUT_MS),
+      },
     );
     if (!res.ok) return { name: null, imageUrl: null };
     const json = await res.json();

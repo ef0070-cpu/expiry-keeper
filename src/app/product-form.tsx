@@ -4,6 +4,7 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import * as Linking from 'expo-linking';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { useBarcodeAutoFill } from '@/lib/barcode-lookup';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -49,6 +50,7 @@ export default function ProductForm() {
     barcode?: string;
     prefillName?: string;
     prefillImage?: string;
+    lookup?: string;
   }>();
   const isEdit = !!params.id;
   const mode = useAppMode();
@@ -59,6 +61,11 @@ export default function ProductForm() {
 
   const [name, setName] = useState(params.prefillName ?? '');
   const [imageUri, setImageUri] = useState<string | null>(params.prefillImage || null);
+  // 스캔 직후 넘어왔으면 상품명·사진을 뒤에서 찾아 빈칸만 채운다(이미 입력했으면 그대로)
+  const lookingUp = useBarcodeAutoFill(params.barcode, params.lookup === '1', (info) => {
+    if (info.name) setName((prev) => prev || info.name!);
+    if (info.imageUrl) setImageUri((prev) => prev ?? info.imageUrl);
+  });
   // 새 상품이면 현재 연도를 미리 채워 월·일만 입력하면 되게 한다
   const [expiryDate, setExpiryDate] = useState(params.id ? '' : String(new Date().getFullYear()));
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -530,7 +537,7 @@ export default function ProductForm() {
             </View>
             <TextInput
               className="text-ink mt-1.5 rounded-xl border border-line bg-paper px-3 py-2.5 text-base"
-              placeholder={mode === 'home' ? '예: 두부' : '예: 해태 오예스 360g'}
+              placeholder={lookingUp ? '상품명 찾는 중…' : mode === 'home' ? '예: 두부' : '예: 해태 오예스 360g'}
               placeholderTextColor="#BBBBBB"
               value={name}
               onChangeText={setName}

@@ -11,6 +11,7 @@ export default function ProductDuplicates() {
     barcode: string;
     prefillName?: string;
     prefillImage?: string;
+    lookup?: string;
   }>();
   const insets = useSafeAreaInsets();
   const [products, setProducts] = useState<Product[] | null>(null);
@@ -27,6 +28,7 @@ export default function ProductDuplicates() {
             barcode: params.barcode,
             prefillName: params.prefillName ?? '',
             prefillImage: params.prefillImage ?? '',
+            lookup: params.lookup ?? '',
           },
         });
         return;
@@ -45,6 +47,7 @@ export default function ProductDuplicates() {
         barcode: params.barcode,
         prefillName: params.prefillName ?? '',
         prefillImage: params.prefillImage ?? '',
+        lookup: params.lookup ?? '',
       },
     });
   };
