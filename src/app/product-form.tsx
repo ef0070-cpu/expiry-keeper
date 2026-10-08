@@ -962,10 +962,11 @@ export default function ProductForm() {
           ) : null}
           <View className="flex-row gap-2">
             <TextInput
-              className="text-ink flex-1 rounded-xl border border-line bg-paper px-3 py-2 text-sm"
-              placeholder={
-                mode === 'home' ? '새 카테고리 입력 (예: 냉장실)' : '새 카테고리 입력 (예: 1호매장, 2호매장)'
-              }
+              className="text-ink flex-1 rounded-xl border border-line bg-paper px-3 py-2.5 text-sm"
+              textAlignVertical="center"
+              // 문구가 길면 큰 글자에서 두 줄로 넘어가 잘렸다 — 짧게, 한 줄 고정
+              placeholder={mode === 'home' ? '새 카테고리 (예: 냉장실)' : '새 카테고리 (예: 1호매장)'}
+              numberOfLines={1}
               placeholderTextColor="#BBBBBB"
               value={newCategory}
               onChangeText={setNewCategory}
