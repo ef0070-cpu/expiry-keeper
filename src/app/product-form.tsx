@@ -703,7 +703,6 @@ export default function ProductForm() {
                   numberOfLines={1}
                   className={`flex-shrink text-xs ${foreignHint ? 'text-primary font-bold' : 'text-muted'}`}
                 >
-                  {foreignHint ? `${foreignHint.country} · ` : ''}
                   {ORDER_SHORT[dateOcrOrder]}
                 </Text>
                 <MaterialCommunityIcons name="chevron-down" size={14} color={foreignHint ? '#CC2222' : '#888888'} />
@@ -820,7 +819,7 @@ export default function ProductForm() {
           <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} className="text-primary mt-1.5 text-xs">
             {foreignHint.mfg
               ? `${foreignHint.country} 제품 바코드예요. 제조일+기간 표기가 많아요.`
-              : `${foreignHint.country} 제품 바코드예요. 날짜 순서가 다르면 바꿔 주세요.`}
+              : `${foreignHint.country} 제품 바코드예요(${ORDER_SHORT[foreignHint.order]}). 다르면 바꿔 주세요.`}
           </Text>
         ) : null}
 
