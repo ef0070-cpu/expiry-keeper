@@ -815,6 +815,15 @@ export default function ProductForm() {
           </View>
         </View>
 
+        {/* 해외 바코드 안내 한 줄 — 전체 폭(유통기한 칸 안은 수량 옆이라 좁아 두 줄로 밀림). 길면 글자를 줄여 한 줄 유지 */}
+        {foreignHint ? (
+          <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} className="text-primary mt-1.5 text-xs">
+            {foreignHint.mfg
+              ? `${foreignHint.country} 제품 바코드예요. 제조일+기간 표기가 많아요.`
+              : `${foreignHint.country} 제품 바코드예요. 날짜 순서가 다르면 바꿔 주세요.`}
+          </Text>
+        ) : null}
+
         {/* 유통기한 입력 도구 한 줄 — 좁은 유통기한 칸 안에 두면 큰 글자에서 두 줄로 밀렸다. 전체 폭 3등분 */}
         <View className="mt-2 flex-row" style={{ gap: 6 }}>
           <ToolButton
