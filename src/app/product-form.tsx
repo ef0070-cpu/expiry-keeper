@@ -85,6 +85,10 @@ export default function ProductForm() {
   // 기본 순서는 설정값. 이 상품에서만 바꾼 순서(버튼·바코드 국가 추천)가 있으면 그게 우선 — 설정은 안 바뀐다
   const defaultDateOrder = useDateOcrOrder();
   const [orderOverride, setOrderOverride] = useState<DateOcrOrder | null>(null);
+  const [orderSheetVisible, setOrderSheetVisible] = useState(false);
+  // 바코드 잘못 읽힘 → 번호를 눌러 다시 촬영·직접 수정
+  const [barcodeEditVisible, setBarcodeEditVisible] = useState(false);
+  const [barcodeDraft, setBarcodeDraft] = useState('');
   const dateOcrOrder = orderOverride ?? defaultDateOrder;
 
   const [name, setName] = useState(params.prefillName ?? '');
@@ -130,6 +134,36 @@ export default function ProductForm() {
 
   const [barcode, setBarcode] = useState<string | null>(params.barcode ?? null);
   const barcodeHint = useMemo(() => dateOrderFromBarcode(barcode), [barcode]);
+  const foreignHint = barcodeHint && barcodeHint.country !== '한국' ? barcodeHint : null;
+
+  const onBarcodePress = () => {
+    const edit = () => {
+      setBarcodeDraft(barcode ?? '');
+      setBarcodeEditVisible(true);
+    };
+    // 수정 중인 상품은 다시 촬영하면 새 상품 등록으로 넘어가 버려서 직접 수정만
+    if (isEdit) return edit();
+    Alert.alert('바코드가 잘못 읽혔나요?', barcode ?? '', [
+      { text: '취소', style: 'cancel' },
+      { text: '직접 수정', onPress: edit },
+      { text: '다시 촬영', onPress: () => router.replace('/scan') },
+    ]);
+  };
+
+  const applyBarcode = () => {
+    const v = barcodeDraft.trim();
+    if (!/^\d{6,13}$/.test(v)) {
+      Alert.alert('입력 확인', '바코드는 6~13자리 숫자여야 합니다.');
+      return;
+    }
+    setBarcodeEditVisible(false);
+    if (isEdit) {
+      setBarcode(v);
+      return;
+    }
+    // 새 상품은 스캔 직후와 똑같이 — 상품명·사진을 새 바코드로 다시 찾는다
+    router.replace({ pathname: '/product-form', params: { barcode: v, lookup: '1' } });
+  };
   useEffect(() => {
     if (barcodeHint) setOrderOverride(barcodeHint.order);
   }, [barcodeHint]);
@@ -620,10 +654,17 @@ export default function ProductForm() {
             <View className="flex-row items-center justify-between">
               <Text className="text-ink text-sm font-bold">상품명 *</Text>
               {barcode ? (
-                <View className="flex-row items-center">
+                <Pressable
+                  onPress={onBarcodePress}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={`바코드 ${barcode}, 눌러서 다시 촬영하거나 수정`}
+                  className="flex-row items-center"
+                >
                   <MaterialCommunityIcons name="barcode" size={14} color="#888888" />
-                  <Text className="text-muted ml-1 text-xs">{barcode}</Text>
-                </View>
+                  <Text className="text-muted ml-1 text-xs underline">{barcode}</Text>
+                  <MaterialCommunityIcons name="pencil-outline" size={12} color="#888888" style={{ marginLeft: 2 }} />
+                </Pressable>
               ) : null}
             </View>
             <TextInput
@@ -646,7 +687,28 @@ export default function ProductForm() {
         {/* 유통기한 + 수량 (한 줄 배치) */}
         <View className="mt-4 flex-row gap-3">
           <View className="flex-1">
-            <Label text="유통기한 *" />
+            <View className="flex-row items-start justify-between">
+              <Label text="유통기한 *" />
+              {/* 날짜 순서 — 버튼 3개를 늘어놓으면 조잡해 작은 선택 하나로. 바코드로 자동 선택되면 나라를 함께 */}
+              <Pressable
+                onPress={() => setOrderSheetVisible(true)}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={`날짜 순서 ${ORDER_SHORT[dateOcrOrder]}, 눌러서 바꾸기`}
+                className={`ml-2 flex-shrink flex-row items-center rounded-full border px-2 py-0.5 ${
+                  foreignHint ? 'border-primary' : 'border-line'
+                } bg-paper`}
+              >
+                <Text
+                  numberOfLines={1}
+                  className={`flex-shrink text-xs ${foreignHint ? 'text-primary font-bold' : 'text-muted'}`}
+                >
+                  {foreignHint ? `${foreignHint.country} · ` : ''}
+                  {ORDER_SHORT[dateOcrOrder]}
+                </Text>
+                <MaterialCommunityIcons name="chevron-down" size={14} color={foreignHint ? '#CC2222' : '#888888'} />
+              </Pressable>
+            </View>
             {liveScanVisible ? (
               <ExpiryLiveScanModal
                 dateOcrOrder={dateOcrOrder}
@@ -711,34 +773,6 @@ export default function ProductForm() {
                 ) : null}
               </View>
             ) : null}
-            {/* 인식 버튼은 입력칸 아래 — 제목 줄에 두면 좁은 화면에서 두 줄로 밀려 옆 '수량'과 높이가 어긋났다 */}
-            <View className="mt-2 flex-row flex-wrap items-center" style={{ columnGap: 14, rowGap: 6 }}>
-              <Pressable
-                onPress={() => setLiveScanVisible(true)}
-                className="flex-row items-center"
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel="카메라로 유통기한 자동 인식"
-              >
-                <MaterialCommunityIcons name="line-scan" size={15} color="#CC2222" />
-                <Text className="text-primary ml-1 text-xs font-medium">자동 인식</Text>
-              </Pressable>
-              <Pressable
-                onPress={scanExpiryDatePhoto}
-                disabled={ocrBusy}
-                className="flex-row items-center"
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel="사진으로 유통기한 인식"
-              >
-                {ocrBusy ? (
-                  <ActivityIndicator size="small" color="#CC2222" />
-                ) : (
-                  <MaterialCommunityIcons name="text-recognition" size={15} color="#CC2222" />
-                )}
-                <Text className="text-primary ml-1 text-xs font-medium">사진으로 인식</Text>
-              </Pressable>
-            </View>
           </View>
           <View>
             <Label text="수량" />
@@ -781,43 +815,104 @@ export default function ProductForm() {
           </View>
         </View>
 
-        {/* 날짜 표기 순서 — 해외 제품을 원터치로. 자동 인식·사진 인식·직접 입력 모두에 적용(설정 화면과 같은 값) */}
-        <View className="mt-2 flex-row flex-wrap items-center" style={{ gap: 6 }}>
-          <Text className="text-muted text-xs">날짜 순서</Text>
-          {DATE_OCR_ORDERS.map((o) => (
-            <Pressable
-              key={o}
-              onPress={() => setOrderOverride(o)}
-              accessibilityRole="button"
-              accessibilityState={{ selected: dateOcrOrder === o }}
-              className={`rounded-full border px-2.5 py-1 ${
-                dateOcrOrder === o ? 'border-primary bg-primary' : 'border-line bg-paper'
-              }`}
-            >
-              <Text className={`text-xs ${dateOcrOrder === o ? 'text-paper font-bold' : 'text-muted'}`}>
-                {ORDER_SHORT[o]}
-              </Text>
-            </Pressable>
-          ))}
-          {/* 중국식(제조일로부터 ~) — 날짜 대신 제조일+보관 기간이 적힌 제품 */}
-          <Pressable
+        {/* 유통기한 입력 도구 한 줄 — 좁은 유통기한 칸 안에 두면 큰 글자에서 두 줄로 밀렸다. 전체 폭 3등분 */}
+        <View className="mt-2 flex-row" style={{ gap: 6 }}>
+          <ToolButton
+            icon="line-scan"
+            label="자동 인식"
+            a11y="카메라로 유통기한 자동 인식"
+            onPress={() => setLiveScanVisible(true)}
+          />
+          <ToolButton
+            icon="text-recognition"
+            label="사진 인식"
+            a11y="사진으로 유통기한 인식"
+            busy={ocrBusy}
+            onPress={scanExpiryDatePhoto}
+          />
+          {/* 중국식(제조일로부터 ~). 중국 바코드면 빨간 바탕으로 강조 — 날짜 대신 제조일+보관 기간 표기가 많다 */}
+          <ToolButton
+            icon="calendar-plus"
+            label="제조일+기간"
+            a11y="제조일과 보관 기간으로 유통기한 계산"
+            highlight={!!barcodeHint?.mfg}
             onPress={() => setManufactureCalcVisible(true)}
-            accessibilityRole="button"
-            // 중국 바코드면 빨간 테두리로 강조 — 날짜 대신 제조일+보관 기간 표기가 많다
-            className={`rounded-full border px-2.5 py-1 ${barcodeHint?.mfg ? 'border-primary bg-paper' : 'border-line bg-paper'}`}
-          >
-            <Text className={`text-xs ${barcodeHint?.mfg ? 'text-primary font-bold' : 'text-muted'}`}>
-              제조일+기간
-            </Text>
-          </Pressable>
+          />
         </View>
-        {barcodeHint && barcodeHint.country !== '한국' ? (
-          <Text className="text-muted mt-1 text-xs">
-            {barcodeHint.mfg
-              ? `${barcodeHint.country} 바코드예요. 제조일+보관 기간으로 적힌 제품이 많아요.`
-              : `${barcodeHint.country} 바코드라 ${ORDER_SHORT[barcodeHint.order]}로 맞췄어요. 다르면 눌러서 바꾸세요.`}
-          </Text>
-        ) : null}
+
+        <Modal
+          visible={barcodeEditVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setBarcodeEditVisible(false)}
+        >
+          <View className="flex-1 items-center justify-center bg-black/60 px-8">
+            <View className="w-full rounded-2xl bg-paper p-4">
+              <Text className="text-ink mb-3 text-base font-bold">바코드 수정</Text>
+              <TextInput
+                className="text-ink rounded-xl border border-line bg-bg px-3 py-2.5 text-base"
+                placeholder="바코드 숫자"
+                placeholderTextColor="#BBBBBB"
+                keyboardType="number-pad"
+                maxLength={13}
+                autoFocus
+                value={barcodeDraft}
+                onChangeText={(t) => setBarcodeDraft(t.replace(/[^0-9]/g, ''))}
+              />
+              <View className="mt-4 flex-row gap-2">
+                <Pressable
+                  onPress={() => setBarcodeEditVisible(false)}
+                  className="flex-1 items-center rounded-xl border border-line bg-paper py-2.5 active:opacity-70"
+                >
+                  <Text className="text-ink text-sm font-medium">취소</Text>
+                </Pressable>
+                <Pressable
+                  onPress={applyBarcode}
+                  className="flex-1 items-center rounded-xl bg-primary py-2.5 active:opacity-80"
+                >
+                  <Text className="text-paper text-sm font-bold">확인</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        <Modal
+          visible={orderSheetVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setOrderSheetVisible(false)}
+        >
+          <Pressable className="flex-1 items-center justify-center bg-black/60 px-8" onPress={() => setOrderSheetVisible(false)}>
+            <View className="w-full rounded-2xl bg-paper p-4">
+              <Text className="text-ink text-base font-bold">날짜 표기 순서</Text>
+              <Text className="text-muted mb-3 mt-1 text-xs">
+                {foreignHint
+                  ? `${foreignHint.country} 바코드라 자동으로 골랐어요. 포장과 다르면 바꾸세요.`
+                  : '포장에 적힌 순서를 고르세요. 이 상품에만 적용돼요.'}
+              </Text>
+              {DATE_OCR_ORDERS.map((o) => (
+                <Pressable
+                  key={o}
+                  onPress={() => {
+                    setOrderOverride(o);
+                    setOrderSheetVisible(false);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: dateOcrOrder === o }}
+                  className={`mb-2 flex-row items-center rounded-xl border px-3 py-2.5 ${
+                    dateOcrOrder === o ? 'border-primary' : 'border-line'
+                  }`}
+                >
+                  <Text className={`flex-1 text-sm ${dateOcrOrder === o ? 'text-primary font-bold' : 'text-ink'}`}>
+                    {ORDER_SHORT[o]}
+                  </Text>
+                  <Text className="text-muted text-xs">{ORDER_EXAMPLE[o]}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </Pressable>
+        </Modal>
 
         {/* 카테고리 */}
         <View className="mt-4">
@@ -919,6 +1014,47 @@ export default function ProductForm() {
         ) : null}
       </ScrollView>
     </KeyboardAvoidingView>
+  );
+}
+
+const ORDER_EXAMPLE: Record<DateOcrOrder, string> = {
+  ymd: '예: 2026.09.10',
+  dmy: '예: 10.09.2026',
+  mdy: '예: 09.10.2026',
+};
+
+/** 유통기한 입력 도구 버튼(자동 인식·사진 인식·제조일+기간) — 한 줄 3등분, 글자가 길면 줄임 */
+function ToolButton({
+  icon,
+  label,
+  a11y,
+  onPress,
+  busy = false,
+  highlight = false,
+}: {
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  label: string;
+  a11y: string;
+  onPress: () => void;
+  busy?: boolean;
+  highlight?: boolean;
+}) {
+  const color = highlight ? '#FFFFFF' : '#CC2222';
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={busy}
+      accessibilityRole="button"
+      accessibilityLabel={a11y}
+      className={`flex-1 flex-row items-center justify-center rounded-xl border py-2 active:opacity-70 ${
+        highlight ? 'border-primary bg-primary' : 'border-line bg-paper'
+      }`}
+    >
+      {busy ? <ActivityIndicator size="small" color={color} /> : <MaterialCommunityIcons name={icon} size={15} color={color} />}
+      <Text numberOfLines={1} className={`ml-1 flex-shrink text-xs font-medium ${highlight ? 'text-paper' : 'text-primary'}`}>
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
