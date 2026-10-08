@@ -795,12 +795,12 @@ export default function ProductForm() {
         {foreignHint ? (
           <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} className="text-primary mt-1.5 text-xs">
             {foreignHint.mfg
-              ? `${foreignHint.country} 제품 바코드예요. 제조일만 있으면 [제조일+기간]을 누르세요.`
+              ? `${foreignHint.country} 제품 바코드예요. 제조일만 있으면 인식할 때 [예]를 누르세요.`
               : `${foreignHint.country} 제품 바코드예요(${ORDER_SHORT[foreignHint.order]}). 다르면 바꿔 주세요.`}
           </Text>
         ) : null}
 
-        {/* 유통기한 입력 도구 한 줄 — 중국 바코드일 때만 [제조일+기간]이 붙는다 */}
+        {/* 유통기한 입력 도구 한 줄. 제조일+기간 팝업은 중국 바코드에서 인식할 때 확인 창 [예]로만 연다 */}
         <View className="mt-2 flex-row" style={{ gap: 6 }}>
           <ToolButton
             icon="line-scan"
@@ -815,14 +815,6 @@ export default function ProductForm() {
             busy={ocrBusy}
             onPress={() => startRecognition(() => void scanExpiryDatePhoto())}
           />
-          {barcodeHint?.mfg ? (
-            <ToolButton
-              icon="calendar-plus"
-              label="제조일+기간"
-              a11y="제조일과 보존기간으로 유통기한 계산"
-              onPress={() => openMfg()}
-            />
-          ) : null}
         </View>
 
         {/* 제조일+기간 팝업 — 중국 제품 등 제조일과 보존기간만 있는 경우 */}
