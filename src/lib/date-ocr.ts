@@ -146,6 +146,35 @@ export function extractDateCandidates(
   return [...desc.filter((d) => d >= referenceDate), ...desc.filter((d) => d < referenceDate)];
 }
 
+// ---------- 바코드 국가번호로 날짜 순서 추천 ----------
+
+// GS1 앞 3자리 범위 → [나라, 날짜 순서]. 주의: 생산국이 아니라 바코드를 등록한 나라라서 추천일 뿐이다
+// (한국 회사가 중국에서 만들어도 880). 목록에 없는 번호는 추천하지 않는다(기본값 유지).
+const GS1_RANGES: [number, number, string, DateOcrOrder][] = [
+  [0, 19, '미국·캐나다', 'mdy'], [30, 39, '미국·캐나다', 'mdy'], [60, 139, '미국·캐나다', 'mdy'],
+  [300, 379, '프랑스', 'dmy'], [400, 440, '독일', 'dmy'], [450, 459, '일본', 'ymd'], [490, 499, '일본', 'ymd'],
+  [460, 469, '러시아', 'dmy'], [471, 471, '대만', 'ymd'], [489, 489, '홍콩', 'dmy'],
+  [500, 509, '영국', 'dmy'], [520, 521, '그리스', 'dmy'], [539, 539, '아일랜드', 'dmy'], [540, 549, '벨기에', 'dmy'],
+  [560, 560, '포르투갈', 'dmy'], [570, 579, '덴마크', 'dmy'], [590, 590, '폴란드', 'dmy'], [640, 649, '핀란드', 'dmy'],
+  [690, 699, '중국', 'ymd'], [700, 709, '노르웨이', 'dmy'], [730, 739, '스웨덴', 'dmy'], [750, 750, '멕시코', 'dmy'],
+  [760, 769, '스위스', 'dmy'], [789, 790, '브라질', 'dmy'], [800, 839, '이탈리아', 'dmy'], [840, 849, '스페인', 'dmy'],
+  [859, 859, '체코', 'dmy'], [868, 869, '터키', 'dmy'], [870, 879, '네덜란드', 'dmy'], [880, 880, '한국', 'ymd'],
+  [885, 885, '태국', 'dmy'], [888, 888, '싱가포르', 'dmy'], [893, 893, '베트남', 'dmy'], [899, 899, '인도네시아', 'dmy'],
+  [900, 919, '오스트리아', 'dmy'], [930, 939, '호주', 'dmy'], [940, 949, '뉴질랜드', 'dmy'], [955, 955, '말레이시아', 'dmy'],
+];
+
+/** 바코드로 나라·날짜 순서 추천. 12자리(UPC-A)는 미국·캐나다. 중국은 제조일+보관 기간 표기가 많아 mfg로 알린다 */
+export function dateOrderFromBarcode(
+  barcode: string | null | undefined,
+): { country: string; order: DateOcrOrder; mfg: boolean } | null {
+  if (!barcode || !/^\d+$/.test(barcode)) return null;
+  if (barcode.length === 12) return { country: '미국·캐나다', order: 'mdy', mfg: false };
+  if (barcode.length !== 13) return null;
+  const p = Number(barcode.slice(0, 3));
+  const hit = GS1_RANGES.find(([lo, hi]) => p >= lo && p <= hi);
+  return hit ? { country: hit[2], order: hit[3], mfg: hit[2] === '중국' } : null;
+}
+
 // ---------- 실시간 자동 인식(카메라 미리보기) ----------
 
 export interface Frame {

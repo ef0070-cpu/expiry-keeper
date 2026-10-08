@@ -1,4 +1,5 @@
 import {
+  dateOrderFromBarcode,
   extractDateCandidates,
   extractExpiryDateFromText,
   stableDate,
@@ -101,5 +102,12 @@ console.assert(extractDateCandidates('숫자 없음', 'ymd', REF).length === 0, 
     '오래된 결과(3번 전)는 세지 않음',
   );
 }
+
+console.assert(dateOrderFromBarcode('8801043014809')?.order === 'ymd', '한국 880');
+console.assert(dateOrderFromBarcode('6901028075831')?.mfg === true, '중국 690 → 제조일+기간 안내');
+console.assert(dateOrderFromBarcode('4006381333931')?.order === 'dmy', '독일 400');
+console.assert(dateOrderFromBarcode('012345678905')?.order === 'mdy', 'UPC-A 12자리 → 미국');
+console.assert(dateOrderFromBarcode('2001234567890') === null, '매장 내부 코드는 추천 없음');
+console.assert(dateOrderFromBarcode(null) === null, '바코드 없음');
 
 console.log('date-ocr selfcheck OK');

@@ -21,10 +21,11 @@ import {
 import CandidatesModal from '@/components/CandidatesModal';
 import ExpiryLiveScanModal from '@/components/ExpiryLiveScanModal';
 import PhotoSourceSheet from '@/components/PhotoSourceSheet';
-import { extractDateCandidates } from '@/lib/date-ocr';
+import { extractDateCandidates, dateOrderFromBarcode } from '@/lib/date-ocr';
 import { errorMessage } from '@/lib/errors';
 import { deleteLocalPhotoIfOwned, persistLocalPhoto } from '@/lib/local-photo';
 import {
+  addDays,
   addMonths,
   autoFormatDate,
   autoFormatDateByOrder,
@@ -52,7 +53,6 @@ import {
   AppMode,
   DATE_OCR_ORDERS,
   DateOcrOrder,
-  setDateOcrOrder,
   useAppMode,
   useCoupangSuggestEnabled,
   useDateInputMethod,
@@ -62,6 +62,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import CoupangRebuyCard from '@/components/CoupangRebuyCard';
 import { Product, ProductStatus } from '@/lib/types';
 
+const MFG_PRESETS: [number, 'month' | 'day'][] = [
+  [3, 'month'], [6, 'month'], [9, 'month'], [12, 'month'], [18, 'month'], [24, 'month'],
+  [7, 'day'], [30, 'day'], [90, 'day'], [180, 'day'], [365, 'day'],
+];
 const ORDER_SHORT: Record<DateOcrOrder, string> = { ymd: '년/월/일', dmy: '일/월/년', mdy: '월/일/년' };
 const ORDER_PLACEHOLDER: Record<DateOcrOrder, string> = { ymd: 'YYYY-MM-DD', dmy: 'DD-MM-YYYY', mdy: 'MM-DD-YYYY' };
 
@@ -78,7 +82,10 @@ export default function ProductForm() {
   const insets = useSafeAreaInsets();
   const coupangSuggest = useCoupangSuggestEnabled();
   const dateInputMethod = useDateInputMethod();
-  const dateOcrOrder = useDateOcrOrder();
+  // 기본 순서는 설정값. 이 상품에서만 바꾼 순서(버튼·바코드 국가 추천)가 있으면 그게 우선 — 설정은 안 바뀐다
+  const defaultDateOrder = useDateOcrOrder();
+  const [orderOverride, setOrderOverride] = useState<DateOcrOrder | null>(null);
+  const dateOcrOrder = orderOverride ?? defaultDateOrder;
 
   const [name, setName] = useState(params.prefillName ?? '');
   const [imageUri, setImageUri] = useState<string | null>(params.prefillImage || null);
@@ -118,8 +125,14 @@ export default function ProductForm() {
   const [manufactureCalcVisible, setManufactureCalcVisible] = useState(false);
   const [manufactureDate, setManufactureDate] = useState('');
   const [manufactureMonths, setManufactureMonths] = useState('6');
+  // 중국 제품 보관 기간(保质期)은 '12个月'처럼 개월, '180天'처럼 일 단위가 섞여 있다
+  const [manufactureUnit, setManufactureUnit] = useState<'month' | 'day'>('month');
 
   const [barcode, setBarcode] = useState<string | null>(params.barcode ?? null);
+  const barcodeHint = useMemo(() => dateOrderFromBarcode(barcode), [barcode]);
+  useEffect(() => {
+    if (barcodeHint) setOrderOverride(barcodeHint.order);
+  }, [barcodeHint]);
   // 수정 시 원래 등록됐던 모드를 유지 (현재 화면 모드로 덮어쓰지 않음)
   const [productMode, setProductMode] = useState<AppMode>(mode ?? 'retail');
 
@@ -482,15 +495,57 @@ export default function ProductForm() {
               onChangeText={(t) => setManufactureDate(autoFormatDate(t))}
             />
             <View className="mt-3">
-              <Label text="개월 수" />
-              <TextInput
-                className="text-ink rounded-xl border border-line bg-bg px-3 py-2.5 text-base"
-                placeholder="6"
-                placeholderTextColor="#BBBBBB"
-                keyboardType="number-pad"
-                value={manufactureMonths}
-                onChangeText={setManufactureMonths}
-              />
+              <Label text="보관 기간" />
+              <View className="flex-row items-center" style={{ gap: 6 }}>
+                <TextInput
+                  className="text-ink flex-1 rounded-xl border border-line bg-bg px-3 py-2.5 text-base"
+                  placeholder="6"
+                  placeholderTextColor="#BBBBBB"
+                  keyboardType="number-pad"
+                  maxLength={4}
+                  value={manufactureMonths}
+                  onChangeText={(t) => setManufactureMonths(t.replace(/[^0-9]/g, ''))}
+                />
+                {(['month', 'day'] as const).map((u) => (
+                  <Pressable
+                    key={u}
+                    onPress={() => setManufactureUnit(u)}
+                    className={`rounded-xl border px-3 py-2.5 ${
+                      manufactureUnit === u ? 'border-primary bg-primary' : 'border-line bg-paper'
+                    }`}
+                  >
+                    <Text className={`text-sm ${manufactureUnit === u ? 'text-paper font-bold' : 'text-ink'}`}>
+                      {u === 'month' ? '개월' : '일'}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+              {/* 중국 제품에 흔한 보관 기간 — 누르면 숫자·단위가 함께 채워진다 */}
+              <View className="mt-2 flex-row flex-wrap" style={{ gap: 6 }}>
+                {MFG_PRESETS.map(([n, u]) => (
+                  <Pressable
+                    key={`${n}${u}`}
+                    onPress={() => {
+                      setManufactureMonths(String(n));
+                      setManufactureUnit(u);
+                    }}
+                    className={`rounded-full border px-2.5 py-1 ${
+                      manufactureMonths === String(n) && manufactureUnit === u
+                        ? 'border-primary bg-primary'
+                        : 'border-line bg-paper'
+                    }`}
+                  >
+                    <Text
+                      className={`text-xs ${
+                        manufactureMonths === String(n) && manufactureUnit === u ? 'text-paper font-bold' : 'text-muted'
+                      }`}
+                    >
+                      {n}
+                      {u === 'month' ? '개월' : '일'}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
             </View>
             <View className="mt-4 flex-row gap-2">
               <Pressable
@@ -498,6 +553,7 @@ export default function ProductForm() {
                   setManufactureCalcVisible(false);
                   setManufactureDate('');
                   setManufactureMonths('6');
+                  setManufactureUnit('month');
                 }}
                 className="flex-1 items-center rounded-xl border border-line bg-paper py-2.5 active:opacity-70"
               >
@@ -505,12 +561,15 @@ export default function ProductForm() {
               </Pressable>
               <Pressable
                 onPress={() => {
-                  const months = Number(manufactureMonths);
-                  if (!isValidDateStr(manufactureDate) || !Number.isFinite(months) || months <= 0) {
-                    Alert.alert('입력 확인', '제조일자(YYYY-MM-DD)와 개월 수를 올바르게 입력해 주세요.');
+                  const n = Number(manufactureMonths);
+                  if (!isValidDateStr(manufactureDate) || !Number.isFinite(n) || n <= 0) {
+                    Alert.alert('입력 확인', '제조일자(YYYY-MM-DD)와 보관 기간을 올바르게 입력해 주세요.');
                     return;
                   }
-                  setExpiryDate(addMonths(manufactureDate, months));
+                  const [y, m, d] = manufactureDate.split('-').map(Number);
+                  setExpiryDate(
+                    manufactureUnit === 'month' ? addMonths(manufactureDate, n) : addDays(new Date(y, m - 1, d), n),
+                  );
                   setManufactureCalcVisible(false);
                 }}
                 className="flex-1 items-center rounded-xl bg-primary py-2.5 active:opacity-80"
@@ -680,9 +739,6 @@ export default function ProductForm() {
                 <Text className="text-primary ml-1 text-xs font-medium">사진으로 인식</Text>
               </Pressable>
             </View>
-            <Pressable onPress={() => setManufactureCalcVisible(true)} className="mt-1.5">
-              <Text className="text-muted text-xs underline">제조일+기간으로 계산</Text>
-            </Pressable>
           </View>
           <View>
             <Label text="수량" />
@@ -726,12 +782,12 @@ export default function ProductForm() {
         </View>
 
         {/* 날짜 표기 순서 — 해외 제품을 원터치로. 자동 인식·사진 인식·직접 입력 모두에 적용(설정 화면과 같은 값) */}
-        <View className="mt-2 flex-row items-center" style={{ gap: 6 }}>
+        <View className="mt-2 flex-row flex-wrap items-center" style={{ gap: 6 }}>
           <Text className="text-muted text-xs">날짜 순서</Text>
           {DATE_OCR_ORDERS.map((o) => (
             <Pressable
               key={o}
-              onPress={() => setDateOcrOrder(o)}
+              onPress={() => setOrderOverride(o)}
               accessibilityRole="button"
               accessibilityState={{ selected: dateOcrOrder === o }}
               className={`rounded-full border px-2.5 py-1 ${
@@ -743,7 +799,22 @@ export default function ProductForm() {
               </Text>
             </Pressable>
           ))}
+          {/* 중국식(제조일로부터 ~) — 날짜 대신 제조일+보관 기간이 적힌 제품 */}
+          <Pressable
+            onPress={() => setManufactureCalcVisible(true)}
+            accessibilityRole="button"
+            className="rounded-full border border-line bg-paper px-2.5 py-1"
+          >
+            <Text className="text-muted text-xs">제조일+기간</Text>
+          </Pressable>
         </View>
+        {barcodeHint && barcodeHint.country !== '한국' ? (
+          <Text className="text-muted mt-1 text-xs">
+            {barcodeHint.mfg
+              ? `${barcodeHint.country} 바코드예요. 제조일+보관 기간으로 적힌 제품이 많아요.`
+              : `${barcodeHint.country} 바코드라 ${ORDER_SHORT[barcodeHint.order]}로 맞췄어요. 다르면 눌러서 바꾸세요.`}
+          </Text>
+        ) : null}
 
         {/* 카테고리 */}
         <View className="mt-4">
