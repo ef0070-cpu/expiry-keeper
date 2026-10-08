@@ -3,9 +3,10 @@ import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/dat
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import * as Linking from 'expo-linking';
-import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { takePickedBarcode } from '@/lib/scan-pick';
 import { useBarcodeAutoFill } from '@/lib/barcode-lookup';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -141,17 +142,16 @@ export default function ProductForm() {
       setBarcodeDraft(barcode ?? '');
       setBarcodeEditVisible(true);
     };
-    // 수정 중인 상품은 다시 촬영하면 새 상품 등록으로 넘어가 버려서 직접 수정만
-    if (isEdit) return edit();
     Alert.alert('바코드가 잘못 읽혔나요?', barcode ?? '', [
       { text: '취소', style: 'cancel' },
       { text: '직접 수정', onPress: edit },
-      { text: '다시 촬영', onPress: () => router.replace('/scan') },
+      // 번호만 읽어 이 화면으로 돌아온다(발주 화면과 같은 방식) — 수정 중인 상품도 쓸 수 있다
+      { text: '다시 촬영', onPress: () => router.push('/scan?mode=pick') },
     ]);
   };
 
-  const applyBarcode = () => {
-    const v = barcodeDraft.trim();
+  const applyBarcode = (value = barcodeDraft) => {
+    const v = value.trim();
     if (!/^\d{6,13}$/.test(v)) {
       Alert.alert('입력 확인', '바코드는 6~13자리 숫자여야 합니다.');
       return;
@@ -164,6 +164,15 @@ export default function ProductForm() {
     // 새 상품은 스캔 직후와 똑같이 — 상품명·사진을 새 바코드로 다시 찾는다
     router.replace({ pathname: '/product-form', params: { barcode: v, lookup: '1' } });
   };
+
+  // [다시 촬영]으로 스캔 화면에 갔다가 돌아오면 읽은 번호 적용
+  useFocusEffect(
+    useCallback(() => {
+      const picked = takePickedBarcode();
+      if (picked) applyBarcode(picked);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isEdit]),
+  );
   useEffect(() => {
     if (barcodeHint) setOrderOverride(barcodeHint.order);
   }, [barcodeHint]);
@@ -651,22 +660,27 @@ export default function ProductForm() {
           </View>
 
           <View className="ml-3 flex-1">
-            <View className="flex-row items-center justify-between">
-              <Text className="text-ink text-sm font-bold">상품명 *</Text>
-              {barcode ? (
-                <Pressable
-                  onPress={onBarcodePress}
-                  hitSlop={8}
-                  accessibilityRole="button"
-                  accessibilityLabel={`바코드 ${barcode}, 눌러서 다시 촬영하거나 수정`}
-                  className="flex-row items-center"
+            <Text className="text-ink text-sm font-bold">상품명 *</Text>
+            {/* 바코드는 제목 옆에 붙이면 작고 눌리는 줄 몰라서 따로 한 줄, 글씨 크게 */}
+            {barcode ? (
+              <Pressable
+                onPress={onBarcodePress}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel={`바코드 ${barcode}, 눌러서 다시 촬영하거나 수정`}
+                className="mt-1 flex-row items-center"
+              >
+                <MaterialCommunityIcons name="barcode" size={18} color="#555555" />
+                <Text
+                  numberOfLines={1}
+                  className="text-ink ml-1 flex-shrink text-sm underline"
+                  style={{ fontVariant: ['tabular-nums'] }}
                 >
-                  <MaterialCommunityIcons name="barcode" size={14} color="#888888" />
-                  <Text className="text-muted ml-1 text-xs underline">{barcode}</Text>
-                  <MaterialCommunityIcons name="pencil-outline" size={12} color="#888888" style={{ marginLeft: 2 }} />
-                </Pressable>
-              ) : null}
-            </View>
+                  {barcode}
+                </Text>
+                <MaterialCommunityIcons name="pencil-outline" size={16} color="#CC2222" style={{ marginLeft: 4 }} />
+              </Pressable>
+            ) : null}
             <TextInput
               className="text-ink mt-1.5 rounded-xl border border-line bg-paper px-3 py-2.5 text-base"
               placeholder={lookingUp ? '상품명 찾는 중…' : mode === 'home' ? '예: 두부' : '예: 해태 오예스 360g'}
@@ -875,7 +889,7 @@ export default function ProductForm() {
                   <Text className="text-ink text-sm font-medium">취소</Text>
                 </Pressable>
                 <Pressable
-                  onPress={applyBarcode}
+                  onPress={() => applyBarcode()}
                   className="flex-1 items-center rounded-xl bg-primary py-2.5 active:opacity-80"
                 >
                   <Text className="text-paper text-sm font-bold">확인</Text>
