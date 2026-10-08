@@ -70,6 +70,8 @@ export default function ProductForm() {
   const [expiryDate, setExpiryDate] = useState(params.id ? '' : String(new Date().getFullYear()));
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [quantity, setQuantity] = useState(1);
+  // 수량 직접 입력 중인 글자(지우는 중 빈칸 허용). quantity는 항상 1 이상으로 유지한다
+  const [qtyText, setQtyText] = useState<string | null>(null);
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
   const [memo, setMemo] = useState('');
   const [createdAt, setCreatedAt] = useState<string | null>(null);
@@ -653,15 +655,37 @@ export default function ProductForm() {
               <Stepper
                 icon="minus"
                 label="수량 감소"
-                onPress={() => setQuantity((n) => Math.max(1, n - 1))}
+                onPress={() => {
+                  setQtyText(null);
+                  setQuantity((n) => Math.max(1, n - 1));
+                }}
               />
-              <Text
-                className="text-ink mx-4 text-lg font-bold"
+              {/* 많이 넣을 때 +를 여러 번 누르기 불편하다는 의견 — 숫자를 눌러 직접 입력 */}
+              <TextInput
+                value={qtyText ?? String(quantity)}
+                onChangeText={(t) => {
+                  const digits = t.replace(/[^0-9]/g, '').slice(0, 4);
+                  setQtyText(digits);
+                  const n = parseInt(digits, 10);
+                  if (n >= 1) setQuantity(n);
+                }}
+                onFocus={() => setQtyText(String(quantity))}
+                onBlur={() => setQtyText(null)}
+                selectTextOnFocus
+                keyboardType="number-pad"
+                maxLength={4}
+                accessibilityLabel="수량 직접 입력"
+                className="text-ink mx-2 min-w-[56px] rounded-lg border border-line bg-paper px-2 py-1 text-center text-lg font-bold"
                 style={{ fontVariant: ['tabular-nums'] }}
-              >
-                {quantity}
-              </Text>
-              <Stepper icon="plus" label="수량 증가" onPress={() => setQuantity((n) => n + 1)} />
+              />
+              <Stepper
+                icon="plus"
+                label="수량 증가"
+                onPress={() => {
+                  setQtyText(null);
+                  setQuantity((n) => Math.min(9999, n + 1));
+                }}
+              />
             </View>
           </View>
         </View>
