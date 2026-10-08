@@ -80,6 +80,38 @@ export function autoFormatDate(input: string): string {
   return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6)}`;
 }
 
+type DateOrder = 'ymd' | 'dmy' | 'mdy'; // settings.ts DateOcrOrder와 같음(순환 import 피함)
+
+/** 직접 입력 숫자를 고른 순서로 서식 — 년/월/일 2026-09-10, 일/월/년 10-09-2026, 월/일/년 09-10-2026 */
+export function autoFormatDateByOrder(input: string, order: DateOrder): string {
+  if (order === 'ymd') return autoFormatDate(input);
+  const d = input.replace(/\D/g, '').slice(0, 8);
+  if (d.length <= 2) return d;
+  if (d.length <= 4) return `${d.slice(0, 2)}-${d.slice(2)}`;
+  return `${d.slice(0, 2)}-${d.slice(2, 4)}-${d.slice(4)}`;
+}
+
+/** 순서대로 입력한 글자 → 저장용 YYYY-MM-DD. 덜 입력했거나 없는 날짜면 null */
+export function orderedInputToIso(text: string, order: DateOrder): string | null {
+  const d = text.replace(/\D/g, '');
+  if (d.length !== 8) return null;
+  const iso =
+    order === 'ymd'
+      ? `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6)}`
+      : order === 'dmy'
+        ? `${d.slice(4)}-${d.slice(2, 4)}-${d.slice(0, 2)}`
+        : `${d.slice(4)}-${d.slice(0, 2)}-${d.slice(2, 4)}`;
+  return isValidDateStr(iso) ? iso : null;
+}
+
+/** 저장용 YYYY-MM-DD → 고른 순서의 표시 글자. 올바른 날짜가 아니면 년/월/일은 그대로, 나머지는 빈칸 */
+export function isoToOrderedInput(iso: string, order: DateOrder): string {
+  if (order === 'ymd') return iso;
+  if (!isValidDateStr(iso)) return '';
+  const [y, m, d] = iso.split('-');
+  return order === 'dmy' ? `${d}-${m}-${y}` : `${m}-${d}-${y}`;
+}
+
 /** dateStr에 개월 수를 더한다. 말일을 초과하면 그 달의 마지막 날로 클램프한다. */
 export function addMonths(dateStr: string, months: number): string {
   const [y, m, d] = dateStr.split('-').map(Number);

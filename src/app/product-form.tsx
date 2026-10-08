@@ -24,7 +24,16 @@ import PhotoSourceSheet from '@/components/PhotoSourceSheet';
 import { extractDateCandidates } from '@/lib/date-ocr';
 import { errorMessage } from '@/lib/errors';
 import { deleteLocalPhotoIfOwned, persistLocalPhoto } from '@/lib/local-photo';
-import { addMonths, autoFormatDate, formatDate, isValidDateStr, todayStr } from '@/lib/dates';
+import {
+  addMonths,
+  autoFormatDate,
+  autoFormatDateByOrder,
+  formatDate,
+  isoToOrderedInput,
+  isValidDateStr,
+  orderedInputToIso,
+  todayStr,
+} from '@/lib/dates';
 import { withinProductLimit } from '@/lib/entitlement';
 import { maybeShowInterstitial } from '@/lib/interstitial';
 import { cancelExpiryAlerts, scheduleExpiryAlerts } from '@/lib/notifications';
@@ -39,10 +48,22 @@ import {
   newId,
   saveProduct,
 } from '@/lib/repo';
-import { AppMode, useAppMode, useCoupangSuggestEnabled, useDateInputMethod, useDateOcrOrder } from '@/lib/settings';
+import {
+  AppMode,
+  DATE_OCR_ORDERS,
+  DateOcrOrder,
+  setDateOcrOrder,
+  useAppMode,
+  useCoupangSuggestEnabled,
+  useDateInputMethod,
+  useDateOcrOrder,
+} from '@/lib/settings';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import CoupangRebuyCard from '@/components/CoupangRebuyCard';
 import { Product, ProductStatus } from '@/lib/types';
+
+const ORDER_SHORT: Record<DateOcrOrder, string> = { ymd: '년/월/일', dmy: '일/월/년', mdy: '월/일/년' };
+const ORDER_PLACEHOLDER: Record<DateOcrOrder, string> = { ymd: 'YYYY-MM-DD', dmy: 'DD-MM-YYYY', mdy: 'MM-DD-YYYY' };
 
 export default function ProductForm() {
   const params = useLocalSearchParams<{
@@ -69,6 +90,15 @@ export default function ProductForm() {
   // 새 상품이면 현재 연도를 미리 채워 월·일만 입력하면 되게 한다
   const [expiryDate, setExpiryDate] = useState(params.id ? '' : String(new Date().getFullYear()));
   const [showDatePicker, setShowDatePicker] = useState(false);
+  // 직접 입력칸에 보이는 글자(고른 날짜 순서대로). 저장·검사는 항상 expiryDate(YYYY-MM-DD)
+  const [expiryText, setExpiryText] = useState(expiryDate);
+  // 인식·달력·제조일 계산·수정 불러오기·순서 전환으로 날짜가 바뀌면 입력칸 글자를 맞춘다.
+  // 해외 순서로 입력하는 중(expiryDate가 빈칸)이면 친 글자를 그대로 둔다
+  useEffect(() => {
+    setExpiryText((prev) =>
+      dateOcrOrder !== 'ymd' && expiryDate === '' ? prev : isoToOrderedInput(expiryDate, dateOcrOrder),
+    );
+  }, [expiryDate, dateOcrOrder]);
   const [quantity, setQuantity] = useState(1);
   // 수량 직접 입력 중인 글자(지우는 중 빈칸 허용). quantity는 항상 1 이상으로 유지한다
   const [qtyText, setQtyText] = useState<string | null>(null);
@@ -579,12 +609,17 @@ export default function ProductForm() {
             {dateInputMethod === 'text' ? (
               <TextInput
                 className="text-ink rounded-xl border border-line bg-paper px-3 py-2.5 text-base"
-                placeholder="YYYY-MM-DD"
+                placeholder={ORDER_PLACEHOLDER[dateOcrOrder]}
                 placeholderTextColor="#BBBBBB"
                 keyboardType="number-pad"
                 maxLength={10}
-                value={expiryDate}
-                onChangeText={(t) => setExpiryDate(autoFormatDate(t))}
+                value={expiryText}
+                onChangeText={(t) => {
+                  const text = autoFormatDateByOrder(t, dateOcrOrder);
+                  setExpiryText(text);
+                  // 년/월/일은 예전처럼 입력 중 글자 그대로, 해외 순서는 다 입력돼야 날짜로 저장
+                  setExpiryDate(dateOcrOrder === 'ymd' ? text : (orderedInputToIso(text, dateOcrOrder) ?? ''));
+                }}
               />
             ) : (
               <Pressable
@@ -688,6 +723,26 @@ export default function ProductForm() {
               />
             </View>
           </View>
+        </View>
+
+        {/* 날짜 표기 순서 — 해외 제품을 원터치로. 자동 인식·사진 인식·직접 입력 모두에 적용(설정 화면과 같은 값) */}
+        <View className="mt-2 flex-row items-center" style={{ gap: 6 }}>
+          <Text className="text-muted text-xs">날짜 순서</Text>
+          {DATE_OCR_ORDERS.map((o) => (
+            <Pressable
+              key={o}
+              onPress={() => setDateOcrOrder(o)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: dateOcrOrder === o }}
+              className={`rounded-full border px-2.5 py-1 ${
+                dateOcrOrder === o ? 'border-primary bg-primary' : 'border-line bg-paper'
+              }`}
+            >
+              <Text className={`text-xs ${dateOcrOrder === o ? 'text-paper font-bold' : 'text-muted'}`}>
+                {ORDER_SHORT[o]}
+              </Text>
+            </Pressable>
+          ))}
         </View>
 
         {/* 카테고리 */}
