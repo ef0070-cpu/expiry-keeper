@@ -803,9 +803,12 @@ export default function ProductForm() {
           <Pressable
             onPress={() => setManufactureCalcVisible(true)}
             accessibilityRole="button"
-            className="rounded-full border border-line bg-paper px-2.5 py-1"
+            // 중국 바코드면 빨간 테두리로 강조 — 날짜 대신 제조일+보관 기간 표기가 많다
+            className={`rounded-full border px-2.5 py-1 ${barcodeHint?.mfg ? 'border-primary bg-paper' : 'border-line bg-paper'}`}
           >
-            <Text className="text-muted text-xs">제조일+기간</Text>
+            <Text className={`text-xs ${barcodeHint?.mfg ? 'text-primary font-bold' : 'text-muted'}`}>
+              제조일+기간
+            </Text>
           </Pressable>
         </View>
         {barcodeHint && barcodeHint.country !== '한국' ? (
