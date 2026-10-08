@@ -7,6 +7,8 @@ type Props = {
   dateOcrOrder: DateOcrOrder;
   onDetected: (date: string) => void;
   onClose: () => void;
+  /** 제조일을 읽을 때 지난 날짜 우선 */
+  preferPast?: boolean;
 };
 
 // 카메라 모듈(react-native-vision-camera)은 새 빌드에만 들어 있다. 예전 빌드에서 바로 import하면

@@ -1,4 +1,15 @@
-import { addMonths, autoFormatDateByOrder, isoToOrderedInput, orderedInputToIso } from './dates';
+import {
+  addMonths,
+  autoFormatDateByOrder,
+  expiryFromManufacture,
+  isoToOrderedInput,
+  orderedInputToIso,
+} from './dates';
+
+console.assert(expiryFromManufacture('2026-03-10', 12, 'month') === '2027-03-09', '제조일+12개월 → 하루 전');
+console.assert(expiryFromManufacture('2026-03-10', 180, 'day') === '2026-09-05', '제조일+180일 → 하루 전');
+console.assert(expiryFromManufacture('2026-03-1', 12, 'month') === null, '덜 입력한 제조일');
+console.assert(expiryFromManufacture('2026-03-10', 0, 'month') === null, '기간 0');
 
 console.assert(addMonths('2026-01-31', 1) === '2026-02-28', '말일 초과 클램프 실패');
 console.assert(addMonths('2026-03-10', 6) === '2026-09-10', '일반 케이스 실패');

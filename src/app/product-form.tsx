@@ -24,12 +24,12 @@ import ExpiryLiveScanModal from '@/components/ExpiryLiveScanModal';
 import PhotoSourceSheet from '@/components/PhotoSourceSheet';
 import { extractDateCandidates, dateOrderFromBarcode } from '@/lib/date-ocr';
 import { errorMessage } from '@/lib/errors';
+import { getMfgPeriod, saveMfgPeriod } from '@/lib/mfg-period';
 import { deleteLocalPhotoIfOwned, persistLocalPhoto } from '@/lib/local-photo';
 import {
-  addDays,
-  addMonths,
   autoFormatDate,
   autoFormatDateByOrder,
+  expiryFromManufacture,
   formatDate,
   isoToOrderedInput,
   isValidDateStr,
@@ -127,11 +127,15 @@ export default function ProductForm() {
   const [showPhotoPicker, setShowPhotoPicker] = useState(false);
   const [ocrBusy, setOcrBusy] = useState(false);
   const [liveScanVisible, setLiveScanVisible] = useState(false);
-  const [manufactureCalcVisible, setManufactureCalcVisible] = useState(false);
+  // 유통기한 입력 방식 — 날짜 그대로(date) / 제조일+보관 기간(mfg, 중국 제품에 흔함).
+  // mfg면 같은 입력칸이 제조일 칸이 되고 유통기한은 바로 계산된다(팝업 없음)
+  const [expiryMode, setExpiryMode] = useState<'date' | 'mfg'>('date');
   const [manufactureDate, setManufactureDate] = useState('');
-  const [manufactureMonths, setManufactureMonths] = useState('6');
+  const [manufactureMonths, setManufactureMonths] = useState('12');
   // 중국 제품 보관 기간(保质期)은 '12个月'처럼 개월, '180天'처럼 일 단위가 섞여 있다
   const [manufactureUnit, setManufactureUnit] = useState<'month' | 'day'>('month');
+  // 인식·달력으로 읽은 날짜는 지금 입력 방식에 맞는 칸으로
+  const applyPickedDate = (d: string) => (expiryMode === 'mfg' ? setManufactureDate(d) : setExpiryDate(d));
 
   const [barcode, setBarcode] = useState<string | null>(params.barcode ?? null);
   const barcodeHint = useMemo(() => dateOrderFromBarcode(barcode), [barcode]);
@@ -176,6 +180,29 @@ export default function ProductForm() {
   useEffect(() => {
     if (barcodeHint) setOrderOverride(barcodeHint.order);
   }, [barcodeHint]);
+  // 이 바코드로 기간을 기억해 두었거나 중국 바코드면 제조일+기간 방식으로 연다(새 상품만)
+  useEffect(() => {
+    if (isEdit || !barcode) return;
+    let alive = true;
+    getMfgPeriod(barcode).then((p) => {
+      if (!alive) return;
+      if (p) {
+        setManufactureMonths(String(p.n));
+        setManufactureUnit(p.unit);
+        setExpiryMode('mfg');
+      } else if (barcodeHint?.mfg) {
+        setExpiryMode('mfg');
+      }
+    });
+    return () => {
+      alive = false;
+    };
+  }, [barcode, isEdit, barcodeHint]);
+  // 제조일+기간 방식이면 유통기한을 바로 계산(덜 입력했으면 빈칸 → 저장 시 확인 요청)
+  useEffect(() => {
+    if (expiryMode !== 'mfg') return;
+    setExpiryDate(expiryFromManufacture(manufactureDate, Number(manufactureMonths), manufactureUnit) ?? '');
+  }, [expiryMode, manufactureDate, manufactureMonths, manufactureUnit]);
   // 수정 시 원래 등록됐던 모드를 유지 (현재 화면 모드로 덮어쓰지 않음)
   const [productMode, setProductMode] = useState<AppMode>(mode ?? 'retail');
 
@@ -286,7 +313,7 @@ export default function ProductForm() {
 
   const onPickDate = (event: DateTimePickerEvent, selected?: Date) => {
     if (Platform.OS === 'android') setShowDatePicker(false);
-    if (event.type === 'set' && selected) setExpiryDate(formatDate(selected));
+    if (event.type === 'set' && selected) applyPickedDate(formatDate(selected));
   };
 
   const pickImage = () => setShowPhotoSource(true);
@@ -350,12 +377,15 @@ export default function ProductForm() {
 
       const { recognizeText } = await import('@infinitered/react-native-mlkit-text-recognition');
       const { text } = await recognizeText(result.assets[0].uri);
-      const candidates = extractDateCandidates(text, dateOcrOrder);
+      const raw = extractDateCandidates(text, dateOcrOrder);
       const today = todayStr();
-      // 오늘 이후 날짜 하나만 읽혔을 때만 묻지 않고 바로 넣는다(단계 최소화). 지난 날짜 하나는
-      // 제조일일 수 있어(유통기한이 흐리게 찍힌 경우) 바로 넣지 않고 확인받는다.
-      if (candidates.length === 1 && candidates[0] >= today) {
-        setExpiryDate(candidates[0]);
+      const isMfg = expiryMode === 'mfg';
+      // 제조일을 읽을 땐 지난 날짜(최근 순)가 맞는 쪽 — 앞으로 놓는다
+      const candidates = isMfg ? [...raw.filter((d) => d <= today), ...raw.filter((d) => d > today)] : raw;
+      // 맞는 쪽 날짜 하나만 읽혔을 때만 묻지 않고 바로 넣는다(단계 최소화). 유통기한인데 지난 날짜
+      // 하나면 제조일일 수 있어(유통기한이 흐리게 찍힌 경우) 바로 넣지 않고 확인받는다.
+      if (candidates.length === 1 && (isMfg ? candidates[0] <= today : candidates[0] >= today)) {
+        applyPickedDate(candidates[0]);
         return;
       }
       const retry = { text: '다시 찍기', onPress: () => void scanExpiryDatePhoto() };
@@ -367,7 +397,7 @@ export default function ProductForm() {
         );
         return;
       }
-      const label = (d: string) => (d < today ? `${d} (지난 날짜)` : d);
+      const label = (d: string) => (!isMfg && d < today ? `${d} (지난 날짜)` : d);
       // 안드로이드 알림창 버튼은 최대 3개 — 후보가 더 있으면 '다른 날짜…'로 다음 후보를 넘겨 본다
       // (예전엔 3번째 후보부터는 고를 방법이 없어 다시 찍어도 같은 후보만 반복됐다)
       const showChoices = (from: number) => {
@@ -379,7 +409,7 @@ export default function ProductForm() {
           `읽은 날짜: ${candidates.map(label).join(', ')}\n맞는 날짜를 눌러 주세요.`,
           [
             hasMore ? { text: '다른 날짜…', onPress: () => showChoices(from + 1) } : retry,
-            ...shown.map((d) => ({ text: label(d), onPress: () => setExpiryDate(d) })),
+            ...shown.map((d) => ({ text: label(d), onPress: () => applyPickedDate(d) })),
           ],
           { cancelable: true },
         );
@@ -401,6 +431,10 @@ export default function ProductForm() {
         router.push('/premium?reason=products');
         return;
       }
+    }
+    // 제조일+기간으로 넣었으면 이 바코드의 기간을 기억 — 다음엔 제조일만 찍으면 된다
+    if (expiryMode === 'mfg' && barcode && Number(manufactureMonths) > 0) {
+      void saveMfgPeriod(barcode, { n: Number(manufactureMonths), unit: manufactureUnit });
     }
     setBusy(true);
     try {
@@ -518,111 +552,6 @@ export default function ProductForm() {
         barcode={barcode ?? ''}
         onClose={() => setShowPhotoPicker(false)}
       />
-      <Modal
-        visible={manufactureCalcVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setManufactureCalcVisible(false)}
-      >
-        <View className="flex-1 items-center justify-center bg-black/60 px-8">
-          <View className="w-full rounded-2xl bg-paper p-4">
-            <Text className="text-ink mb-3 text-base font-bold">제조일+기간으로 계산</Text>
-            <Label text="제조일자" />
-            <TextInput
-              className="text-ink rounded-xl border border-line bg-bg px-3 py-2.5 text-base"
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor="#BBBBBB"
-              keyboardType="number-pad"
-              maxLength={10}
-              value={manufactureDate}
-              onChangeText={(t) => setManufactureDate(autoFormatDate(t))}
-            />
-            <View className="mt-3">
-              <Label text="보관 기간" />
-              <View className="flex-row items-center" style={{ gap: 6 }}>
-                <TextInput
-                  className="text-ink flex-1 rounded-xl border border-line bg-bg px-3 py-2.5 text-base"
-                  placeholder="6"
-                  placeholderTextColor="#BBBBBB"
-                  keyboardType="number-pad"
-                  maxLength={4}
-                  value={manufactureMonths}
-                  onChangeText={(t) => setManufactureMonths(t.replace(/[^0-9]/g, ''))}
-                />
-                {(['month', 'day'] as const).map((u) => (
-                  <Pressable
-                    key={u}
-                    onPress={() => setManufactureUnit(u)}
-                    className={`rounded-xl border px-3 py-2.5 ${
-                      manufactureUnit === u ? 'border-primary bg-primary' : 'border-line bg-paper'
-                    }`}
-                  >
-                    <Text className={`text-sm ${manufactureUnit === u ? 'text-paper font-bold' : 'text-ink'}`}>
-                      {u === 'month' ? '개월' : '일'}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-              {/* 중국 제품에 흔한 보관 기간 — 누르면 숫자·단위가 함께 채워진다 */}
-              <View className="mt-2 flex-row flex-wrap" style={{ gap: 6 }}>
-                {MFG_PRESETS.map(([n, u]) => (
-                  <Pressable
-                    key={`${n}${u}`}
-                    onPress={() => {
-                      setManufactureMonths(String(n));
-                      setManufactureUnit(u);
-                    }}
-                    className={`rounded-full border px-2.5 py-1 ${
-                      manufactureMonths === String(n) && manufactureUnit === u
-                        ? 'border-primary bg-primary'
-                        : 'border-line bg-paper'
-                    }`}
-                  >
-                    <Text
-                      className={`text-xs ${
-                        manufactureMonths === String(n) && manufactureUnit === u ? 'text-paper font-bold' : 'text-muted'
-                      }`}
-                    >
-                      {n}
-                      {u === 'month' ? '개월' : '일'}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-            <View className="mt-4 flex-row gap-2">
-              <Pressable
-                onPress={() => {
-                  setManufactureCalcVisible(false);
-                  setManufactureDate('');
-                  setManufactureMonths('6');
-                  setManufactureUnit('month');
-                }}
-                className="flex-1 items-center rounded-xl border border-line bg-paper py-2.5 active:opacity-70"
-              >
-                <Text className="text-ink text-sm font-medium">취소</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => {
-                  const n = Number(manufactureMonths);
-                  if (!isValidDateStr(manufactureDate) || !Number.isFinite(n) || n <= 0) {
-                    Alert.alert('입력 확인', '제조일자(YYYY-MM-DD)와 보관 기간을 올바르게 입력해 주세요.');
-                    return;
-                  }
-                  const [y, m, d] = manufactureDate.split('-').map(Number);
-                  setExpiryDate(
-                    manufactureUnit === 'month' ? addMonths(manufactureDate, n) : addDays(new Date(y, m - 1, d), n),
-                  );
-                  setManufactureCalcVisible(false);
-                }}
-                className="flex-1 items-center rounded-xl bg-primary py-2.5 active:opacity-80"
-              >
-                <Text className="text-paper text-sm font-bold">계산</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
       <ScrollView
         className="flex-1 bg-bg"
         // 하단 안내바(제스처·버튼 바)에 마지막 줄(쿠팡 표시 문구)이 가리지 않게 그 높이만큼 더 띄운다
@@ -702,8 +631,9 @@ export default function ProductForm() {
         <View className="mt-4 flex-row gap-3">
           <View className="flex-1">
             <View className="flex-row items-start justify-between">
-              <Label text="유통기한 *" />
-              {/* 날짜 순서 — 버튼 3개를 늘어놓으면 조잡해 작은 선택 하나로. 바코드로 자동 선택되면 나라를 함께 */}
+              <Label text={expiryMode === 'mfg' ? '제조일 *' : '유통기한 *'} />
+              {/* 날짜 순서 — 버튼 3개를 늘어놓으면 조잡해 작은 선택 하나로. 제조일 방식(중국식)은 년/월/일 고정이라 숨김 */}
+              {expiryMode === 'date' ? (
               <Pressable
                 onPress={() => setOrderSheetVisible(true)}
                 hitSlop={8}
@@ -721,13 +651,20 @@ export default function ProductForm() {
                 </Text>
                 <MaterialCommunityIcons name="chevron-down" size={14} color={foreignHint ? '#CC2222' : '#888888'} />
               </Pressable>
+              ) : null}
             </View>
             {liveScanVisible ? (
               <ExpiryLiveScanModal
-                dateOcrOrder={dateOcrOrder}
+                dateOcrOrder={expiryMode === 'mfg' ? 'ymd' : dateOcrOrder}
+                preferPast={expiryMode === 'mfg'}
                 onClose={() => setLiveScanVisible(false)}
                 onDetected={(date) => {
                   setLiveScanVisible(false);
+                  // 제조일은 지난 날짜가 정상 — 묻지 않고 넣는다
+                  if (expiryMode === 'mfg') {
+                    setManufactureDate(date);
+                    return;
+                  }
                   // 지난 날짜는 제조일일 수 있어 바로 넣지 않고 확인받는다(사진 인식과 같은 규칙)
                   if (date >= todayStr()) {
                     setExpiryDate(date);
@@ -740,7 +677,18 @@ export default function ProductForm() {
                 }}
               />
             ) : null}
-            {dateInputMethod === 'text' ? (
+            {expiryMode === 'mfg' && dateInputMethod === 'text' ? (
+              <TextInput
+                className="text-ink rounded-xl border border-primary bg-paper px-3 py-2.5 text-base"
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor="#BBBBBB"
+                keyboardType="number-pad"
+                maxLength={10}
+                value={manufactureDate}
+                onChangeText={(t) => setManufactureDate(autoFormatDate(t))}
+                accessibilityLabel="제조일"
+              />
+            ) : dateInputMethod === 'text' ? (
               <TextInput
                 className="text-ink rounded-xl border border-line bg-paper px-3 py-2.5 text-base"
                 placeholder={ORDER_PLACEHOLDER[dateOcrOrder]}
@@ -762,9 +710,9 @@ export default function ProductForm() {
               >
                 <Text
                   className="text-base"
-                  style={{ color: expiryDate ? '#1A1A1A' : '#BBBBBB' }}
+                  style={{ color: (expiryMode === 'mfg' ? manufactureDate : expiryDate) ? '#1A1A1A' : '#BBBBBB' }}
                 >
-                  {expiryDate || 'YYYY-MM-DD'}
+                  {(expiryMode === 'mfg' ? manufactureDate : expiryDate) || 'YYYY-MM-DD'}
                 </Text>
               </Pressable>
             )}
@@ -832,7 +780,9 @@ export default function ProductForm() {
         {foreignHint ? (
           <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} className="text-primary mt-1.5 text-xs">
             {foreignHint.mfg
-              ? `${foreignHint.country} 제품 바코드예요. 제조일+기간 표기가 많아요.`
+              ? expiryMode === 'mfg'
+                ? `${foreignHint.country} 제품이라 제조일+기간으로 열었어요. 날짜가 찍혀 있으면 끄세요.`
+                : `${foreignHint.country} 제품 바코드예요. 제조일+기간 표기가 많아요.`
               : `${foreignHint.country} 제품 바코드예요(${ORDER_SHORT[foreignHint.order]}). 다르면 바꿔 주세요.`}
           </Text>
         ) : null}
@@ -852,15 +802,71 @@ export default function ProductForm() {
             busy={ocrBusy}
             onPress={scanExpiryDatePhoto}
           />
-          {/* 중국식(제조일로부터 ~). 중국 바코드면 빨간 바탕으로 강조 — 날짜 대신 제조일+보관 기간 표기가 많다 */}
+          {/* 중국식(제조일로부터 ~) 켜고 끄기 — 켜지면 빨간 바탕, 위 입력칸이 제조일 칸으로 바뀐다 */}
           <ToolButton
             icon="calendar-plus"
             label="제조일+기간"
-            a11y="제조일과 보관 기간으로 유통기한 계산"
-            highlight={!!barcodeHint?.mfg}
-            onPress={() => setManufactureCalcVisible(true)}
+            a11y={expiryMode === 'mfg' ? '제조일+기간 끄고 유통기한 날짜로 입력' : '제조일과 보관 기간으로 유통기한 계산'}
+            highlight={expiryMode === 'mfg'}
+            onPress={() => setExpiryMode((m) => (m === 'mfg' ? 'date' : 'mfg'))}
           />
         </View>
+
+        {/* 제조일+기간: 기간 고르기 + 계산 결과를 바로 아래에(팝업 없이) */}
+        {expiryMode === 'mfg' ? (
+          <View className="mt-2 rounded-xl border border-line bg-paper p-3">
+            <View className="flex-row items-center" style={{ gap: 6 }}>
+              <Text className="text-ink text-sm font-bold">보관 기간</Text>
+              <TextInput
+                className="text-ink w-16 rounded-lg border border-line bg-bg px-2 py-1.5 text-center text-base"
+                keyboardType="number-pad"
+                maxLength={4}
+                value={manufactureMonths}
+                onChangeText={(t) => setManufactureMonths(t.replace(/[^0-9]/g, ''))}
+                accessibilityLabel="보관 기간 숫자"
+              />
+              {(['month', 'day'] as const).map((u) => (
+                <Pressable
+                  key={u}
+                  onPress={() => setManufactureUnit(u)}
+                  className={`rounded-lg border px-3 py-1.5 ${
+                    manufactureUnit === u ? 'border-primary bg-primary' : 'border-line bg-paper'
+                  }`}
+                >
+                  <Text className={`text-sm ${manufactureUnit === u ? 'text-paper font-bold' : 'text-ink'}`}>
+                    {u === 'month' ? '개월' : '일'}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            {/* 중국 제품에 흔한 보관 기간 — 누르면 숫자·단위가 함께 채워진다 */}
+            <View className="mt-2 flex-row flex-wrap" style={{ gap: 6 }}>
+              {MFG_PRESETS.map(([n, u]) => {
+                const on = manufactureMonths === String(n) && manufactureUnit === u;
+                return (
+                  <Pressable
+                    key={`${n}${u}`}
+                    onPress={() => {
+                      setManufactureMonths(String(n));
+                      setManufactureUnit(u);
+                    }}
+                    className={`rounded-full border px-2.5 py-1 ${on ? 'border-primary bg-primary' : 'border-line bg-paper'}`}
+                  >
+                    <Text className={`text-xs ${on ? 'text-paper font-bold' : 'text-muted'}`}>
+                      {n}
+                      {u === 'month' ? '개월' : '일'}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Text className="text-ink mt-2.5 text-sm">
+              → 유통기한{' '}
+              <Text className="text-primary font-bold">{expiryDate || '제조일을 입력하세요'}</Text>
+              {expiryDate ? <Text className="text-muted text-xs">  (기간 끝나기 하루 전)</Text> : null}
+            </Text>
+          </View>
+        ) : null}
 
         <Modal
           visible={barcodeEditVisible}

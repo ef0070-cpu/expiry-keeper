@@ -12,6 +12,7 @@ import {
   textInRegion,
   viewRectToImage,
 } from '@/lib/date-ocr';
+import { todayStr } from '@/lib/dates';
 import { errorMessage } from '@/lib/errors';
 import { DateOcrOrder, getScanHapticEnabled } from '@/lib/settings';
 
@@ -28,12 +29,14 @@ type Props = {
   dateOcrOrder: DateOcrOrder;
   onDetected: (date: string) => void;
   onClose: () => void;
+  /** 제조일을 읽을 때 — 지난 날짜(가장 최근)를 먼저 고른다. 기본은 유통기한이라 앞 날짜 우선 */
+  preferPast?: boolean;
 };
 
 /** 카메라를 비추기만 하면 유통기한을 계속 읽는 화면(react-native-vision-camera 4).
  * 셔터로 사진을 찍지 않고 미리보기 화면을 캡처(takeSnapshot)해 빠르고, 화면을 누르면 그 자리에
  * 초점을 맞춘다. 사각형 안 글자만 읽고, 최근 3번 중 2번 같은 날짜가 읽히면 확정한다. */
-export default function ExpiryLiveScanCamera({ dateOcrOrder, onDetected, onClose }: Props) {
+export default function ExpiryLiveScanCamera({ dateOcrOrder, onDetected, onClose, preferPast = false }: Props) {
   const { hasPermission, requestPermission } = useCameraPermission();
   const device = useCameraDevice('back', { physicalDevices: ['wide-angle-camera'] });
   const cameraRef = useRef<Camera>(null);
@@ -74,7 +77,9 @@ export default function ExpiryLiveScanCamera({ dateOcrOrder, onDetected, onClose
                   viewRectToImage(box, preview, shot, BOX_PAD_RATIO),
                 )
               : text;
-          const found = extractDateCandidates(target, dateOcrOrder)[0] ?? null;
+          const candidates = extractDateCandidates(target, dateOcrOrder);
+          const found =
+            (preferPast ? candidates.find((d) => d <= todayStr()) : undefined) ?? candidates[0] ?? null;
           if (stopped) break;
           history.push(found);
           if (found) setLastRead(found);
@@ -107,7 +112,7 @@ export default function ExpiryLiveScanCamera({ dateOcrOrder, onDetected, onClose
     return () => {
       stopped = true;
     };
-  }, [ready, dateOcrOrder]);
+  }, [ready, dateOcrOrder, preferPast]);
 
   const top = Math.max(insets.top, 16) + 8;
 

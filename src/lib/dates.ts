@@ -121,3 +121,13 @@ export function addMonths(dateStr: string, months: number): string {
   const lastDay = new Date(targetYear, targetMonth + 1, 0).getDate();
   return formatDate(new Date(targetYear, targetMonth, Math.min(d, lastDay)));
 }
+
+/** 제조일+보관 기간 → 유통기한. 중국 기준(GB 7718)은 제조 당일·다음 날 시작을 둘 다 허용해서
+ * 보수적으로 하루 전으로 계산한다(12개월이면 2026-03-10 → 2027-03-09). 잘못된 입력이면 null */
+export function expiryFromManufacture(mfg: string, n: number, unit: 'month' | 'day'): string | null {
+  if (!isValidDateStr(mfg) || !Number.isInteger(n) || n <= 0) return null;
+  const [y, m, d] = mfg.split('-').map(Number);
+  const end = unit === 'month' ? addMonths(mfg, n) : addDays(new Date(y, m - 1, d), n);
+  const [ey, em, ed] = end.split('-').map(Number);
+  return addDays(new Date(ey, em - 1, ed), -1);
+}

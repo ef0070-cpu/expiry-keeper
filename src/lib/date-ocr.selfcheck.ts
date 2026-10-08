@@ -110,4 +110,9 @@ console.assert(dateOrderFromBarcode('012345678905')?.order === 'mdy', 'UPC-A 12�
 console.assert(dateOrderFromBarcode('2001234567890') === null, '매장 내부 코드는 추천 없음');
 console.assert(dateOrderFromBarcode(null) === null, '바코드 없음');
 
+console.assert(extractDateCandidates('生产日期 20260310', 'ymd', REF)[0] === '2026-03-10', '붙은 8자리 날짜');
+console.assert(extractDateCandidates('2026031014:22 B3', 'ymd', REF)[0] === '2026-03-10', '시간이 바로 붙은 날짜');
+console.assert(extractDateCandidates('8801043014809', 'ymd', REF).length === 0, '바코드 숫자는 날짜 아님');
+console.assert(extractDateCandidates('LOT 20260310123456', 'ymd', REF).length === 0, '긴 로트 번호는 날짜 아님');
+
 console.log('date-ocr selfcheck OK');

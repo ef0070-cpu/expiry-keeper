@@ -17,6 +17,9 @@ function lastDayOfMonth(year: number, month: number): number {
 // '12345.6'이 '2345.6'으로 잡히던 문제. 연도는 2자리·4자리만(3자리 '120'이 2120년이 되던 문제).
 const TRIPLE_RE = /(?<!\d)(\d{4}|\d{1,2})\s*[.\-/]\s*(\d{1,2})\s*[.\-/]\s*(\d{4}|\d{1,2})(?!\d)/g;
 const PAIR_RE = /(?<!\d)(\d{4}|\d{2})\s*[.\-/]\s*(\d{1,2})(?!\d)/g;
+// 구분 기호 없이 붙은 8자리 날짜(중국 제품에 흔함: '20260310', 시간이 바로 붙은 '2026031014:22').
+// 더 긴 숫자(바코드·로트 번호)의 일부는 제외 — 뒤에 숫자가 오면 시간(HH:)일 때만 허용
+const COMPACT_RE = /(?<!\d)(20\d{2})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])(?=\D|$|[0-2]\d:)/g;
 
 /** 유통기한으로 말이 되는 연도 범위(기준 해 3년 전 ~ 10년 뒤). 성분표 숫자 등이 우연히 날짜
  * 모양이 돼도 터무니없는 연도(2120년 등)는 후보에서 뺀다. */
@@ -135,6 +138,10 @@ export function extractDateCandidates(
   for (const m of text.matchAll(TRIPLE_RE)) {
     const resolved = resolveTriple(m[1], m[2], m[3], dateOcrOrder);
     if (resolved) found.add(resolved);
+  }
+  for (const m of text.matchAll(COMPACT_RE)) {
+    const d = `${m[1]}-${m[2]}-${m[3]}`;
+    if (isValidDateStr(d)) found.add(d);
   }
   if (found.size === 0) {
     for (const m of text.matchAll(PAIR_RE)) {
