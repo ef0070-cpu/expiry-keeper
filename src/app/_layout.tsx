@@ -63,7 +63,7 @@ export default function RootLayout() {
     syncOrderCatalog();
     dedupeOrderProductsByBarcode();
     markInstalled();
-    checkForUpdate();
+    checkForUpdate().catch(() => {}); // 안내는 부가 기능 — 실패해도 앱 시작을 막지 않는다
     return () => sub.subscription.unsubscribe();
   }, []);
 

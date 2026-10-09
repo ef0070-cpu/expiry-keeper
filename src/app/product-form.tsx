@@ -100,7 +100,11 @@ export default function ProductForm() {
   const [name, setName] = useState(params.prefillName ?? '');
   const [imageUri, setImageUri] = useState<string | null>(params.prefillImage || null);
   // 스캔 직후 넘어왔으면 상품명·사진을 뒤에서 찾아 빈칸만 채운다(이미 입력했으면 그대로)
-  const lookingUp = useBarcodeAutoFill(params.barcode, params.lookup === '1', (info) => {
+  // 새 상품에서 바코드를 고치면 그 번호로 다시 찾는다(화면을 새로 열지 않아 날짜·수량·메모는 그대로)
+  const [lookupBarcodeNo, setLookupBarcodeNo] = useState(params.barcode);
+  const autoFilled = useRef<{ name?: string; image?: string }>({});
+  const lookingUp = useBarcodeAutoFill(lookupBarcodeNo, params.lookup === '1' || lookupBarcodeNo !== params.barcode, (info) => {
+    autoFilled.current = { name: info.name ?? undefined, image: info.imageUrl ?? undefined };
     if (info.name) setName((prev) => prev || info.name!);
     if (info.imageUrl) setImageUri((prev) => prev ?? info.imageUrl);
   });
@@ -173,12 +177,15 @@ export default function ProductForm() {
       return;
     }
     setBarcodeEditVisible(false);
-    if (isEdit) {
-      setBarcode(v);
-      return;
-    }
-    // 새 상품은 스캔 직후와 똑같이 — 상품명·사진을 새 바코드로 다시 찾는다
-    router.replace({ pathname: '/product-form', params: { barcode: v, lookup: '1' } });
+    if (v === barcode) return;
+    setBarcode(v);
+    if (isEdit) return;
+    // 새 상품은 상품명·사진을 새 바코드로 다시 찾는다. 예전 번호로 자동으로 채워진 것만 비우고
+    // 사람이 고친 상품명·사진, 유통기한·수량·카테고리·메모는 그대로 둔다
+    // (예전엔 화면을 새로 열어 입력한 내용이 다 사라졌다)
+    setName((prev) => (prev && prev === autoFilled.current.name ? '' : prev));
+    setImageUri((prev) => (prev && prev === autoFilled.current.image ? null : prev));
+    setLookupBarcodeNo(v);
   };
 
   // [다시 촬영]으로 스캔 화면에 갔다가 돌아오면 읽은 번호 적용
@@ -190,7 +197,8 @@ export default function ProductForm() {
     }, [isEdit]),
   );
   useEffect(() => {
-    if (barcodeHint) setOrderOverride(barcodeHint.order);
+    // 추천이 없는 바코드로 바뀌면 이전 바코드의 추천을 남기지 않고 설정값으로
+    setOrderOverride(barcodeHint ? barcodeHint.order : null);
   }, [barcodeHint]);
   // 이 바코드로 기간을 기억해 두었으면 팝업에 미리 채운다
   useEffect(() => {
@@ -332,7 +340,8 @@ export default function ProductForm() {
 
   const onPickDate = (event: DateTimePickerEvent, selected?: Date) => {
     if (Platform.OS === 'android') setShowDatePicker(false);
-    if (event.type === 'set' && selected) applyPickedDate(formatDate(selected));
+    // 이 달력은 늘 유통기한 칸 — 중국 제품 [예] 뒤 인식이 중간에 끝나 남은 제조일 표시를 따르지 않는다
+    if (event.type === 'set' && selected) setExpiryDate(formatDate(selected));
   };
 
   const pickImage = () => setShowPhotoSource(true);
@@ -606,7 +615,7 @@ export default function ProductForm() {
               )}
             </Pressable>
             {imageUri ? (
-              <Pressable onPress={() => setImageUri(null)} className="mt-1.5">
+              <Pressable onPress={() => setImageUri(null)} hitSlop={10} accessibilityRole="button" className="mt-1.5">
                 <Text className="text-muted text-xs underline">사진 제거</Text>
               </Pressable>
             ) : null}
@@ -643,7 +652,7 @@ export default function ProductForm() {
             />
             {barcode ? (
               <View className="mt-1.5 flex-row flex-wrap" style={{ gap: 12 }}>
-                <Pressable onPress={() => setShowPhotoPicker(true)}>
+                <Pressable onPress={() => setShowPhotoPicker(true)} hitSlop={10} accessibilityRole="button">
                   <Text className="text-muted text-xs underline">제품 사진 선택 하기</Text>
                 </Pressable>
               </View>
@@ -721,6 +730,8 @@ export default function ProductForm() {
             ) : (
               <Pressable
                 onPress={() => setShowDatePicker(true)}
+                accessibilityRole="button"
+                accessibilityLabel={expiryDate ? `유통기한 ${expiryDate}, 눌러서 달력에서 바꾸기` : '유통기한 달력에서 고르기'}
                 className="rounded-xl border border-line bg-paper px-3 py-2.5"
               >
                 <Text
@@ -784,7 +795,7 @@ export default function ProductForm() {
                 label="수량 증가"
                 onPress={() => {
                   setQtyText(null);
-                  setQuantity((n) => Math.min(9999, n + 1));
+                  setQuantity((n) => (n >= 9999 ? n : n + 1)); // 합치기로 9999를 넘긴 수량을 줄이지 않게
                 }}
               />
             </View>
@@ -819,7 +830,11 @@ export default function ProductForm() {
 
         {/* 제조일+기간 팝업 — 중국 제품 등 제조일과 보존기간만 있는 경우 */}
         <Modal visible={mfgVisible} transparent animationType="fade" onRequestClose={() => setMfgVisible(false)}>
-          <View className="flex-1 items-center justify-center bg-black/60 px-6">
+          {/* 기간 숫자를 칠 때 키보드가 [확인]·계산 결과를 가리지 않게 팝업을 위로 올린다 */}
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            className="flex-1 items-center justify-center bg-black/60 px-6"
+          >
             <View className="w-full rounded-2xl bg-paper p-5">
               <View className="flex-row items-center">
                 <Text className="text-ink flex-1 text-center text-lg font-bold">제조일 + 기간 입력</Text>
@@ -838,7 +853,7 @@ export default function ProductForm() {
               <Text className="text-ink mb-1.5 mt-4 text-sm font-bold">제조일 (생산일)</Text>
               <View className="flex-row items-center" style={{ gap: 8 }}>
                 <View className="flex-1 flex-row items-center rounded-xl border border-line bg-paper px-3">
-                  <Pressable onPress={() => setMfgPickerVisible(true)} hitSlop={8} accessibilityLabel="달력에서 제조일 고르기">
+                  <Pressable onPress={() => setMfgPickerVisible(true)} hitSlop={12} accessibilityRole="button" accessibilityLabel="달력에서 제조일 고르기">
                     <MaterialCommunityIcons name="calendar-month-outline" size={20} color="#888888" />
                   </Pressable>
                   <TextInput
@@ -907,6 +922,8 @@ export default function ProductForm() {
                         setManufactureMonths(String(n));
                         setManufactureUnit(u);
                       }}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: on }}
                       className={`rounded-full border px-3 py-1.5 ${on ? 'border-primary bg-primary/10' : 'border-line bg-paper'}`}
                     >
                       <Text className={`text-sm ${on ? 'text-primary font-bold' : 'text-ink'}`}>
@@ -949,7 +966,7 @@ export default function ProductForm() {
                 </Pressable>
               </View>
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
 
         <Modal
@@ -1035,6 +1052,8 @@ export default function ProductForm() {
                 <Pressable
                   key={c}
                   onPress={() => toggleCategory(c)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: selectedCategories.has(c) }}
                   className={`rounded-full border px-3.5 py-1.5 ${
                     selectedCategories.has(c) ? 'border-primary bg-primary' : 'border-line bg-paper'
                   }`}
@@ -1159,12 +1178,13 @@ function ToolButton({
       disabled={busy}
       accessibilityRole="button"
       accessibilityLabel={a11y}
-      className={`flex-1 flex-row items-center justify-center rounded-xl border py-2 active:opacity-70 ${
+      // 자주 누르는 버튼이라 손가락 크기(44)는 확보
+      className={`min-h-[44px] flex-1 flex-row items-center justify-center rounded-xl border py-2 active:opacity-70 ${
         highlight ? 'border-primary bg-primary' : 'border-line bg-paper'
       }`}
     >
-      {busy ? <ActivityIndicator size="small" color={color} /> : <MaterialCommunityIcons name={icon} size={15} color={color} />}
-      <Text numberOfLines={1} className={`ml-1 flex-shrink text-xs font-medium ${highlight ? 'text-paper' : 'text-primary'}`}>
+      {busy ? <ActivityIndicator size="small" color={color} /> : <MaterialCommunityIcons name={icon} size={18} color={color} />}
+      <Text numberOfLines={1} className={`ml-1 flex-shrink text-sm font-medium ${highlight ? 'text-paper' : 'text-primary'}`}>
         {label}
       </Text>
     </Pressable>

@@ -11,7 +11,7 @@ const DISMISSED_KEY = 'updateDismissed:v1';
 function openStore() {
   const id = Application.applicationId ?? 'com.shlab.expirykeeper';
   Linking.openURL(`market://details?id=${id}`).catch(() =>
-    Linking.openURL(`https://play.google.com/store/apps/details?id=${id}`),
+    Linking.openURL(`https://play.google.com/store/apps/details?id=${id}`).catch(() => {}),
   );
 }
 
@@ -32,9 +32,15 @@ export async function checkForUpdate(): Promise<void> {
   const notes = r.update_notes?.trim() || '더 좋아진 새 버전이 나왔어요.';
   const update = { text: '업데이트', onPress: openStore };
   if (decision === 'force') {
-    Alert.alert('업데이트가 필요해요', `${notes}\n\n계속 쓰시려면 새 버전으로 업데이트해 주세요.`, [update], {
-      cancelable: false,
-    });
+    // 안드로이드 알림창은 버튼을 누르면 닫힌다 → 스토어에서 업데이트 없이 돌아와도 다시 띄워 막는다
+    const block = () =>
+      Alert.alert(
+        '업데이트가 필요해요',
+        `${notes}\n\n계속 쓰시려면 새 버전으로 업데이트해 주세요.`,
+        [{ text: '업데이트', onPress: () => (openStore(), block()) }],
+        { cancelable: false },
+      );
+    block();
     return;
   }
   Alert.alert('새 버전이 나왔어요', notes, [
