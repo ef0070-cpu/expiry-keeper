@@ -401,10 +401,11 @@ export default function Dashboard() {
         icon={mode === 'home' ? 'plus' : 'barcode-scan'}
         label={mode === 'home' ? '상품추가' : undefined}
         accessibilityLabel={mode === 'home' ? '상품 추가' : '바코드 스캔'}
-        bottom={mode === 'home' && adsVisible ? 24 : undefined}
+        bottom={adsVisible ? 24 : undefined}
       />
       </View>
-      {mode === 'home' ? <HomeBanner /> : null}
+      {/* 하단 배너: 가정용·매장용 모두 무료 사용자만(매장 유료·평생 광고 제거·테스터는 안 보임) */}
+      <HomeBanner />
     </View>
   );
 }

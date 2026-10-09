@@ -18,7 +18,6 @@ const REASON_TEXT: Record<string, string> = {
   order: '이번 달 무료 발주서 공유 횟수를 모두 썼어요.',
   priceTag: '이번 달 무료 가격표 저장·공유 횟수를 모두 썼어요.',
   team: '무료로는 혼자 사용할 수 있어요. 팀원과 함께 쓰려면 매장용 구독이 필요해요.',
-  alerts: '무료로 받을 수 있는 상품별 알림 횟수를 모두 설정했어요.',
 };
 
 const formatKoreanDate = (iso: string) => {

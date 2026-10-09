@@ -1,11 +1,14 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { Alert } from 'react-native';
 import {
   DEFAULT_CONFIG,
   FREE,
   canAddProduct,
   canUseMonthly,
   monthKey,
+  monthlyRemaining,
   toEntitlement,
   toPlanConfig,
   type Entitlement,
@@ -55,7 +58,7 @@ export async function refreshEntitlement(): Promise<Entitlement> {
   if (!supabase) return current();
   const [ent, cfg] = await Promise.all([
     supabase.rpc('get_my_entitlement'),
-    supabase.from('app_config').select('paywall_enabled, product_limit, monthly_limit, alert_limit').eq('id', 1).maybeSingle(),
+    supabase.from('app_config').select('paywall_enabled, product_limit, monthly_limit').eq('id', 1).maybeSingle(),
   ]);
   if (!cfg.error && cfg.data) {
     config = toPlanConfig(cfg.data as PlanConfigRow);
@@ -109,8 +112,30 @@ export async function getMonthlyUsage(kind: MonthlyKind): Promise<number> {
   return Number((await AsyncStorage.getItem(usageKey(kind))) ?? 0);
 }
 
+/** 1회 사용 기록. 무료 한도가 있으면 남은 횟수 안내창을 띄운다(유료·스위치 꺼짐이면 조용히) */
 export async function bumpMonthlyUsage(kind: MonthlyKind): Promise<void> {
-  await AsyncStorage.setItem(usageKey(kind), String((await getMonthlyUsage(kind)) + 1));
+  await load();
+  const used = (await getMonthlyUsage(kind)) + 1;
+  await AsyncStorage.setItem(usageKey(kind), String(used));
+  const left = monthlyRemaining(used, current().retailPremium, config);
+  if (left !== null) showMonthlyUsageNotice(kind, left);
+}
+
+const KIND_NAME: Record<MonthlyKind, string> = { order: '발주서 공유', priceTag: '가격표 저장·공유' };
+
+function showMonthlyUsageNotice(kind: MonthlyKind, left: number) {
+  const total = config.monthlyLimit;
+  const body =
+    left > 0
+      ? `이번 달 무료 ${KIND_NAME[kind]} ${total}회 중 1회를 썼어요.\n남은 횟수: ${left}회`
+      : `이번 달 무료 ${KIND_NAME[kind]} ${total}회를 모두 썼어요.\n다음 달 1일에 다시 ${total}회가 생겨요.`;
+  const ok = { text: '확인' };
+  // 거의 다 썼을 때만 유료 안내 버튼 — 매번 권하면 귀찮다
+  Alert.alert(
+    left > 0 ? `${KIND_NAME[kind]} 1회 사용` : '무료 횟수를 모두 썼어요',
+    body,
+    left <= 1 ? [ok, { text: '무제한으로 쓰기', onPress: () => router.push(`/premium?reason=${kind}`) }] : [ok],
+  );
 }
 
 /** 매장 월 한도(발주서·가격표) 안인가 — 스위치 꺼짐·유료면 항상 true */
