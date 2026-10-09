@@ -673,6 +673,21 @@ export default function Order() {
     [load, onChangeStatus],
   );
 
+  // 줄 그리는 함수를 고정 — 매번 새로 만들면 목록이 보이는 줄 전부를 다시 그린다
+  const renderCatalogRow = useCallback(
+    ({ item }: { item: OrderProduct }) => (
+      <CatalogRow
+        product={item}
+        qty={cart[item.id] ?? 0}
+        badge={item.barcode ? updateBadges.get(item.barcode) : undefined}
+        onChangeQty={changeQty}
+        onPress={handleOpenProduct}
+        onLongPress={onLongPressProduct}
+      />
+    ),
+    [cart, updateBadges, changeQty, handleOpenProduct, onLongPressProduct],
+  );
+
   const onEditSettingsProduct = useCallback(() => {
     if (!settingsProduct) return;
     router.push({ pathname: '/order-product-form', params: { id: settingsProduct.id } });
@@ -1059,16 +1074,14 @@ export default function Order() {
             keyExtractor={(item) => item.id}
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={{ paddingTop: 12, paddingBottom: 120 + insets.bottom }}
-            renderItem={({ item }) => (
-              <CatalogRow
-                product={item}
-                qty={cart[item.id] ?? 0}
-                badge={item.barcode ? updateBadges.get(item.barcode) : undefined}
-                onChangeQty={changeQty}
-                onPress={handleOpenProduct}
-                onLongPress={onLongPressProduct}
-              />
-            )}
+            // 폴드 실측(2026-10-10): 검색어로 목록 개수가 크게 바뀔 때(388→208개) 한 번에 316ms 멈췄다.
+            // 기본값은 화면 위아래 10화면(약 150줄)을 미리 만들어 두어, 검색할 때마다 그만큼 지우고 새로 만들었다.
+            // 위아래 2화면만 미리 만들고, 화면 밖 줄은 그리기에서 뺀다.
+            initialNumToRender={10}
+            maxToRenderPerBatch={8}
+            windowSize={5}
+            removeClippedSubviews
+            renderItem={renderCatalogRow}
             ListEmptyComponent={
               <View className="mt-24 items-center">
                 <MaterialCommunityIcons name="cart-outline" size={48} color="#CCCCCC" />
