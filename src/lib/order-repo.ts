@@ -113,7 +113,8 @@ export async function saveOrderProduct(rawP: OrderProduct): Promise<OrderProduct
     const categoryChanged = !isNew && items[idx].category !== p.category;
     const priceChanged = !isNew && items[idx].price !== p.price;
     const oldBarcode = !isNew && items[idx].barcode !== p.barcode ? items[idx].barcode : null;
-    if (isNew) items.push(p);
+    // 새로 등록한 상품은 목록 맨 앞에 — 예전엔 맨 끝에 붙어 등록하고 나면 찾기 어려웠다
+    if (isNew) items.unshift(p);
     else items[idx] = p;
     await writeOrderProducts(items);
     return { p, isNew, categoryChanged, priceChanged, oldBarcode };
@@ -123,6 +124,16 @@ export async function saveOrderProduct(rawP: OrderProduct): Promise<OrderProduct
   if (oldBarcode) await recordRemovedBarcode(oldBarcode);
   upsertBarcodeCatalog(p.barcode, p.name, p.imageUri).catch(() => {});
   if (isNew) {
+    // 직접 등록한 상품도 "신규" 표시 — 공용 목록 신규처럼 하루 동안 맨 위에 모인다(등록 화면에서 돌아오기 전에 기록)
+    if (p.barcode) {
+      try {
+        const badges = await readBadges();
+        badges[p.barcode] = { kind: 'new' };
+        await writeBadges(badges);
+      } catch {
+        // 표시는 부가 기능 — 실패해도 저장은 성공
+      }
+    }
     submitNewOrderProduct(p).catch(() => {});
   } else {
     if (p.barcode && p.imageUri) {
