@@ -8,6 +8,7 @@ import { LogBox } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useAppMode } from '@/lib/settings';
+import { checkForUpdate } from '@/lib/app-update';
 import {
   dedupeOrderProductsByBarcode,
   migrateLocalOrderDataToCloud,
@@ -62,6 +63,7 @@ export default function RootLayout() {
     syncOrderCatalog();
     dedupeOrderProductsByBarcode();
     markInstalled();
+    checkForUpdate();
     return () => sub.subscription.unsubscribe();
   }, []);
 
