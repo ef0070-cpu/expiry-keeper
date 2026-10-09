@@ -3,8 +3,16 @@ import type { OrderProduct } from './order-types';
 /** repo.ts의 newId()와 동일한 로직. 이 파일을 tsx로 단독 실행 가능한 순수 로직으로 유지하기 위해
  * (repo.ts는 AsyncStorage 등 RN 전용 모듈을 함께 import해 tsx 번들링이 깨짐) 별도로 둔다. */
 function defaultId(): string {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+  return PUBLIC_ID_PREFIX + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
 }
+
+/**
+ * 기본 상품·공용 카탈로그에서 그대로 만든 사본의 id 접두사. 이런 사본은 공용 목록에서 언제든 다시
+ * 만들 수 있어 서버(order_products)에 올리지 않는다 — 예전엔 설치마다 약 400행이 올라가 표가 폭증했다.
+ * 진열·장바구니에 쓰였거나 사용자가 고친 사본만 올린다(order-dedupe.ts needsCloudCopy).
+ * 'p'는 시각 기반 일반 id(현재 'm…')보다 글자순으로 뒤라, 바코드 중복 정리 때 서버의 기존 사본이 남는다.
+ */
+export const PUBLIC_ID_PREFIX = 'pub';
 
 export type OrderCatalogRow = {
   barcode: string;

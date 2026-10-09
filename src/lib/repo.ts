@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { upsertBarcodeCatalog } from './barcode-catalog';
 import { submitPhotoCandidateIfChanged } from './photo-candidates';
+import { fetchAll } from './paged';
 import { getCachedAppMode } from './settings';
 import { uploadPhotoToBucket } from './storage';
 import { supabase } from './supabase';
@@ -127,16 +128,20 @@ function remember(items: Product[]): Product[] {
 export async function listProducts(filter: ListFilter = 'active'): Promise<Product[]> {
   const mode = getCachedAppMode() ?? 'retail';
   if (supabase) {
-    let query = supabase
-      .from('products')
-      .select('*')
-      .eq('mode', mode)
-      .order('expiry_date', { ascending: true });
-    if (filter === 'active') query = query.eq('status', 'active');
-    if (filter === 'resolved') query = query.neq('status', 'active');
-    const { data, error } = await query;
-    if (error) throw new Error(error.message);
-    return remember((data as ProductRow[]).map(fromRow));
+    const client = supabase;
+    // 1000개 넘는 매장도 잘리지 않게 끝까지 받는다(같은 날짜끼리는 id로 순서 고정)
+    const rows = await fetchAll<ProductRow>((from, to) => {
+      let query = client
+        .from('products')
+        .select('*')
+        .eq('mode', mode)
+        .order('expiry_date', { ascending: true })
+        .order('id', { ascending: true });
+      if (filter === 'active') query = query.eq('status', 'active');
+      if (filter === 'resolved') query = query.neq('status', 'active');
+      return query.range(from, to);
+    });
+    return remember(rows.map(fromRow));
   }
   const items = await localList();
   const filtered = items.filter((p) => {

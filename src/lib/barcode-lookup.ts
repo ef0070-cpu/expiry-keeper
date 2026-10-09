@@ -10,15 +10,16 @@ import { BarcodeInfo } from './types';
 export async function lookupBarcode(barcode: string, brand?: string): Promise<BarcodeInfo> {
   if (!supabase) return { name: null, imageUrl: null };
 
-  // 우리 앱 사용자가 이미 등록해둔 상품(공용 목록)이 외부 API보다 정확해 우선한다. 예전엔 이걸 먼저
-  // 확인하고 나서야 서버 조회를 시작해 두 왕복 시간이 더해졌다 — 둘을 동시에 시작한다.
-  const cachedP = supabase.from('barcode_catalog').select('name, image_uri').eq('barcode', barcode).maybeSingle();
-  const remoteP = supabase.functions.invoke('barcode-lookup', { body: { barcode, brand } });
-  const { data: cached } = await cachedP;
-  if (cached) return { name: cached.name, imageUrl: cached.image_uri };
-  const { data, error } = await remoteP;
-  if (error || !data) return { name: null, imageUrl: null };
-  return { name: data.name ?? null, imageUrl: data.imageUrl ?? null };
+  // 우리 앱 사용자가 이미 등록해둔 상품(공용 목록)이 외부 API보다 정확해 우선한다. 공용 목록에 있으면
+  // 외부 조회(서버 함수 → 식품안전나라·네이버·오픈푸드팩트 3~4곳)를 아예 부르지 않는다 — 예전엔 동시에
+  // 시작해 이미 아는 바코드도 매번 외부 API 하루 한도를 깎았다. 등록 화면은 조회를 뒤에서 하므로 기다림은 없다.
+  const { data: cached } = await supabase.from('barcode_catalog').select('name, image_uri').eq('barcode', barcode).maybeSingle();
+  if (cached?.image_uri) return { name: cached.name, imageUrl: cached.image_uri };
+  // 공용 목록에 이름만 있고 사진이 없으면(사진 없이 저장·신고로 지워짐) 외부에서 사진만 찾아온다.
+  // 이름은 사용자가 등록한 값이 더 정확하니 그대로 둔다.
+  const { data, error } = await supabase.functions.invoke('barcode-lookup', { body: { barcode, brand } });
+  if (error || !data) return { name: cached?.name ?? null, imageUrl: null };
+  return { name: cached?.name ?? data.name ?? null, imageUrl: data.imageUrl ?? null };
 }
 
 /**

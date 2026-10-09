@@ -1,4 +1,4 @@
-import { mergeRemoteOrderProducts, planBarcodeDedupe } from './order-dedupe';
+import { mergeRemoteOrderProducts, needsCloudCopy, planBarcodeDedupe } from './order-dedupe';
 import { OrderProduct } from './order-types';
 
 const p = (id: string, barcode: string | null, extra: Partial<OrderProduct> = {}): OrderProduct => ({
@@ -62,6 +62,18 @@ const p = (id: string, barcode: string | null, extra: Partial<OrderProduct> = {}
 {
   const merged = mergeRemoteOrderProducts([p('a', '1')], [p('b', '1'), p('c', '2')], new Set(['b']));
   console.assert(merged.map((x) => x.id).join() === 'a,c', '삭제한 id가 되살아나면 안 됨');
+}
+
+{
+  // 서버에 올릴 상품: 공용 목록 사본(pub…)은 진열·장바구니에 쓰인 것만
+  const none = new Set<string>();
+  console.assert(needsCloudCopy(p('mabc', '1'), none, none), '직접 만든 상품은 올린다');
+  console.assert(!needsCloudCopy(p('pubmabc', '1'), none, none), '손대지 않은 공용 사본은 안 올린다');
+  console.assert(needsCloudCopy(p('pubmabc', '1'), none, new Set(['pubmabc'])), '진열·장바구니에 쓰인 공용 사본은 올린다');
+  console.assert(!needsCloudCopy(p('mabc', '1'), new Set(['mabc']), none), '이미 서버에 있으면 안 올린다');
+  // 서버의 예전 사본(m…)이 새 공용 사본(pub…)보다 먼저라 중복 정리 때 남는다 — 재설치해도 서버 진열이 맞는다
+  const { idRemap } = planBarcodeDedupe([p('pubm1', '9'), p('mzzz', '9')]);
+  console.assert(idRemap.get('pubm1') === 'mzzz', '서버 사본이 남는다');
 }
 
 console.log('order-dedupe selfcheck OK');

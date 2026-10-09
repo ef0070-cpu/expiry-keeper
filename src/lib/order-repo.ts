@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { upsertBarcodeCatalog } from './barcode-catalog';
-import { applyBarcodeMoves, mergeCatalogIntoProducts, type BarcodeMove, type OrderCatalogRow } from './order-catalog-merge';
+import { PUBLIC_ID_PREFIX, applyBarcodeMoves, mergeCatalogIntoProducts, type BarcodeMove, type OrderCatalogRow } from './order-catalog-merge';
+import { fetchAll } from './paged';
 import { submitNewOrderProduct } from './order-report';
 import {
   getSubmittedPhotoCandidates,
@@ -20,10 +21,11 @@ import {
   pushCart,
   pushCategories,
   pushOrderProduct,
+  pushOrderProducts,
   pushStore,
   pushStoreLayoutPart,
 } from './order-cloud-sync';
-import { mergeRemoteOrderProducts, planBarcodeDedupe } from './order-dedupe';
+import { mergeRemoteOrderProducts, needsCloudCopy, planBarcodeDedupe } from './order-dedupe';
 import { FridgeAssignment, FridgeSection, OrderCart, OrderProduct, Store } from './order-types';
 import { DEFAULT_ORDER_PRODUCTS } from './order-seed-data';
 
@@ -688,7 +690,8 @@ export function seedDefaultOrderProducts(): Promise<number> {
   return withProductsLock(async () => {
     const existing = await listOrderProducts();
     if (existing.length > 0) return 0;
-    const items: OrderProduct[] = DEFAULT_ORDER_PRODUCTS.map((p) => ({ ...p, id: newId() }));
+    // 공용 목록 사본 표시(pub) — 진열·장바구니에 쓰기 전엔 서버에 올리지 않는다(needsCloudCopy)
+    const items: OrderProduct[] = DEFAULT_ORDER_PRODUCTS.map((p) => ({ ...p, id: PUBLIC_ID_PREFIX + newId() }));
     await writeOrderProducts(items);
     return items.length;
   });
@@ -698,12 +701,15 @@ export function seedDefaultOrderProducts(): Promise<number> {
 export async function syncOrderCatalog(): Promise<void> {
   if (!supabase) return;
   try {
-    const [{ data, error }, movesRes] = await Promise.all([
-      supabase.from('order_catalog').select('barcode, name, brand, price, category, image_uri'),
+    const client = supabase;
+    const [data, movesRes] = await Promise.all([
+      // 공용 목록이 1000개를 넘어도 잘리지 않게 끝까지(실패하면 아래 catch에서 조용히 넘어감)
+      fetchAll<OrderCatalogRow>((from, to) =>
+        client.from('order_catalog').select('barcode, name, brand, price, category, image_uri').order('barcode').range(from, to),
+      ),
       // 승인된 바코드 변경(수정 제안). 표가 아직 없는 서버면 오류 — 그땐 옮길 것 없음으로 본다.
-      supabase.from('order_barcode_moves').select('old_barcode, new_barcode'),
+      client.from('order_barcode_moves').select('old_barcode, new_barcode'),
     ]);
-    if (error || !data) return;
     const moves = (movesRes.data ?? []) as BarcodeMove[];
 
     const { changed, newBarcodes, updatedBarcodes, moved } = await withProductsLock(async () => {
@@ -883,9 +889,9 @@ export async function syncOrderStores(): Promise<void> {
       if (merged.length !== local.length) await writeOrderProducts(merged);
       return local;
     });
-    for (const local of localProducts) {
-      if (!remoteProductIds.has(local.id)) pushOrderProduct(local).catch(() => {});
-    }
+    // 서버에 없는 것만, 한 번에. 손대지 않은 공용 목록 사본은 올리지 않는다(설치마다 약 400행이 쌓이던 원인)
+    const referenced = await referencedOrderProductIds();
+    pushOrderProducts(localProducts.filter((p) => needsCloudCopy(p, remoteProductIds, referenced))).catch(() => {});
     // 서버에서 받아온 상품이 이미 있는 상품과 바코드가 같으면(재설치·다른 기기) 여기서 합친다
     await dedupeOrderProductsByBarcode();
   } catch {
@@ -946,6 +952,21 @@ let dedupeRunning: Promise<void> | null = null;
  * 모든 매장(+ 매장 미선택 전역) 장바구니 수량은 남긴 상품으로 합산하고, 냉장고 배정은 매장별로
  * 남긴 상품 배정이 이미 있으면 중복 배정을 버린다.
  */
+/** 장바구니(모든 매장)·냉장고 진열·구역 구분선이 가리키는 상품 id — 서버에 꼭 있어야 하는 상품 */
+async function referencedOrderProductIds(): Promise<Set<string>> {
+  const ids = new Set<string>();
+  const stores = await listStores();
+  for (const key of [CART_KEY, ...stores.map((s) => `orderCart:${s.id}`)]) {
+    const raw = await AsyncStorage.getItem(key);
+    if (raw) for (const id of Object.keys(JSON.parse(raw) as OrderCart)) ids.add(id);
+  }
+  for (const store of stores) {
+    for (const a of await listFridgeAssignments(store.id)) ids.add(a.productId);
+    for (const list of Object.values(await listFridgeSectionDividers(store.id))) list.forEach((id) => ids.add(id));
+  }
+  return ids;
+}
+
 export function dedupeOrderProductsByBarcode(): Promise<void> {
   // 동기화 여러 개가 동시에 부를 수 있어, 도는 중이면 그 작업을 같이 기다린다
   dedupeRunning ??= withProductsLock(runDedupe).finally(() => {

@@ -1,4 +1,14 @@
+import { PUBLIC_ID_PREFIX } from './order-catalog-merge';
 import { OrderProduct } from './order-types';
+
+/**
+ * 동기화 때 서버에 새로 올릴 상품인가. 서버에 이미 있으면 아니다. 공용 목록 사본(pub…)은 진열·장바구니에
+ * 쓰인 것만 — 재설치 때 서버에서 받은 진열이 가리킬 상품이 있어야 하니까. 고친 사본은 저장할 때 따로 올라간다.
+ */
+export function needsCloudCopy(p: OrderProduct, remoteIds: Set<string>, referencedIds: Set<string>): boolean {
+  if (remoteIds.has(p.id)) return false;
+  return !p.id.startsWith(PUBLIC_ID_PREFIX) || referencedIds.has(p.id);
+}
 
 /**
  * 같은 바코드의 발주 상품이 여러 개면 가장 먼저 만든 사본(id가 가장 작은 것 — id 앞부분이 생성

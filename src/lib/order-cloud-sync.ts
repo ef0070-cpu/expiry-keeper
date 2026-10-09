@@ -1,3 +1,4 @@
+import { fetchAll } from './paged';
 import { supabase } from './supabase';
 import type { FridgeAssignment, FridgeSection, OrderCart, OrderProduct, Store } from './order-types';
 
@@ -109,24 +110,33 @@ function toOrderProduct(row: OrderProductRow): OrderProduct {
   };
 }
 
+const toOrderProductRow = (p: OrderProduct, now: string) => ({
+  id: p.id,
+  name: p.name,
+  brand: p.brand,
+  price: p.price,
+  category: p.category,
+  barcode: p.barcode,
+  image_uri: p.imageUri,
+  status: p.status ?? 'active',
+  aliases: p.aliases ?? [],
+  updated_at: now,
+});
+
 export async function pushOrderProduct(p: OrderProduct): Promise<void> {
-  if (!supabase) return;
-  const { error } = await supabase.from('order_products').upsert(
-    {
-      id: p.id,
-      name: p.name,
-      brand: p.brand,
-      price: p.price,
-      category: p.category,
-      barcode: p.barcode,
-      image_uri: p.imageUri,
-      status: p.status ?? 'active',
-      aliases: p.aliases ?? [],
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: 'id' },
-  );
-  if (error) throw error;
+  return pushOrderProducts([p]);
+}
+
+/** 여러 상품을 한 번에 올린다(예전엔 상품마다 요청 1개라 첫 동기화에 수백 번 왕복했다) */
+export async function pushOrderProducts(list: OrderProduct[]): Promise<void> {
+  if (!supabase || list.length === 0) return;
+  const now = new Date().toISOString();
+  for (let i = 0; i < list.length; i += 500) {
+    const { error } = await supabase
+      .from('order_products')
+      .upsert(list.slice(i, i + 500).map((p) => toOrderProductRow(p, now)), { onConflict: 'id' });
+    if (error) throw error;
+  }
 }
 
 export async function deleteOrderProductCloud(id: string): Promise<void> {
@@ -137,11 +147,19 @@ export async function deleteOrderProductCloud(id: string): Promise<void> {
 
 export async function fetchMyOrderProducts(): Promise<OrderProduct[]> {
   if (!supabase) return [];
-  const { data, error } = await supabase
-    .from('order_products')
-    .select('id, name, brand, price, category, barcode, image_uri, status, aliases');
-  if (error || !data) return [];
-  return (data as OrderProductRow[]).map(toOrderProduct);
+  const client = supabase;
+  try {
+    const rows = await fetchAll<OrderProductRow>((from, to) =>
+      client
+        .from('order_products')
+        .select('id, name, brand, price, category, barcode, image_uri, status, aliases')
+        .order('id')
+        .range(from, to),
+    );
+    return rows.map(toOrderProduct);
+  } catch {
+    return [];
+  }
 }
 
 // ---------- 발주 카테고리(검색 필터 칩) ----------
