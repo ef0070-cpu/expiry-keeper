@@ -26,7 +26,7 @@ import {
   needsOrderSetup,
   assignToFridgeSection,
   CatalogUpdateBadge,
-  clearAllCatalogUpdateBadges,
+  markCatalogUpdateBadgesSeen,
   clearAllOrderProducts,
   clearCatalogUpdateBadge,
   deleteFridgeSection,
@@ -127,9 +127,8 @@ export default function Order() {
     setCategories(categoryList);
     if (cartVersionRef.current === cartVersion) setCart(cartData);
     setUpdateBadges(badges);
-    // 발주 화면을 한 번 띄운 것 자체를 "확인함"으로 본다 — 이번 렌더에는 그대로 보이고,
-    // 다음부터는 상품을 개별로 안 열어봐도 다시 안 뜬다.
-    if (badges.size > 0) clearAllCatalogUpdateBadges().catch(() => {});
+    // 처음 보인 때부터 하루 유지 — 나갔다 들어와도 계속 보인다(예전엔 화면을 한 번 열면 바로 지워졌다)
+    if (badges.size > 0) markCatalogUpdateBadgesSeen().catch(() => {});
     setStores(storeList);
     setActiveStoreIdState(activeId);
     // 구역 목록/구분선은 매장별이라 매장이 선택 안 됐으면 비워둔다(빠른발주는 매장 선택을 요구함).

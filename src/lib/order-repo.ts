@@ -1,6 +1,15 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { upsertBarcodeCatalog } from './barcode-catalog';
-import { PUBLIC_ID_PREFIX, applyBarcodeMoves, mergeCatalogIntoProducts, type BarcodeMove, type OrderCatalogRow } from './order-catalog-merge';
+import {
+  PUBLIC_ID_PREFIX,
+  applyBarcodeMoves,
+  mergeCatalogIntoProducts,
+  pruneBadges,
+  type BadgeEntry,
+  type BarcodeMove,
+  type CatalogUpdateBadge,
+  type OrderCatalogRow,
+} from './order-catalog-merge';
 import { fetchAll } from './paged';
 import { submitNewOrderProduct } from './order-report';
 import {
@@ -44,7 +53,7 @@ const CATALOG_UPDATE_BADGE_KEY = 'orderCatalogUpdateBadges:v1';
 const STORES_KEY = 'stores:v1';
 const ACTIVE_STORE_KEY = 'activeStoreId:v1';
 
-export type CatalogUpdateBadge = 'new' | 'updated';
+export type { CatalogUpdateBadge } from './order-catalog-merge';
 
 export const DEFAULT_CATEGORIES = ['바', '콘', '튜브', '샌드/기타', '홈/컵'];
 
@@ -758,10 +767,11 @@ export async function syncOrderCatalog(): Promise<void> {
     for (const p of moved) pushOrderProduct(p).catch(() => {});
     if (changed) await dedupeOrderProductsByBarcode();
     if (newBarcodes.length || updatedBarcodes.length) {
-      const badges = await getCatalogUpdateBadges();
-      for (const b of newBarcodes) badges.set(b, 'new');
-      for (const b of updatedBarcodes) badges.set(b, 'updated');
-      await writeCatalogUpdateBadges(badges);
+      const badges = await readBadges();
+      // 새로 바뀐 상품은 "못 본 상태"로 — 하루를 처음부터 다시 센다
+      for (const b of newBarcodes) badges[b] = { kind: 'new' };
+      for (const b of updatedBarcodes) badges[b] = { kind: 'updated' };
+      await writeBadges(badges);
     }
   } catch {
     // best-effort: 오프라인 등 실패 시 기존 로컬 상태 유지
@@ -769,27 +779,33 @@ export async function syncOrderCatalog(): Promise<void> {
 }
 
 /** 공용 카탈로그 동기화로 새로 추가되거나(new) 필드가 바뀐(updated) 상품의 바코드 목록.
- * 발주 목록 화면이 이걸로 "신규"/"수정" 뱃지를 표시하고 최상단에 올린다. 상품을 하나하나 열어봐야
- * 지워지면 사용자가 그렇게까지 안 하므로, 발주 화면을 한 번 띄운 것 자체를 "확인함"으로 보고
- * clearAllCatalogUpdateBadges로 한꺼번에 지운다(이번 화면엔 그대로 보이고, 다음부터 안 뜬다). */
-export async function getCatalogUpdateBadges(): Promise<Map<string, CatalogUpdateBadge>> {
+ * 발주 목록 화면이 이걸로 "신규"/"수정" 뱃지를 표시하고 최상단에 올린다. 화면에 처음 보인 때부터
+ * 하루(BADGE_KEEP_MS) 유지 — 예전엔 화면을 한 번 열면 바로 지워져 나갔다 들어오면 사라졌다. */
+async function readBadges(): Promise<Record<string, BadgeEntry>> {
   const raw = await AsyncStorage.getItem(CATALOG_UPDATE_BADGE_KEY);
-  return new Map(Object.entries(raw ? (JSON.parse(raw) as Record<string, CatalogUpdateBadge>) : {}));
+  return pruneBadges(raw ? JSON.parse(raw) : {}, Date.now(), false);
 }
 
-async function writeCatalogUpdateBadges(badges: Map<string, CatalogUpdateBadge>): Promise<void> {
-  await AsyncStorage.setItem(CATALOG_UPDATE_BADGE_KEY, JSON.stringify(Object.fromEntries(badges)));
+async function writeBadges(badges: Record<string, BadgeEntry>): Promise<void> {
+  await AsyncStorage.setItem(CATALOG_UPDATE_BADGE_KEY, JSON.stringify(badges));
 }
 
+export async function getCatalogUpdateBadges(): Promise<Map<string, CatalogUpdateBadge>> {
+  return new Map(Object.entries(await readBadges()).map(([b, e]) => [b, e.kind]));
+}
+
+/** 상품을 직접 열어 봤으면 그 상품 표시만 바로 지운다 */
 export async function clearCatalogUpdateBadge(barcode: string): Promise<void> {
-  const badges = await getCatalogUpdateBadges();
-  if (!badges.delete(barcode)) return;
-  await writeCatalogUpdateBadges(badges);
+  const badges = await readBadges();
+  if (!(barcode in badges)) return;
+  delete badges[barcode];
+  await writeBadges(badges);
 }
 
-/** 발주 화면을 한 번 확인한 것으로 보고 신규/수정 뱃지를 전부 지운다(개별 상품 열람 불필요). */
-export async function clearAllCatalogUpdateBadges(): Promise<void> {
-  await AsyncStorage.removeItem(CATALOG_UPDATE_BADGE_KEY);
+/** 발주 화면에 표시가 보였다 — 아직 못 본 것에 처음 본 시각을 찍는다(그때부터 하루 유지) */
+export async function markCatalogUpdateBadgesSeen(): Promise<void> {
+  const raw = await AsyncStorage.getItem(CATALOG_UPDATE_BADGE_KEY);
+  await writeBadges(pruneBadges(raw ? JSON.parse(raw) : {}, Date.now(), true));
 }
 
 // ---------- 매장/레이아웃/장바구니/발주상품 클라우드 동기화 ----------

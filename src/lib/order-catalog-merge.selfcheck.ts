@@ -1,4 +1,4 @@
-import { applyBarcodeMoves, mergeCatalogIntoProducts } from './order-catalog-merge';
+import { BADGE_KEEP_MS, applyBarcodeMoves, mergeCatalogIntoProducts, pruneBadges } from './order-catalog-merge';
 import type { OrderProduct } from './order-types';
 
 const base: OrderProduct = {
@@ -97,6 +97,17 @@ const base: OrderProduct = {
   console.assert(merged.items.length === 2 && merged.newBarcodes.length === 0, '옮긴 뒤엔 새 바코드가 신규로 중복 추가되면 안 됨');
   const already = applyBarcodeMoves([old, { ...base, id: 'c', barcode: 'NEW' }], [{ old_barcode: 'OLD', new_barcode: 'NEW' }]);
   console.assert(already.moved.length === 0 && already.items[0].barcode === 'OLD', '새 바코드 상품이 이미 있으면 옮기지 않음');
+}
+
+{
+  // 신규·수정 표시: 처음 본 때부터 하루 유지
+  const T = 1_000_000;
+  const seen = pruneBadges({ a: 'new', b: { kind: 'updated' } }, T, true);
+  console.assert(seen.a.seenAt === T && seen.a.kind === 'new' && seen.b.seenAt === T, '예전 형식도 읽고, 처음 본 시각을 찍는다');
+  console.assert(Object.keys(pruneBadges(seen, T + BADGE_KEEP_MS - 1, true)).length === 2, '하루 안엔 계속 보인다');
+  console.assert(pruneBadges(seen, T + BADGE_KEEP_MS - 1, true).a.seenAt === T, '다시 봐도 처음 본 시각은 그대로');
+  console.assert(Object.keys(pruneBadges(seen, T + BADGE_KEEP_MS, true)).length === 0, '하루 지나면 사라진다');
+  console.assert(pruneBadges({ c: { kind: 'new' } }, T + 10 * BADGE_KEEP_MS, false).c.seenAt === undefined, '못 본 표시는 며칠이 지나도 남는다');
 }
 
 console.log('order-catalog-merge selfcheck OK');

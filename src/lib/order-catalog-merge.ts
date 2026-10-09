@@ -83,6 +83,32 @@ export function mergeCatalogIntoProducts(
   return { items: next, changed, newBarcodes, updatedBarcodes };
 }
 
+// ---------- 발주 목록 "신규"·"수정" 표시 ----------
+
+export type CatalogUpdateBadge = 'new' | 'updated';
+/** seenAt: 화면에 처음 보인 시각(ms). 없으면 아직 못 봄 */
+export type BadgeEntry = { kind: CatalogUpdateBadge; seenAt?: number };
+/** 처음 본 뒤 이만큼 유지(사장님 결정 2026-10-10: 최소 하루). 예전엔 화면을 한 번 열면 바로 지워졌다 */
+export const BADGE_KEEP_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * 저장된 표시 정리. 처음 본 지 BADGE_KEEP_MS가 지난 것은 지우고, markSeen이면 아직 못 본 것에 지금 시각을
+ * 찍는다(앱을 며칠 안 열어도 처음 볼 때부터 하루를 센다). 예전 형식({바코드: 'new'})도 읽는다. IO 없는 순수 함수.
+ */
+export function pruneBadges(
+  raw: Record<string, BadgeEntry | CatalogUpdateBadge>,
+  now: number,
+  markSeen: boolean,
+): Record<string, BadgeEntry> {
+  const out: Record<string, BadgeEntry> = {};
+  for (const [barcode, v] of Object.entries(raw)) {
+    const e: BadgeEntry = typeof v === 'string' ? { kind: v } : v;
+    if (e.seenAt !== undefined && now - e.seenAt >= BADGE_KEEP_MS) continue;
+    out[barcode] = markSeen && e.seenAt === undefined ? { ...e, seenAt: now } : e;
+  }
+  return out;
+}
+
 export type BarcodeMove = { old_barcode: string; new_barcode: string };
 
 /**
