@@ -23,14 +23,19 @@ export function useAdsVisible(): boolean {
   return adsAvailable && !useEntitlement().adFree;
 }
 
-export default function HomeBanner() {
+/** placement="top": 화면 아래가 큰 버튼(계산기 키패드)이라 바로 붙이면 실수 클릭이 많은 화면용 */
+export default function HomeBanner({ placement = 'bottom' }: { placement?: 'top' | 'bottom' }) {
   const insets = useSafeAreaInsets();
   const visible = useAdsVisible();
   if (!Ads || !visible) return null;
   const { BannerAd, BannerAdSize, TestIds } = Ads;
+  const top = placement === 'top';
   return (
-    // 하단 안내바 높이만큼 아래를 띄워 배너가 안내바에 겹치지 않게
-    <View className="items-center border-t border-line bg-paper" style={{ paddingBottom: insets.bottom }}>
+    // 하단이면 안내바 높이만큼 아래를 띄워 배너가 안내바에 겹치지 않게
+    <View
+      className={`items-center border-line bg-paper ${top ? 'mt-3 border-y' : 'border-t'}`}
+      style={{ paddingBottom: top ? 0 : insets.bottom }}
+    >
       <BannerAd
         unitId={__DEV__ ? TestIds.ADAPTIVE_BANNER : BANNER_UNIT_ID}
         // 화면 폭에 맞춰 높이가 정해지는 고정형 배너 — 폴드 접힘/펼침 모두 맞는다

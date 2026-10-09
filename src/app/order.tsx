@@ -58,6 +58,7 @@ import {
 } from '@/lib/order-repo';
 import { FridgeAssignment, FridgeSection, OrderCart, OrderProduct, OrderStatus, Store } from '@/lib/order-types';
 import { buildProductSearchIndex, searchOrderProducts } from '@/lib/order-search';
+import HomeBanner from '@/components/HomeBanner';
 
 const STATUS_META: Record<OrderStatus, { label: string; color: string }> = {
   active: { label: '시판중', color: '#2E7D32' },
@@ -750,6 +751,8 @@ export default function Order() {
 
   return (
     <View className="flex-1 bg-bg">
+    {/* 본문(떠 있는 [발주 내역 확인] 버튼 포함)과 하단 배너를 나눠, 버튼이 배너를 가리지 않고 그 위에 오게 */}
+    <View className="flex-1">
       <Stack.Screen
         options={{
           headerRight: () => (
@@ -1251,6 +1254,9 @@ export default function Order() {
           </Pressable>
         </View>
       ) : null}
+    </View>
+      {/* 매장 무료 사용자 하단 배너(구독·이벤트·테스터는 안 보임) */}
+      <HomeBanner />
     </View>
   );
 }

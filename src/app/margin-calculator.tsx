@@ -3,6 +3,7 @@ import { Stack } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import HomeBanner from '@/components/HomeBanner';
 import { computeMissing, MarginField, MarginInputs } from '@/lib/margin';
 import {
   calculate as generalCalculate,
@@ -188,6 +189,8 @@ export default function MarginCalculator() {
             </Text>
           </Pressable>
         </View>
+        {/* 매장 무료 사용자 배너 — 아래는 키패드라 실수 클릭이 많아 위쪽(탭 아래)에 둔다 */}
+        <HomeBanner placement="top" />
 
         {mode === 'cost' ? (
           <>
