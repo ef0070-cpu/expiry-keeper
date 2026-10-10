@@ -130,13 +130,22 @@ export async function pushOrderProduct(p: OrderProduct): Promise<void> {
 /** 여러 상품을 한 번에 올린다(예전엔 상품마다 요청 1개라 첫 동기화에 수백 번 왕복했다) */
 export async function pushOrderProducts(list: OrderProduct[]): Promise<void> {
   if (!supabase || list.length === 0) return;
+  const client = supabase;
   const now = new Date().toISOString();
+  const upsert = (rows: OrderProduct[]) =>
+    client.from('order_products').upsert(rows.map((p) => toOrderProductRow(p, now)), { onConflict: 'id' });
+  let firstError: unknown = null;
   for (let i = 0; i < list.length; i += 500) {
-    const { error } = await supabase
-      .from('order_products')
-      .upsert(list.slice(i, i + 500).map((p) => toOrderProductRow(p, now)), { onConflict: 'id' });
-    if (error) throw error;
+    const chunk = list.slice(i, i + 500);
+    const { error } = await upsert(chunk);
+    if (!error) continue;
+    // 묶음 안 한 건(제약·권한) 때문에 나머지까지 못 올리지 않게 — 그 묶음만 한 개씩 다시
+    for (const p of chunk) {
+      const r = await upsert([p]);
+      if (r.error) firstError ??= r.error;
+    }
   }
+  if (firstError) throw firstError;
 }
 
 export async function deleteOrderProductCloud(id: string): Promise<void> {
@@ -148,18 +157,16 @@ export async function deleteOrderProductCloud(id: string): Promise<void> {
 export async function fetchMyOrderProducts(): Promise<OrderProduct[]> {
   if (!supabase) return [];
   const client = supabase;
-  try {
-    const rows = await fetchAll<OrderProductRow>((from, to) =>
-      client
-        .from('order_products')
-        .select('id, name, brand, price, category, barcode, image_uri, status, aliases')
-        .order('id')
-        .range(from, to),
-    );
-    return rows.map(toOrderProduct);
-  } catch {
-    return [];
-  }
+  // 실패하면 빈 목록이 아니라 오류 — 빈 목록이면 "서버에 아무것도 없다"로 보고 로컬 상품을 전부 다시
+  // 올려, 다른 기기에서 고친 값을 옛 값으로 덮어쓸 수 있다. 호출부(syncOrderStores)가 그 회차를 건너뛴다.
+  const rows = await fetchAll<OrderProductRow>((from, to) =>
+    client
+      .from('order_products')
+      .select('id, name, brand, price, category, barcode, image_uri, status, aliases')
+      .order('id')
+      .range(from, to),
+  );
+  return rows.map(toOrderProduct);
 }
 
 // ---------- 발주 카테고리(검색 필터 칩) ----------

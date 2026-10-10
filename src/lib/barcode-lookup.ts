@@ -15,12 +15,21 @@ export async function lookupBarcode(barcode: string, brand?: string): Promise<Ba
   // 시작해 이미 아는 바코드도 매번 외부 API 하루 한도를 깎았다. 등록 화면은 조회를 뒤에서 하므로 기다림은 없다.
   const { data: cached } = await supabase.from('barcode_catalog').select('name, image_uri').eq('barcode', barcode).maybeSingle();
   if (cached?.image_uri) return { name: cached.name, imageUrl: cached.image_uri };
+  // 이번 실행에서 이미 외부 조회한 바코드는 결과를 그대로 — 사진 없는 인기 바코드를 스캔할 때마다
+  // 외부 API 하루 한도를 깎지 않게
+  const seen = lookedUp.get(barcode);
+  if (seen) return { name: cached?.name ?? seen.name, imageUrl: seen.imageUrl };
   // 공용 목록에 이름만 있고 사진이 없으면(사진 없이 저장·신고로 지워짐) 외부에서 사진만 찾아온다.
   // 이름은 사용자가 등록한 값이 더 정확하니 그대로 둔다.
   const { data, error } = await supabase.functions.invoke('barcode-lookup', { body: { barcode, brand } });
-  if (error || !data) return { name: cached?.name ?? null, imageUrl: null };
-  return { name: cached?.name ?? data.name ?? null, imageUrl: data.imageUrl ?? null };
+  if (error || !data) return { name: cached?.name ?? null, imageUrl: null }; // 실패는 기억하지 않음(다음에 다시 시도)
+  const found = { name: data.name ?? null, imageUrl: data.imageUrl ?? null };
+  lookedUp.set(barcode, found);
+  return { name: cached?.name ?? found.name, imageUrl: found.imageUrl };
 }
+
+/** 앱 실행 중 외부 조회 결과(사진 없음 포함). ponytail: 실행 중 메모리만 — 재실행하면 다시 조회 */
+const lookedUp = new Map<string, BarcodeInfo>();
 
 /**
  * 등록 화면이 열린 뒤 바코드 상품 정보를 뒤에서 찾아 넘겨준다(fill에서 빈칸만 채울 것). 스캔 직후

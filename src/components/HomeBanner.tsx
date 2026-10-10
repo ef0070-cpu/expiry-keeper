@@ -1,6 +1,7 @@
+import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useEntitlement } from '@/lib/entitlement';
+import { isEntitlementLoaded, useEntitlement, whenEntitlementLoaded } from '@/lib/entitlement';
 
 // 애드몹 배너(가정용 메인 목록 하단 고정). 개발 중(__DEV__)엔 구글 테스트 광고만 —
 // 실제 광고 ID로 테스트하다 본인이 누르면 무효 클릭으로 계정이 정지될 수 있다.
@@ -20,7 +21,13 @@ export const adsAvailable = Ads !== null;
 
 /** 배너가 실제로 보이는가 — 광고 모듈이 있고 광고 제거(평생 결제·테스터)가 아닐 때 */
 export function useAdsVisible(): boolean {
-  return adsAvailable && !useEntitlement().adFree;
+  const ent = useEntitlement();
+  // 저장된 권한을 읽기 전엔 무료로 보여 매장 유료 사용자에게 배너가 잠깐 붙었다 사라졌다 — 읽은 뒤에 판단
+  const [loaded, setLoaded] = useState(isEntitlementLoaded);
+  useEffect(() => {
+    if (!loaded) whenEntitlementLoaded().then(() => setLoaded(true), () => setLoaded(true));
+  }, [loaded]);
+  return adsAvailable && loaded && !ent.adFree;
 }
 
 /** placement="top": 화면 아래가 큰 버튼(계산기 키패드)이라 바로 붙이면 실수 클릭이 많은 화면용 */

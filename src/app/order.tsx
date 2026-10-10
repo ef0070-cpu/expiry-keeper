@@ -1076,11 +1076,11 @@ export default function Order() {
             contentContainerStyle={{ paddingTop: 12, paddingBottom: 120 + insets.bottom }}
             // 폴드 실측(2026-10-10): 검색어로 목록 개수가 크게 바뀔 때(388→208개) 한 번에 316ms 멈췄다.
             // 기본값은 화면 위아래 10화면(약 150줄)을 미리 만들어 두어, 검색할 때마다 그만큼 지우고 새로 만들었다.
-            // 위아래 2화면만 미리 만들고, 화면 밖 줄은 그리기에서 뺀다.
+            // 위아래 2화면만 미리 만든다. (removeClippedSubviews는 목록이 크게 바뀔 때 줄이 빈칸으로 남는
+            // 안드로이드 버그가 있어 쓰지 않는다)
             initialNumToRender={10}
             maxToRenderPerBatch={8}
             windowSize={5}
-            removeClippedSubviews
             renderItem={renderCatalogRow}
             ListEmptyComponent={
               <View className="mt-24 items-center">

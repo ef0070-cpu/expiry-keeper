@@ -154,6 +154,8 @@ export default function ProductForm() {
   const applyPickedDate = (d: string) => (mfgTargetRef.current ? openMfg(d) : setExpiryDate(d));
 
   const [barcode, setBarcode] = useState<string | null>(params.barcode ?? null);
+  const barcodeRef = useRef(barcode);
+  barcodeRef.current = barcode;
   const barcodeHint = useMemo(() => dateOrderFromBarcode(barcode), [barcode]);
   const foreignHint = barcodeHint && barcodeHint.country !== '한국' ? barcodeHint : null;
 
@@ -177,7 +179,8 @@ export default function ProductForm() {
       return;
     }
     setBarcodeEditVisible(false);
-    if (v === barcode) return;
+    // 화면 복귀(다시 촬영) 때 부르는 함수는 예전 렌더의 barcode를 기억하고 있어 최신 값(ref)과 비교한다
+    if (v === barcodeRef.current) return;
     setBarcode(v);
     if (isEdit) return;
     // 새 상품은 상품명·사진을 새 바코드로 다시 찾는다. 예전 번호로 자동으로 채워진 것만 비우고

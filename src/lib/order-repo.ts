@@ -125,15 +125,8 @@ export async function saveOrderProduct(rawP: OrderProduct): Promise<OrderProduct
   upsertBarcodeCatalog(p.barcode, p.name, p.imageUri).catch(() => {});
   if (isNew) {
     // 직접 등록한 상품도 "신규" 표시 — 공용 목록 신규처럼 하루 동안 맨 위에 모인다(등록 화면에서 돌아오기 전에 기록)
-    if (p.barcode) {
-      try {
-        const badges = await readBadges();
-        badges[p.barcode] = { kind: 'new' };
-        await writeBadges(badges);
-      } catch {
-        // 표시는 부가 기능 — 실패해도 저장은 성공
-      }
-    }
+    // 표시는 부가 기능 — 실패해도 저장은 성공
+    if (p.barcode) await addCatalogUpdateBadges([[p.barcode, 'new']]).catch(() => {});
     submitNewOrderProduct(p).catch(() => {});
   } else {
     if (p.barcode && p.imageUri) {
@@ -166,6 +159,8 @@ export async function saveOrderProduct(rawP: OrderProduct): Promise<OrderProduct
   if (priceChanged && p.barcode) {
     recordPriceOverride(p.barcode, p.price).catch(() => {});
   }
+  // 고친 공용 사본은 꼭 서버에 있어야 한다 — 지금 못 올려도(오프라인) 다음 동기화가 올리게 기억
+  if (p.id.startsWith(PUBLIC_ID_PREFIX)) await addPubKeepId(p.id).catch(() => {});
   pushOrderProduct(p).catch(() => {});
   return p;
 }
@@ -617,6 +612,7 @@ export async function listFridgeAssignments(storeId: string): Promise<FridgeAssi
 async function writeFridgeAssignments(storeId: string, list: FridgeAssignment[]): Promise<void> {
   await AsyncStorage.setItem(fridgeAssignmentsKey(storeId), JSON.stringify(list));
   pushStoreLayoutPart(storeId, { assignments: list }).catch(() => {});
+  pushPubCopiesNow(list.map((a) => a.productId)).catch(() => {});
 }
 
 /** 상품을 이 매장의 특정 구역에 배정한다.
@@ -684,6 +680,7 @@ export async function writeOrderCart(cart: OrderCart): Promise<void> {
   await AsyncStorage.setItem(await resolveCartKey(), JSON.stringify(cart));
   const storeId = await getActiveStoreId();
   if (storeId) pushCart(storeId, cart).catch(() => {});
+  pushPubCopiesNow(Object.keys(cart)).catch(() => {});
 }
 
 /** 수량을 절대값으로 설정한다 (0 이하면 항목 제거). 갱신된 전체 카트를 반환한다. */
@@ -772,17 +769,19 @@ export async function syncOrderCatalog(): Promise<void> {
       const merged = mergeCatalogIntoProducts(items, rows, removedBarcodes);
       const changed = merged.changed || moved.length > 0;
       if (changed) await writeOrderProducts(merged.items);
-      return { changed, newBarcodes: merged.newBarcodes, updatedBarcodes: merged.updatedBarcodes, moved };
+      // 처음 채우는 것(로컬 목록이 비어 있던 새 설치)은 "신규"가 아니다 — 안 그러면 공용 목록 약 400개가
+      // 하루 내내 전부 "신규"로 보여 표시가 의미 없어진다
+      const newBarcodes = rawItems.length === 0 ? [] : merged.newBarcodes;
+      return { changed, newBarcodes, updatedBarcodes: merged.updatedBarcodes, moved };
     });
     // 옮긴 상품은 클라우드 사본(order_products)도 새 바코드로 맞춘다 — 다른 기기 pull이 예전 값으로 되돌리지 않게
     for (const p of moved) pushOrderProduct(p).catch(() => {});
     if (changed) await dedupeOrderProductsByBarcode();
     if (newBarcodes.length || updatedBarcodes.length) {
-      const badges = await readBadges();
-      // 새로 바뀐 상품은 "못 본 상태"로 — 하루를 처음부터 다시 센다
-      for (const b of newBarcodes) badges[b] = { kind: 'new' };
-      for (const b of updatedBarcodes) badges[b] = { kind: 'updated' };
-      await writeBadges(badges);
+      await addCatalogUpdateBadges([
+        ...newBarcodes.map((b): [string, CatalogUpdateBadge] => [b, 'new']),
+        ...updatedBarcodes.map((b): [string, CatalogUpdateBadge] => [b, 'updated']),
+      ]);
     }
   } catch {
     // best-effort: 오프라인 등 실패 시 기존 로컬 상태 유지
@@ -792,6 +791,15 @@ export async function syncOrderCatalog(): Promise<void> {
 /** 공용 카탈로그 동기화로 새로 추가되거나(new) 필드가 바뀐(updated) 상품의 바코드 목록.
  * 발주 목록 화면이 이걸로 "신규"/"수정" 뱃지를 표시하고 최상단에 올린다. 화면에 처음 보인 때부터
  * 하루(BADGE_KEEP_MS) 유지 — 예전엔 화면을 한 번 열면 바로 지워져 나갔다 들어오면 사라졌다. */
+// 표시 읽기→고치기→쓰기가 겹치면(화면 열기의 "봤음" 기록과 동기화의 새 표시가 동시에) 한쪽이 다른 쪽을
+// 옛 값으로 덮어써 표시가 사라졌다 — 한 줄로 세워 차례로 실행한다.
+let badgeChain: Promise<unknown> = Promise.resolve();
+function withBadgeLock<T>(fn: () => Promise<T>): Promise<T> {
+  const run = badgeChain.then(fn, fn);
+  badgeChain = run.catch(() => {});
+  return run;
+}
+
 async function readBadges(): Promise<Record<string, BadgeEntry>> {
   const raw = await AsyncStorage.getItem(CATALOG_UPDATE_BADGE_KEY);
   return pruneBadges(raw ? JSON.parse(raw) : {}, Date.now(), false);
@@ -806,17 +814,30 @@ export async function getCatalogUpdateBadges(): Promise<Map<string, CatalogUpdat
 }
 
 /** 상품을 직접 열어 봤으면 그 상품 표시만 바로 지운다 */
-export async function clearCatalogUpdateBadge(barcode: string): Promise<void> {
-  const badges = await readBadges();
-  if (!(barcode in badges)) return;
-  delete badges[barcode];
-  await writeBadges(badges);
+export function clearCatalogUpdateBadge(barcode: string): Promise<void> {
+  return withBadgeLock(async () => {
+    const badges = await readBadges();
+    if (!(barcode in badges)) return;
+    delete badges[barcode];
+    await writeBadges(badges);
+  });
 }
 
 /** 발주 화면에 표시가 보였다 — 아직 못 본 것에 처음 본 시각을 찍는다(그때부터 하루 유지) */
-export async function markCatalogUpdateBadgesSeen(): Promise<void> {
-  const raw = await AsyncStorage.getItem(CATALOG_UPDATE_BADGE_KEY);
-  await writeBadges(pruneBadges(raw ? JSON.parse(raw) : {}, Date.now(), true));
+export function markCatalogUpdateBadgesSeen(): Promise<void> {
+  return withBadgeLock(async () => {
+    const raw = await AsyncStorage.getItem(CATALOG_UPDATE_BADGE_KEY);
+    await writeBadges(pruneBadges(raw ? JSON.parse(raw) : {}, Date.now(), true));
+  });
+}
+
+/** 새로 바뀐(또는 직접 등록한) 상품에 "못 본 상태" 표시 — 하루를 처음부터 다시 센다 */
+function addCatalogUpdateBadges(entries: [string, CatalogUpdateBadge][]): Promise<void> {
+  return withBadgeLock(async () => {
+    const badges = await readBadges();
+    for (const [barcode, kind] of entries) badges[barcode] = { kind };
+    await writeBadges(badges);
+  });
 }
 
 // ---------- 매장/레이아웃/장바구니/발주상품 클라우드 동기화 ----------
@@ -910,6 +931,7 @@ export async function syncOrderStores(): Promise<void> {
     // 서버 응답은 잠금 밖에서 기다리고(그동안 저장이 막히지 않게), 합치기만 잠금 안에서 한다
     const remoteProducts = await fetchMyOrderProducts();
     const remoteProductIds = new Set(remoteProducts.map((p) => p.id));
+    for (const id of remoteProductIds) if (id.startsWith(PUBLIC_ID_PREFIX)) pubOnServer.add(id);
     const localProducts = await withProductsLock(async () => {
       const local = await listOrderProducts();
       const merged = mergeRemoteOrderProducts(local, remoteProducts, deletedProductIds);
@@ -958,10 +980,10 @@ export async function migrateLocalOrderDataToCloud(): Promise<void> {
         await pushCart(store.id, JSON.parse(cartRaw) as OrderCart);
       }
     }
-    const products = await listOrderProducts();
-    for (const p of products) {
-      await pushOrderProduct(p);
-    }
+    // 손대지 않은 공용 사본은 빼고 한 번에(예전엔 새 설치마다 약 400개를 하나씩 올렸다)
+    const referenced = await referencedOrderProductIds();
+    const products = (await listOrderProducts()).filter((p) => needsCloudCopy(p, new Set(), referenced));
+    await pushOrderProducts(products);
     await AsyncStorage.setItem(ORDER_CLOUD_MIGRATED_KEY, '1');
   } catch {
     // 부분 실패 — 플래그를 세우지 않아 다음 실행 때 재시도
@@ -979,13 +1001,52 @@ let dedupeRunning: Promise<void> | null = null;
  * 모든 매장(+ 매장 미선택 전역) 장바구니 수량은 남긴 상품으로 합산하고, 냉장고 배정은 매장별로
  * 남긴 상품 배정이 이미 있으면 중복 배정을 버린다.
  */
-/** 장바구니(모든 매장)·냉장고 진열·구역 구분선이 가리키는 상품 id — 서버에 꼭 있어야 하는 상품 */
+// ---------- 공용 목록 사본(pub…) 서버 올리기 ----------
+// 손대지 않은 공용 사본은 서버에 안 올리지만, 진열·장바구니에 쓰이거나 사용자가 고친 사본은 꼭 올려야
+// 재설치·다른 기기·팀원이 볼 수 있다. 쓰는 순간 바로 올리고, 실패해도 다음 동기화가 다시 올린다.
+
+/** 사용자가 고친 공용 사본 id — 오프라인이라 저장 때 못 올렸어도 다음 동기화가 올리게 기억한다 */
+const PUB_KEEP_KEY = 'orderPubKeep:v1';
+
+async function getPubKeepIds(): Promise<string[]> {
+  try {
+    const raw = await AsyncStorage.getItem(PUB_KEEP_KEY);
+    return raw ? (JSON.parse(raw) as string[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+async function addPubKeepId(id: string): Promise<void> {
+  const ids = await getPubKeepIds();
+  if (!ids.includes(id)) await AsyncStorage.setItem(PUB_KEEP_KEY, JSON.stringify([...ids, id]));
+}
+
+/** 이번 실행에서 서버에 있다고 확인했거나 올린 공용 사본 — 장바구니 +/− 때마다 다시 올리지 않게 */
+const pubOnServer = new Set<string>();
+
+/** 진열·장바구니에 쓰인 공용 사본을 지금 바로 올린다(다음 동기화까지 기다리면 그 사이 재설치 시 진열이 빈다) */
+async function pushPubCopiesNow(ids: string[]): Promise<void> {
+  const want = new Set(ids.filter((id) => id.startsWith(PUBLIC_ID_PREFIX) && !pubOnServer.has(id)));
+  if (want.size === 0) return;
+  const list = (await listOrderProducts()).filter((p) => want.has(p.id));
+  await pushOrderProducts(list);
+  for (const p of list) pubOnServer.add(p.id);
+}
+
+/** 장바구니(모든 매장)·냉장고 진열·구역 구분선이 가리키는 상품, 사용자가 고친 공용 사본 — 서버에 꼭 있어야 하는 상품 */
 async function referencedOrderProductIds(): Promise<Set<string>> {
-  const ids = new Set<string>();
+  const ids = new Set<string>(await getPubKeepIds());
   const stores = await listStores();
   for (const key of [CART_KEY, ...stores.map((s) => `orderCart:${s.id}`)]) {
     const raw = await AsyncStorage.getItem(key);
-    if (raw) for (const id of Object.keys(JSON.parse(raw) as OrderCart)) ids.add(id);
+    if (!raw) continue;
+    // 깨진 장바구니 값 하나 때문에 상품 올리기 전체가 멈추지 않게 그 값만 건너뛴다
+    try {
+      for (const id of Object.keys(JSON.parse(raw) as OrderCart)) ids.add(id);
+    } catch {
+      // 건너뜀
+    }
   }
   for (const store of stores) {
     for (const a of await listFridgeAssignments(store.id)) ids.add(a.productId);

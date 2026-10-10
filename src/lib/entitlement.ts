@@ -70,6 +70,10 @@ export async function refreshEntitlement(): Promise<Entitlement> {
   return current();
 }
 
+/** 폰에 저장된 권한을 읽었는가 — 읽기 전엔 무료로 보이니 광고처럼 유료 사용자에게 깜빡이면 안 되는 곳은 기다린다 */
+export const isEntitlementLoaded = (): boolean => row !== undefined;
+export const whenEntitlementLoaded = (): Promise<void> => load();
+
 /** 로그아웃하면 다른 계정이 이전 권한을 물려받지 않게 비운다. */
 export function clearEntitlement(): Promise<void> {
   return store(null);
@@ -114,11 +118,16 @@ export async function getMonthlyUsage(kind: MonthlyKind): Promise<number> {
 
 /** 1회 사용 기록. 무료 한도가 있으면 남은 횟수 안내창을 띄운다(유료·스위치 꺼짐이면 조용히) */
 export async function bumpMonthlyUsage(kind: MonthlyKind): Promise<void> {
-  await load();
   const used = (await getMonthlyUsage(kind)) + 1;
   await AsyncStorage.setItem(usageKey(kind), String(used));
-  const left = monthlyRemaining(used, current().retailPremium, config);
-  if (left !== null) showMonthlyUsageNotice(kind, left);
+  // 안내창은 부가 기능 — 여기서 실패해도 이미 끝난 공유·저장을 "실패"로 보이게 하지 않는다
+  try {
+    await load();
+    const left = monthlyRemaining(used, current().retailPremium, config);
+    if (left !== null) showMonthlyUsageNotice(kind, left);
+  } catch {
+    // 무시
+  }
 }
 
 const KIND_NAME: Record<MonthlyKind, string> = { order: '발주서 공유', priceTag: '가격표 저장·공유' };
@@ -130,11 +139,13 @@ function showMonthlyUsageNotice(kind: MonthlyKind, left: number) {
       ? `이번 달 무료 ${KIND_NAME[kind]} ${total}회 중 1회를 썼어요.\n남은 횟수: ${left}회`
       : `이번 달 무료 ${KIND_NAME[kind]} ${total}회를 모두 썼어요.\n다음 달 1일에 다시 ${total}회가 생겨요.`;
   const ok = { text: '확인' };
-  // 거의 다 썼을 때만 유료 안내 버튼 — 매번 권하면 귀찮다
+  // 거의 다 썼을 때만 유료 안내 버튼 — 매번 권하면 귀찮다. 가격표 화면은 전체 화면 창(Modal) 위라
+  // 유료 안내 화면으로 넘어가도 가려져 보이지 않아 버튼을 두지 않는다(다 쓰면 다음 시도 때 안내로 넘어감)
+  const upsell = left <= 1 && kind !== 'priceTag';
   Alert.alert(
     left > 0 ? `${KIND_NAME[kind]} 1회 사용` : '무료 횟수를 모두 썼어요',
     body,
-    left <= 1 ? [ok, { text: '무제한으로 쓰기', onPress: () => router.push(`/premium?reason=${kind}`) }] : [ok],
+    upsell ? [ok, { text: '무제한으로 쓰기', onPress: () => router.push(`/premium?reason=${kind}`) }] : [ok],
   );
 }
 
