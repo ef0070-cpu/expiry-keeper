@@ -6,8 +6,8 @@ import { shouldShowInterstitial } from './interstitial-rule';
 
 // 가정용 전면 광고 — 상품 저장 직후에만, 하루 1회, 설치 3일 뒤부터, 광고 제거 구매자 제외(docs/monetization.md 1-2).
 // 닫으면 "광고 없이 쓰기" 안내로 평생 결제(광고 제거)를 권한다.
-// 실제 광고 단위 ID는 애드몹에서 만들어 받으면 넣는다 — 비어 있으면 스토어 앱에선 띄우지 않는다.
-const INTERSTITIAL_UNIT_ID = '';
+// 애드몹 광고 단위 save_interstitial(2026-10-10 생성). 개발 중(__DEV__)엔 구글 테스트 광고만 쓴다.
+const INTERSTITIAL_UNIT_ID = 'ca-app-pub-9764423893666665/5675068238';
 const INSTALLED_KEY = 'installedAt:v1';
 const SHOWN_KEY = 'interstitialShownAt:v1';
 
