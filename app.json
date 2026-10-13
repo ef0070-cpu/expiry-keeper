@@ -59,7 +59,13 @@
           "photosPermission": "상품 사진 선택을 위해 앨범 접근 권한이 필요합니다."
         }
       ],
-      "expo-notifications",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#2E4A62"
+        }
+      ],
       [
         "expo-contacts",
         {
