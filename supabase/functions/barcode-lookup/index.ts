@@ -1,5 +1,6 @@
 import { corsHeaders } from '../_shared/cors.ts';
 import { searchProductImage } from '../_shared/image-search.ts';
+import { rankNaverItems, stripNaverHtml, type NaverShopItem } from '../_shared/naver-pick.ts';
 
 type BarcodeInfo = { name: string | null; imageUrl: string | null };
 
@@ -48,9 +49,6 @@ async function lookupFoodSafetyKorea(barcode: string): Promise<BarcodeInfo> {
   }
 }
 
-const stripNaverHtml = (s: string) =>
-  s.replace(/<[^>]+>/g, '').replace(/&quot;/g, '"').replace(/&amp;/g, '&').trim();
-
 // ponytail: 식품안전나라 C005는 2018년 이후 유통물류진흥원 쪽 데이터가 유료화되면서
 // 갱신이 끊긴 상태라 최근 출시/리뉴얼된 국내 상품은 못 찾는 경우가 많다. 네이버쇼핑은
 // 실시간으로 갱신되는 판매 데이터라 바코드 숫자를 검색어로 넣으면 최신 국내 상품도
@@ -61,7 +59,7 @@ async function lookupNaverShopping(barcode: string): Promise<BarcodeInfo> {
   if (!clientId || !clientSecret) return { name: null, imageUrl: null };
   try {
     const res = await fetch(
-      `https://openapi.naver.com/v1/search/shop.json?query=${encodeURIComponent(barcode)}&display=5`,
+      `https://openapi.naver.com/v1/search/shop.json?query=${encodeURIComponent(barcode)}&display=10`,
       {
         headers: { 'X-Naver-Client-Id': clientId, 'X-Naver-Client-Secret': clientSecret },
         signal: AbortSignal.timeout(LOOKUP_TIMEOUT_MS),
@@ -69,8 +67,9 @@ async function lookupNaverShopping(barcode: string): Promise<BarcodeInfo> {
     );
     if (!res.ok) return { name: null, imageUrl: null };
     const json = await res.json();
-    const items: { title?: string; image?: string }[] = json?.items ?? [];
-    const hit = items.find((it) => it.title && containsHangul(stripNaverHtml(it.title)));
+    const items: NaverShopItem[] = json?.items ?? [];
+    // 묶음·박스 판매글보다 단품, 단품보다 네이버 가격비교 대표 사진을 고른다(naver-pick.ts)
+    const hit = rankNaverItems(items)[0];
     if (!hit?.title) return { name: null, imageUrl: null };
     return { name: stripNaverHtml(hit.title), imageUrl: hit.image || null };
   } catch {

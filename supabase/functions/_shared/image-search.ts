@@ -1,3 +1,5 @@
+import { rankNaverItems, type NaverShopItem } from './naver-pick.ts';
+
 // 상품 사진일 가능성이 낮은 출처(블로그·카페·SNS·지도/플레이스 후기 등)는 걸러낸다.
 // (예: "호떡"을 검색하면 호떡집 후기 블로그 사진이 상위로 잡히는 문제)
 const NON_PRODUCT_DOC_HOSTS = [
@@ -83,13 +85,14 @@ export async function searchProductImageCandidates(query: string, limit = 6): Pr
   if (naverId && naverSecret) {
     try {
       const res = await fetch(
-        `https://openapi.naver.com/v1/search/shop.json?query=${encodeURIComponent(query)}&display=${limit}`,
+        `https://openapi.naver.com/v1/search/shop.json?query=${encodeURIComponent(query)}&display=${limit * 2}`,
         { headers: { 'X-Naver-Client-Id': naverId, 'X-Naver-Client-Secret': naverSecret } },
       );
       if (res.ok) {
         const json = await res.json();
-        const items: { image?: string }[] = json?.items ?? [];
-        const urls = items.map((it) => it.image).filter((u): u is string => !!u);
+        const items: NaverShopItem[] = json?.items ?? [];
+        // 두 배로 받아 묶음·중고 판매글을 뒤로 미루고 앞쪽 후보만 보여 준다(naver-pick.ts)
+        const urls = rankNaverItems(items).map((it) => it.image!);
         if (urls.length > 0) return urls.slice(0, limit);
       }
     } catch {
