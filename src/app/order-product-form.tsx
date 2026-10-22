@@ -18,6 +18,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import CandidatesModal from '@/components/CandidatesModal';
 import PhotoSourceSheet from '@/components/PhotoSourceSheet';
+import PhotoCaptureSheet from '@/components/PhotoCaptureSheet';
 import Chip from '@/components/Chip';
 import { hasImageSearchKeys, lookupBarcode, useBarcodeAutoFill } from '@/lib/barcode-lookup';
 import { deleteLocalPhotoIfOwned, persistLocalPhoto } from '@/lib/local-photo';
@@ -55,10 +56,13 @@ export default function OrderProductForm() {
 
   const [name, setName] = useState(params.prefillName ?? '');
   const [imageUri, setImageUri] = useState<string | null>(params.prefillImage || null);
+  // 찾은 사진이 없으면 사진 직접 등록 창을 바로 띄운다
+  const [showCapture, setShowCapture] = useState(false);
   // 스캔 직후 넘어왔으면 상품명·사진을 뒤에서 찾아 빈칸만 채운다(이미 입력했으면 그대로)
   const lookingUp = useBarcodeAutoFill(params.barcode, params.lookup === '1', (info) => {
     if (info.name) setName((prev) => prev || info.name!);
     if (info.imageUrl) setImageUri((prev) => prev ?? info.imageUrl);
+    else if (!imageUri) setShowCapture(true);
   });
   const [brand, setBrand] = useState('');
   const [price, setPrice] = useState('');
@@ -244,11 +248,13 @@ export default function OrderProductForm() {
     const info = await lookupBarcode(v, brand.trim() || undefined);
     setCheckingBarcode(false);
     if (!info.name && !info.imageUrl) {
-      Alert.alert('조회 결과 없음', '일치하는 정보를 찾지 못했습니다. 직접 입력해 주세요.');
+      if (!imageUri) setShowCapture(true);
+      else Alert.alert('조회 결과 없음', '일치하는 정보를 찾지 못했습니다. 직접 입력해 주세요.');
       return;
     }
     if (info.name && !name.trim()) setName(info.name);
     if (info.imageUrl && !imageUri) setImageUri(info.imageUrl);
+    else if (!info.imageUrl && !imageUri) setShowCapture(true);
   };
 
   const addCategory = async () => {
@@ -375,6 +381,15 @@ export default function OrderProductForm() {
       className="flex-1"
     >
       <Stack.Screen options={{ title: isEdit ? '발주 상품 수정' : '발주 상품 등록' }} />
+      <PhotoCaptureSheet
+        visible={showCapture && !!barcode.trim()}
+        barcode={barcode.trim()}
+        onClose={() => setShowCapture(false)}
+        onDone={(uri) => {
+          setShowCapture(false);
+          setImageUri(uri);
+        }}
+      />
       <PhotoSourceSheet
         visible={photoSource !== null}
         title={photoSource === 'report' ? '신고 사진' : '상품 사진'}

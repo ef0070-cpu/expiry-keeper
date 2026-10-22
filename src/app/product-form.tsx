@@ -22,6 +22,7 @@ import {
 import CandidatesModal from '@/components/CandidatesModal';
 import ExpiryLiveScanModal from '@/components/ExpiryLiveScanModal';
 import PhotoSourceSheet from '@/components/PhotoSourceSheet';
+import PhotoCaptureSheet from '@/components/PhotoCaptureSheet';
 import { extractDateCandidates, dateOrderFromBarcode } from '@/lib/date-ocr';
 import { errorMessage } from '@/lib/errors';
 import { getMfgPeriod, saveMfgPeriod } from '@/lib/mfg-period';
@@ -103,10 +104,13 @@ export default function ProductForm() {
   // 새 상품에서 바코드를 고치면 그 번호로 다시 찾는다(화면을 새로 열지 않아 날짜·수량·메모는 그대로)
   const [lookupBarcodeNo, setLookupBarcodeNo] = useState(params.barcode);
   const autoFilled = useRef<{ name?: string; image?: string }>({});
+  // 찾은 사진이 없으면 사진 직접 등록 창을 바로 띄운다
+  const [showCapture, setShowCapture] = useState(false);
   const lookingUp = useBarcodeAutoFill(lookupBarcodeNo, params.lookup === '1' || lookupBarcodeNo !== params.barcode, (info) => {
     autoFilled.current = { name: info.name ?? undefined, image: info.imageUrl ?? undefined };
     if (info.name) setName((prev) => prev || info.name!);
     if (info.imageUrl) setImageUri((prev) => prev ?? info.imageUrl);
+    else if (!imageUri) setShowCapture(true);
   });
   // 새 상품이면 현재 연도를 미리 채워 월·일만 입력하면 되게 한다
   const [expiryDate, setExpiryDate] = useState(params.id ? '' : String(new Date().getFullYear()));
@@ -567,6 +571,15 @@ export default function ProductForm() {
       className="flex-1"
     >
       <Stack.Screen options={{ title: isEdit ? '상품 수정' : '상품 등록' }} />
+      <PhotoCaptureSheet
+        visible={showCapture && !!lookupBarcodeNo}
+        barcode={lookupBarcodeNo ?? ''}
+        onClose={() => setShowCapture(false)}
+        onDone={(uri) => {
+          setShowCapture(false);
+          setImageUri(uri);
+        }}
+      />
       <PhotoSourceSheet
         visible={showPhotoSource}
         title="상품 사진"

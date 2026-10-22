@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import { uploadPhotoToBucket } from './storage';
 import type { OrderProduct } from './order-types';
+import { isPhotoPrivate } from './photo-privacy';
 
 /** 신고/제안 첨부 사진을 Storage에 올리고 공개 URL을 돌려준다. 실패하면 null. */
 function uploadReportPhoto(uri: string): Promise<string | null> {
@@ -157,7 +158,8 @@ export async function submitNewOrderProduct(product: OrderProduct): Promise<void
  * 원본 경로 대신 이 값으로 자기 기록을 맞출 수 있도록 한다(로컬 파일 경로와 실제 저장된 URL이
  * 달라 나중에 삭제 매칭이 안 되는 문제 방지). */
 export async function submitPhotoCandidate(barcode: string, photoUri: string): Promise<string | null> {
-  if (!supabase) return null;
+  // 사진 직접 등록에서 공유 동의를 끈 바코드는 내 매장에서만 쓴다
+  if (!supabase || (await isPhotoPrivate(barcode))) return null;
   try {
     const photoUrl = await uploadReportPhoto(photoUri);
     if (!photoUrl) return null;
