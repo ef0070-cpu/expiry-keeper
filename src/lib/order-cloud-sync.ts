@@ -1,6 +1,6 @@
 import { fetchAll } from './paged';
 import { supabase } from './supabase';
-import type { FridgeAssignment, FridgeSection, OrderCart, OrderProduct, Store } from './order-types';
+import type { FridgeAssignment, FridgeLayoutSettings, FridgeSection, OrderCart, OrderProduct, Store } from './order-types';
 
 // ---------- 매장 ----------
 
@@ -31,6 +31,9 @@ type StoreLayoutPartial = Partial<{
   sections: FridgeSection[];
   dividers: Record<string, string[]>;
   assignments: FridgeAssignment[];
+  // migration-fridge-layout-settings.sql 이후 칸. 이 칸이 없는 서버에 섞어 보내면 업로드 전체가 실패하므로
+  // 반드시 settings만 따로 보낸다(order-repo.ts writeFridgeLayoutSettings).
+  settings: FridgeLayoutSettings;
 }>;
 
 export async function pushStoreLayoutPart(storeId: string, partial: StoreLayoutPartial): Promise<void> {
@@ -48,17 +51,19 @@ export type StoreLayout = {
   sections: FridgeSection[];
   dividers: Record<string, string[]>;
   assignments: FridgeAssignment[];
+  settings?: Partial<FridgeLayoutSettings> | null;
+  updated_at?: string | null;
 };
 
 export async function fetchStoreLayout(storeId: string): Promise<StoreLayout | null> {
   if (!supabase) return null;
-  const { data, error } = await supabase
-    .from('order_store_layout')
-    .select('sections, dividers, assignments')
-    .eq('store_id', storeId)
-    .maybeSingle();
-  if (error || !data) return null;
-  return data as StoreLayout;
+  const query = (cols: string) =>
+    supabase!.from('order_store_layout').select(cols).eq('store_id', storeId).maybeSingle();
+  let res = await query('sections, dividers, assignments, settings, updated_at');
+  // settings 칸을 아직 안 만든 서버(SQL 미실행)면 그 칸 없이 다시 — 배치 받아오기 자체가 막히지 않게
+  if (res.error) res = await query('sections, dividers, assignments, updated_at');
+  if (res.error || !res.data) return null;
+  return res.data as unknown as StoreLayout;
 }
 
 // ---------- 매장별 장바구니 ----------

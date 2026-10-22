@@ -35,7 +35,8 @@ import {
   pushStoreLayoutPart,
 } from './order-cloud-sync';
 import { mergeRemoteOrderProducts, needsCloudCopy, planBarcodeDedupe } from './order-dedupe';
-import { FridgeAssignment, FridgeSection, OrderCart, OrderProduct, Store } from './order-types';
+import { FridgeAssignment, FridgeLayoutSettings, FridgeSection, OrderCart, OrderProduct, Store } from './order-types';
+import { FridgeBackground, FridgeColumns, TileSpan, normalizeColumns, normalizeSpan } from './fridge-layout';
 import { DEFAULT_ORDER_PRODUCTS } from './order-seed-data';
 
 export { newId };
@@ -50,6 +51,7 @@ const BRAND_OVERRIDE_KEY = 'orderBrandOverrides:v1';
 const NAME_OVERRIDE_KEY = 'orderNameOverrides:v1';
 const CATALOG_REFERENCE_PRICE_KEY = 'orderCatalogReferencePrice:v1';
 const CATALOG_UPDATE_BADGE_KEY = 'orderCatalogUpdateBadges:v1';
+const TILE_COLOR_KEY = 'orderTileColors:v1';
 const STORES_KEY = 'stores:v1';
 const ACTIVE_STORE_KEY = 'activeStoreId:v1';
 
@@ -163,6 +165,22 @@ export async function saveOrderProduct(rawP: OrderProduct): Promise<OrderProduct
   if (p.id.startsWith(PUBLIC_ID_PREFIX)) await addPubKeepId(p.id).catch(() => {});
   pushOrderProduct(p).catch(() => {});
   return p;
+}
+
+/** 상품 id → 빠른발주 카드에 사장님이 직접 고른 색(#RRGGBB). 없으면 이름으로 정한 자동 색(tile-color.ts).
+ * ponytail: 이 기기에만 저장 — 팀원 기기와 색을 맞춰야 하면 order_products에 칸을 추가해 동기화. */
+export async function getTileColors(): Promise<Record<string, string>> {
+  const raw = await AsyncStorage.getItem(TILE_COLOR_KEY);
+  return raw ? (JSON.parse(raw) as Record<string, string>) : {};
+}
+
+/** color가 null이면 자동 색으로 되돌린다 */
+export async function setTileColor(productId: string, color: string | null): Promise<Record<string, string>> {
+  const colors = await getTileColors();
+  if (color) colors[productId] = color;
+  else delete colors[productId];
+  await AsyncStorage.setItem(TILE_COLOR_KEY, JSON.stringify(colors));
+  return colors;
 }
 
 export async function getRemovedBarcodes(): Promise<Set<string>> {
@@ -484,7 +502,59 @@ export async function listFridgeSections(storeId: string): Promise<FridgeSection
 
 async function writeFridgeSections(storeId: string, sections: FridgeSection[]): Promise<void> {
   await AsyncStorage.setItem(fridgeSectionsKey(storeId), JSON.stringify(sections));
+  await touchFridgeLayout(storeId);
   pushStoreLayoutPart(storeId, { sections }).catch(() => {});
+}
+
+// ---------- 매장별 배치 시각(팀원 기기와 맞추기) ----------
+// 이 기기에서 배치를 마지막으로 바꾼 시각. 서버(order_store_layout.updated_at)가 이보다 새로우면
+// 팀원이 바꾼 것이므로 받아온다(pullStoreLayout). 예전엔 이 기기에 배치가 없을 때만 받아와
+// 팀원이 바꾼 진열이 다른 기기에 반영되지 않았다.
+// ponytail: 기기 시계 기준 마지막에 쓴 쪽이 이김 — 두 사람이 동시에 다른 구역을 고치면 한쪽이 덮인다.
+function fridgeLayoutAtKey(storeId: string): string {
+  return `fridgeLayoutAt:${storeId}`;
+}
+
+async function touchFridgeLayout(storeId: string, at = new Date().toISOString()): Promise<void> {
+  await AsyncStorage.setItem(fridgeLayoutAtKey(storeId), at);
+}
+
+// ---------- 매장별 빠른발주 설정(구역 열 수·냉동고 배경) ----------
+
+function fridgeLayoutSettingsKey(storeId: string): string {
+  return `fridgeLayoutSettings:${storeId}`;
+}
+
+function normalizeLayoutSettings(raw: Partial<FridgeLayoutSettings> | null | undefined): FridgeLayoutSettings {
+  const columns: Record<string, FridgeColumns> = {};
+  for (const [section, v] of Object.entries(raw?.columns ?? {})) columns[section] = normalizeColumns(v);
+  const bg = raw?.background;
+  return { columns, background: bg === 'chest' || bg === 'case' || bg === 'none' ? bg : 'none' };
+}
+
+export async function getFridgeLayoutSettings(storeId: string): Promise<FridgeLayoutSettings> {
+  const raw = await AsyncStorage.getItem(fridgeLayoutSettingsKey(storeId));
+  return normalizeLayoutSettings(raw ? (JSON.parse(raw) as Partial<FridgeLayoutSettings>) : null);
+}
+
+async function writeFridgeLayoutSettings(storeId: string, settings: FridgeLayoutSettings): Promise<void> {
+  await AsyncStorage.setItem(fridgeLayoutSettingsKey(storeId), JSON.stringify(settings));
+  await touchFridgeLayout(storeId);
+  // settings 칸이 없는 서버(SQL 미실행)에서도 다른 배치 업로드가 막히지 않게 따로 보낸다
+  pushStoreLayoutPart(storeId, { settings }).catch(() => {});
+}
+
+export async function setFridgeColumns(storeId: string, section: FridgeSection, cols: FridgeColumns): Promise<FridgeLayoutSettings> {
+  const s = await getFridgeLayoutSettings(storeId);
+  const next = { ...s, columns: { ...s.columns, [section]: cols } };
+  await writeFridgeLayoutSettings(storeId, next);
+  return next;
+}
+
+export async function setFridgeBackground(storeId: string, background: FridgeBackground): Promise<FridgeLayoutSettings> {
+  const next = { ...(await getFridgeLayoutSettings(storeId)), background };
+  await writeFridgeLayoutSettings(storeId, next);
+  return next;
 }
 
 export async function addFridgeSection(storeId: string, name: string): Promise<FridgeSection[]> {
@@ -580,6 +650,7 @@ export async function listFridgeSectionDividers(storeId: string): Promise<Record
 
 async function writeFridgeSectionDividers(storeId: string, map: Record<string, string[]>): Promise<void> {
   await AsyncStorage.setItem(fridgeSectionDividersKey(storeId), JSON.stringify(map));
+  await touchFridgeLayout(storeId);
   pushStoreLayoutPart(storeId, { dividers: map }).catch(() => {});
 }
 
@@ -611,6 +682,7 @@ export async function listFridgeAssignments(storeId: string): Promise<FridgeAssi
 
 async function writeFridgeAssignments(storeId: string, list: FridgeAssignment[]): Promise<void> {
   await AsyncStorage.setItem(fridgeAssignmentsKey(storeId), JSON.stringify(list));
+  await touchFridgeLayout(storeId);
   pushStoreLayoutPart(storeId, { assignments: list }).catch(() => {});
   pushPubCopiesNow(list.map((a) => a.productId)).catch(() => {});
 }
@@ -656,8 +728,30 @@ export async function reorderFridgeAssignments(
 ): Promise<FridgeAssignment[]> {
   const list = await listFridgeAssignments(storeId);
   const others = list.filter((a) => a.section !== section);
-  const reordered = orderedProductIds.map((productId) => ({ productId, section }));
+  // 칸 크기(span)는 순서를 바꿔도 그대로 따라간다
+  const spanOf = new Map(list.filter((a) => a.section === section).map((a) => [a.productId, a.span]));
+  const reordered = orderedProductIds.map((productId) => {
+    const span = spanOf.get(productId);
+    return span && span !== 1 ? { productId, section, span } : { productId, section };
+  });
   const next = [...others, ...reordered];
+  await writeFridgeAssignments(storeId, next);
+  return next;
+}
+
+/** 배치 편집 [완료]: 이 구역의 상품·빈칸 순서와 칸 크기를 통째로 저장한다(다른 구역은 그대로). 팀원 기기로도 올라간다. */
+export async function saveFridgeSectionLayout(
+  storeId: string,
+  section: FridgeSection,
+  items: { productId: string; span?: TileSpan }[],
+): Promise<FridgeAssignment[]> {
+  const list = await listFridgeAssignments(storeId);
+  const others = list.filter((a) => a.section !== section);
+  const mine = items.map(({ productId, span }) => {
+    const s = normalizeSpan(span);
+    return s === 1 ? { productId, section } : { productId, section, span: s };
+  });
+  const next = [...others, ...mine];
   await writeFridgeAssignments(storeId, next);
   return next;
 }
@@ -842,27 +936,34 @@ function addCatalogUpdateBadges(entries: [string, CatalogUpdateBadge][]): Promis
 
 // ---------- 매장/레이아웃/장바구니/발주상품 클라우드 동기화 ----------
 
-/** 이 매장의 레이아웃(구역/구분선/배정)을 클라우드에서 당겨온다. 세 로컬 키 중 하나라도 이미
- * 이 기기에 쓰인 적 있으면(재설치 직후가 아니라면 거의 항상 그렇다) 건드리지 않는다 — 매
- * 수정마다 이미 push가 따라붙으므로 로컬이 서버보다 뒤처질 일이 없다. */
-async function pullStoreLayoutIfLocalEmpty(storeId: string): Promise<void> {
-  const [sectionsRaw, dividersRaw, assignmentsRaw] = await Promise.all([
+/** 이 매장의 레이아웃(구역/구분선/배정/열 수·배경)을 클라우드에서 당겨온다.
+ * 이 기기에 없는 칸은 채우고, 서버가 이 기기보다 나중에 바뀌었으면(팀원이 진열을 고침) 통째로 받아온다.
+ * 예전엔 로컬이 비어 있을 때만 받아와 팀원이 바꾼 배치가 반영되지 않았다(2026-10-22). */
+async function pullStoreLayout(storeId: string): Promise<void> {
+  const [sectionsRaw, dividersRaw, assignmentsRaw, settingsRaw, localAt] = await Promise.all([
     AsyncStorage.getItem(fridgeSectionsKey(storeId)),
     AsyncStorage.getItem(fridgeSectionDividersKey(storeId)),
     AsyncStorage.getItem(fridgeAssignmentsKey(storeId)),
+    AsyncStorage.getItem(fridgeLayoutSettingsKey(storeId)),
+    AsyncStorage.getItem(fridgeLayoutAtKey(storeId)),
   ]);
-  if (sectionsRaw !== null && dividersRaw !== null && assignmentsRaw !== null) return;
   const layout = await fetchStoreLayout(storeId);
   if (!layout) return;
-  if (sectionsRaw === null) {
+  const serverNewer = !!layout.updated_at && (!localAt || layout.updated_at > localAt);
+  if (sectionsRaw === null || serverNewer) {
     await AsyncStorage.setItem(fridgeSectionsKey(storeId), JSON.stringify(layout.sections));
   }
-  if (dividersRaw === null) {
+  if (dividersRaw === null || serverNewer) {
     await AsyncStorage.setItem(fridgeSectionDividersKey(storeId), JSON.stringify(layout.dividers));
   }
-  if (assignmentsRaw === null) {
+  if (assignmentsRaw === null || serverNewer) {
     await AsyncStorage.setItem(fridgeAssignmentsKey(storeId), JSON.stringify(layout.assignments));
   }
+  // settings 칸이 없는 서버면 layout.settings가 undefined — 이 기기 설정을 그대로 둔다
+  if (layout.settings && (settingsRaw === null || serverNewer)) {
+    await AsyncStorage.setItem(fridgeLayoutSettingsKey(storeId), JSON.stringify(normalizeLayoutSettings(layout.settings)));
+  }
+  if (serverNewer && layout.updated_at) await touchFridgeLayout(storeId, layout.updated_at);
 }
 
 /** 이 매장의 장바구니를 클라우드에서 당겨온다. 로컬에 이미 있으면 건드리지 않는다. */
@@ -919,7 +1020,7 @@ export async function syncOrderStores(): Promise<void> {
 
     const allStoreIds = new Set([...localStoreIds, ...remoteStoreIds]);
     for (const storeId of allStoreIds) {
-      await pullStoreLayoutIfLocalEmpty(storeId);
+      await pullStoreLayout(storeId);
       await pullCartIfLocalEmpty(storeId);
     }
 

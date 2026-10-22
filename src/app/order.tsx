@@ -1,4 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useFonts } from 'expo-font';
+import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
@@ -46,8 +48,11 @@ import {
   renameFridgeSection,
   renameOrderCategory,
   renameStore,
-  reorderFridgeAssignments,
   reorderFridgeSections,
+  getFridgeLayoutSettings,
+  setFridgeColumns,
+  setFridgeBackground,
+  saveFridgeSectionLayout,
   saveOrderProduct,
   seedDefaultOrderProducts,
   setActiveStoreId,
@@ -55,8 +60,13 @@ import {
   syncOrderStores,
   toggleFridgeSectionDivider,
   writeOrderCart,
+  getTileColors,
+  setTileColor,
 } from '@/lib/order-repo';
-import { FridgeAssignment, FridgeSection, OrderCart, OrderProduct, OrderStatus, Store } from '@/lib/order-types';
+import { TILE_COLOR_CHOICES, tileColor } from '@/lib/tile-color';
+import FridgeGrid, { FridgeGridItem } from '@/components/FridgeGrid';
+import { DEFAULT_COLUMNS, isSpacerId, normalizeSpan, packRows } from '@/lib/fridge-layout';
+import { FridgeAssignment, FridgeLayoutSettings, FridgeSection, OrderCart, OrderProduct, OrderStatus, Store } from '@/lib/order-types';
 import { buildProductSearchIndex, searchOrderProducts } from '@/lib/order-search';
 import HomeBanner from '@/components/HomeBanner';
 
@@ -89,8 +99,17 @@ export default function Order() {
   const [showFridgeSectionModal, setShowFridgeSectionModal] = useState(false);
   const [showAddToFridge, setShowAddToFridge] = useState(false);
   const [movingProduct, setMovingProduct] = useState<OrderProduct | null>(null);
-  const [pendingMoveTileId, setPendingMoveTileId] = useState<string | null>(null);
   const [settingsProduct, setSettingsProduct] = useState<OrderProduct | null>(null);
+  // 빠른발주 텍스트 카드: 빨간 숫자를 누르면 여는 수량 조절 창, 사장님이 고른 카드 색, 카드 글꼴(도현체, OFL)
+  const [qtyProduct, setQtyProduct] = useState<OrderProduct | null>(null);
+  // 매장별 빠른발주 설정(구역 열 수·냉동고 배경)과 배치 편집 모드
+  const [layoutSettings, setLayoutSettings] = useState<FridgeLayoutSettings>({ columns: {}, background: 'none' });
+  const [layoutEditing, setLayoutEditing] = useState(false);
+  const [tileColors, setTileColors] = useState<Record<string, string>>({});
+  const [tileFontLoaded] = useFonts({ DoHyeon: require('../../assets/fonts/DoHyeon-Regular.ttf') });
+  useEffect(() => {
+    getTileColors().then(setTileColors).catch(() => {});
+  }, []);
   const [fridgeSearchQuery, setFridgeSearchQuery] = useState('');
   const [query, setQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('전체');
@@ -146,6 +165,7 @@ export default function Order() {
     setFridgeAssignments(assignments);
     setFridgeSections(sections);
     setFridgeSectionDividersState(sectionDividers);
+    setLayoutSettings(activeId ? await getFridgeLayoutSettings(activeId) : { columns: {}, background: 'none' });
     // 현재 선택된 구역이 삭제/이름변경 등으로 더는 목록에 없으면 첫 구역으로 되돌린다.
     setActiveSection((prev) => (sections.includes(prev) ? prev : (sections[0] ?? '')));
   }, []);
@@ -343,12 +363,20 @@ export default function Order() {
   // 자동 숨김 — 다시 active로 바꾸면 배정 정보가 남아 있어 별도 조작 없이 재노출됨).
   // fridgeAssignments 배열의 저장 순서를 그대로 표시 순서로 쓴다 — 드래그로 정렬한 순서가
   // 실제로 보이려면 products 배열 순서가 아니라 이 배열 순서를 따라야 한다.
-  const fridgeProducts = useMemo(() => {
+  // 빈칸('spacer:…')은 상품 대신 자리만 차지하는 항목, span은 카드가 차지하는 칸(2026-10-22 배치 편집)
+  const fridgeItems = useMemo<FridgeGridItem[]>(() => {
     const productById = new Map(products.map((p) => [p.id, p]));
-    return fridgeAssignments
-      .filter((a) => a.section === activeSection)
-      .map((a) => productById.get(a.productId))
-      .filter((p): p is OrderProduct => !!p && (p.status ?? 'active') === 'active');
+    const out: FridgeGridItem[] = [];
+    for (const a of fridgeAssignments) {
+      if (a.section !== activeSection) continue;
+      if (isSpacerId(a.productId)) {
+        out.push({ id: a.productId, product: null, span: normalizeSpan(a.span) });
+        continue;
+      }
+      const p = productById.get(a.productId);
+      if (p && (p.status ?? 'active') === 'active') out.push({ id: p.id, product: p, span: normalizeSpan(a.span) });
+    }
+    return out;
   }, [products, fridgeAssignments, activeSection]);
 
   const fridgeSectionByProductId = useMemo(
@@ -356,12 +384,7 @@ export default function Order() {
     [fridgeAssignments],
   );
 
-  const activeColumns = 3;
-  // JS에서 픽셀을 직접 계산하는 방식은 기기별 실측 오차로 카드 크기가 어긋나는 문제가 있었다.
-  // 대신 3칸 기준 고정 퍼센트 너비(FridgeTile의 width)를 줘서, 마지막 줄에 항목이 3개보다
-  // 적게 남아도(예: 1개) 항상 같은 크기로 보이게 한다. -2는 tile 사이 gap(10px)이 들어갈
-  // 자리를 남기기 위한 여유분.
-  const tileMaxWidthPercent: `${number}%` = `${Math.max(14, Math.floor(100 / activeColumns) - 2)}%`;
+  const activeColumns = layoutSettings.columns[activeSection] ?? DEFAULT_COLUMNS;
 
   const activeDividerIds = useMemo(
     () => new Set(fridgeSectionDividers[activeSection] ?? []),
@@ -373,35 +396,14 @@ export default function Order() {
   // 구분선(줄 중간에서 끊김)은 지원하지 않는다(ponytail: 줄 단위 스냅, 필요해지면 상품 단위로 확장).
   const getRowLastProductId = useCallback(
     (productId: string) => {
-      const idx = fridgeProducts.findIndex((p) => p.id === productId);
+      // 칸 크기가 섞여도 화면과 같은 줄 나누기(packRows)로 "그 줄의 마지막 항목"을 찾는다
+      const idx = fridgeItems.findIndex((i) => i.id === productId);
       if (idx < 0) return productId;
-      const rowEndIdx = Math.min(
-        Math.floor(idx / activeColumns) * activeColumns + activeColumns - 1,
-        fridgeProducts.length - 1,
-      );
-      return fridgeProducts[rowEndIdx].id;
+      const row = packRows(fridgeItems.map((i) => i.span), activeColumns).find((r) => r.some((c) => c.index === idx));
+      return row ? fridgeItems[row[row.length - 1].index].id : productId;
     },
-    [fridgeProducts, activeColumns],
+    [fridgeItems, activeColumns],
   );
-
-  type FridgeGridRow =
-    | { type: 'products'; key: string; items: OrderProduct[] }
-    | { type: 'divider'; key: string };
-
-  // FlatList의 numColumns는 줄 전체 너비로 그려야 하는 구분선을 셀 단위로만 꾸밀 수 있어 표현이
-  // 불가능해서, 직접 줄 단위로 나눠 구분선 줄을 끼워넣는 방식으로 그린다.
-  const fridgeGridRows = useMemo(() => {
-    const rows: FridgeGridRow[] = [];
-    for (let i = 0; i < fridgeProducts.length; i += activeColumns) {
-      const items = fridgeProducts.slice(i, i + activeColumns);
-      rows.push({ type: 'products', key: `row-${items[0].id}`, items });
-      const rowLast = items[items.length - 1];
-      if (activeDividerIds.has(rowLast.id)) {
-        rows.push({ type: 'divider', key: `divider-${rowLast.id}` });
-      }
-    }
-    return rows;
-  }, [fridgeProducts, activeColumns, activeDividerIds]);
 
   // 연달아 여러 상품을 추가할 수 있도록 추가해도 모달을 닫지 않는다 — 검색어만 비워서
   // 바로 다음 상품을 검색할 수 있게 한다. 닫기는 모달의 X 버튼으로 직접 눌러야 한다.
@@ -442,23 +444,6 @@ export default function Order() {
     [activeStoreId, activeSection, fridgeSectionByProductId, products],
   );
 
-  // 낙관적 업데이트: 로컬 state를 먼저 갱신하고 저장은 fire-and-forget —
-  // 저장 완료를 기다렸다가 state를 갱신하면, 화살표를 빠르게 연달아 누를 때 두 번째
-  // 탭이 아직 반영 전인 stale한 순서를 기준으로 계산해 순서가 꼬일 수 있었다.
-  const onReorderFridgeProducts = useCallback(
-    (orderedProducts: OrderProduct[]) => {
-      if (!activeStoreId) return;
-      const ids = orderedProducts.map((p) => p.id);
-      setFridgeAssignments((prev) => {
-        const others = prev.filter((a) => a.section !== activeSection);
-        const reordered = ids.map((productId) => ({ productId, section: activeSection }));
-        return [...others, ...reordered];
-      });
-      reorderFridgeAssignments(activeStoreId, activeSection, ids).catch(() => {});
-    },
-    [activeStoreId, activeSection],
-  );
-
   const onReorderFridgeSections = useCallback(
     (sections: FridgeSection[]) => {
       if (!activeStoreId) return;
@@ -467,27 +452,6 @@ export default function Order() {
     },
     [activeStoreId],
   );
-
-  // 드래그가 좁은 화면에서 조작하기 어려워 화살표 방식을 썼었지만, 먼 거리 이동에 탭이 너무 많이
-  // 필요해 불편하다는 피드백으로 탭-투-타겟 방식으로 교체: 이동 아이콘으로 상품 하나를 "대기" 상태로
-  // 두고, 그 다음 탭한 자리로 바로 이동한다(거리와 무관하게 항상 탭 2번). 끼워넣기(사이 항목들이
-  // 밀림)가 아니라 1:1 맞교환 — B를 A 자리로 옮기면 A가 B의 원래 자리로 간다.
-  const onMoveFridgeProductTo = useCallback(
-    (sourceId: string, targetId: string) => {
-      if (sourceId === targetId) return;
-      const sourceIndex = fridgeProducts.findIndex((p) => p.id === sourceId);
-      const targetIndex = fridgeProducts.findIndex((p) => p.id === targetId);
-      if (sourceIndex < 0 || targetIndex < 0) return;
-      const next = [...fridgeProducts];
-      [next[sourceIndex], next[targetIndex]] = [next[targetIndex], next[sourceIndex]];
-      onReorderFridgeProducts(next);
-    },
-    [fridgeProducts, onReorderFridgeProducts],
-  );
-
-  const onToggleTileMove = useCallback((productId: string) => {
-    setPendingMoveTileId((prev) => (prev === productId ? null : productId));
-  }, []);
 
   const totalCount = Object.values(cart).reduce((sum, qty) => sum + qty, 0);
 
@@ -508,19 +472,15 @@ export default function Order() {
 
   const onTileTap = useCallback(
     (product: OrderProduct) => {
-      if (pendingMoveTileId) {
-        if (pendingMoveTileId !== product.id) onMoveFridgeProductTo(pendingMoveTileId, product.id);
-        setPendingMoveTileId(null);
-        return;
-      }
       changeQty(product.id, 1);
+      Haptics.selectionAsync().catch(() => {});
       // 오터치로 잘못 담았을 때 발주 내역까지 가서 찾지 않고 그 자리에서 바로 취소할 수 있도록,
       // 방금 담은 것 하나만 짧게 기억해둔다.
       setLastAdd({ id: product.id, name: product.name });
       if (lastAddTimeoutRef.current) clearTimeout(lastAddTimeoutRef.current);
       lastAddTimeoutRef.current = setTimeout(() => setLastAdd(null), 2500);
     },
-    [pendingMoveTileId, onMoveFridgeProductTo, changeQty],
+    [changeQty],
   );
 
   const undoLastAdd = useCallback(() => {
@@ -717,6 +677,22 @@ export default function Order() {
     },
     [activeStoreId, movingProduct],
   );
+
+  // 배치 편집 [완료]: 이 구역의 순서·칸 크기·빈칸을 저장(order_store_layout으로 팀원 기기에도 동기화)
+  const onSaveFridgeLayout = useCallback(
+    async (items: FridgeGridItem[]) => {
+      if (!activeStoreId) return;
+      setFridgeAssignments(
+        await saveFridgeSectionLayout(activeStoreId, activeSection, items.map((i) => ({ productId: i.id, span: i.span }))),
+      );
+    },
+    [activeStoreId, activeSection],
+  );
+
+  // 구역·매장·화면을 바꾸면 저장하지 않은 편집은 닫는다
+  useEffect(() => {
+    setLayoutEditing(false);
+  }, [activeSection, activeStoreId, mode]);
 
   const onRemoveFridgeTile = useCallback(
     (p: OrderProduct) => {
@@ -922,18 +898,6 @@ export default function Order() {
         >
           <View className="rounded-full bg-ink/80 px-4 py-2">
             <Text className="text-paper text-sm font-medium">{toastMessage}</Text>
-          </View>
-        </View>
-      ) : null}
-
-      {pendingMoveTileId ? (
-        <View
-          pointerEvents="none"
-          className="absolute left-0 right-0 z-20 items-center"
-          style={{ top: insets.top + 76 }}
-        >
-          <View className="rounded-full bg-ink px-4 py-2">
-            <Text className="text-paper text-sm font-medium">옮길 자리를 탭하세요 (취소: 다시 탭)</Text>
           </View>
         </View>
       ) : null}
@@ -1144,13 +1108,16 @@ export default function Order() {
             <>
               <QuickOrderHelpModal visible={showQuickHelp} onClose={() => setShowQuickHelp(false)} />
 
-              <FlatList
-                key={`quick-grid-${activeColumns}`}
-                data={fridgeGridRows}
-                keyExtractor={(row) => row.key}
-                keyboardShouldPersistTaps="handled"
-                ListHeaderComponent={
-                  <>
+              <FridgeGrid
+                items={fridgeItems}
+                cols={activeColumns}
+                background={layoutSettings.background}
+                dividerIds={activeDividerIds}
+                label={`${stores.find((st) => st.id === activeStoreId)?.name ?? '냉동고'} · ${activeSection}`}
+                cart={cart}
+                tileColors={tileColors}
+                fontFamily={tileFontLoaded ? 'DoHyeon' : undefined}
+                header={<>
                     <ScrollView
                       horizontal
                       showsHorizontalScrollIndicator={false}
@@ -1179,31 +1146,7 @@ export default function Order() {
                     </ScrollView>
                   </>
                 }
-                contentContainerStyle={{ padding: 16, paddingBottom: 120 + insets.bottom }}
-                renderItem={({ item: row }) =>
-                  row.type === 'divider' ? (
-                    <View className="mb-3" style={{ height: 4, backgroundColor: '#888888', borderRadius: 2 }} />
-                  ) : (
-                    <View className="flex-row" style={{ gap: 10 }}>
-                      {row.items.map((item) => (
-                        <FridgeTile
-                          key={item.id}
-                          product={item}
-                          qty={cart[item.id] ?? 0}
-                          isPending={pendingMoveTileId === item.id}
-                          maxWidthPercent={tileMaxWidthPercent}
-                          onTap={() => onTileTap(item)}
-                          onOpenSettings={() => setSettingsProduct(item)}
-                          onRemove={() => onRemoveFridgeTile(item)}
-                          onToggleMove={() => onToggleTileMove(item.id)}
-                          onDecrement={() => changeQty(item.id, -1)}
-                        />
-                      ))}
-                    </View>
-                  )
-                }
-                ListEmptyComponent={
-                  syncing ? (
+                empty={syncing ? (
                     <ActivityIndicator color="#CC2222" style={{ marginTop: 32 }} />
                   ) : (
                     <Text className="text-muted mt-8 text-center text-sm">
@@ -1211,6 +1154,24 @@ export default function Order() {
                     </Text>
                   )
                 }
+                bottomPadding={120 + insets.bottom}
+                editing={layoutEditing}
+                onEditingChange={setLayoutEditing}
+                onSave={onSaveFridgeLayout}
+                onChangeColumns={(c) => {
+                  if (!activeStoreId) return;
+                  setLayoutSettings((prev) => ({ ...prev, columns: { ...prev.columns, [activeSection]: c } }));
+                  setFridgeColumns(activeStoreId, activeSection, c).catch(() => {});
+                }}
+                onChangeBackground={(bg) => {
+                  if (!activeStoreId) return;
+                  setLayoutSettings((prev) => ({ ...prev, background: bg }));
+                  setFridgeBackground(activeStoreId, bg).catch(() => {});
+                }}
+                onTap={onTileTap}
+                onOpenSettings={setSettingsProduct}
+                onRemove={onRemoveFridgeTile}
+                onOpenQty={setQtyProduct}
               />
               <AddToFridgeModal
                 visible={showAddToFridge}
@@ -1245,6 +1206,22 @@ export default function Order() {
                 onMove={onMoveSettingsProduct}
                 onToggleDivider={onToggleRowDivider}
                 onClose={() => setSettingsProduct(null)}
+                autoColor={settingsProduct ? tileColor(settingsProduct.name).bg : undefined}
+                pickedColor={settingsProduct ? tileColors[settingsProduct.id] ?? null : null}
+                onPickColor={(color) => {
+                  if (!settingsProduct) return;
+                  setTileColor(settingsProduct.id, color).then(setTileColors).catch(() => {});
+                }}
+              />
+              <QtySheet
+                productName={qtyProduct?.name ?? ''}
+                qty={qtyProduct ? cart[qtyProduct.id] ?? 0 : 0}
+                visible={qtyProduct !== null}
+                onConfirm={(next) => {
+                  if (qtyProduct) changeQty(qtyProduct.id, next - (cart[qtyProduct.id] ?? 0));
+                  setQtyProduct(null);
+                }}
+                onClose={() => setQtyProduct(null)}
               />
             </>
           )}
@@ -1273,107 +1250,6 @@ export default function Order() {
   );
 }
 
-const FridgeTile = memo(function FridgeTile({
-  product,
-  qty,
-  isPending,
-  maxWidthPercent,
-  onTap,
-  onOpenSettings,
-  onRemove,
-  onToggleMove,
-  onDecrement,
-}: {
-  product: OrderProduct;
-  qty: number;
-  isPending: boolean;
-  maxWidthPercent: `${number}%`;
-  onTap: () => void;
-  onOpenSettings: () => void;
-  onRemove: () => void;
-  onToggleMove: () => void;
-  onDecrement: () => void;
-}) {
-  const [showPreview, setShowPreview] = useState(false);
-
-  return (
-    <Pressable
-      onPress={onTap}
-      onLongPress={() => setShowPreview(true)}
-      onPressOut={() => setShowPreview(false)}
-      delayLongPress={300}
-      accessibilityRole="button"
-      accessibilityLabel={isPending ? `${product.name} 이동 취소` : product.name}
-      className="mb-3 items-center rounded-xl border border-line bg-paper p-2 active:opacity-70"
-      // style을 함수(({ pressed }) => ...)로 주면 NativeWind(className)와 섞일 때 함수가 무시돼
-      // 너비·이동 중 강조가 전혀 적용되지 않았다 → 일반 배열로 주고 눌림 표시는 active:로 대신한다.
-      // 고정 width: 3칸이 다 안 찬 줄이나 이름이 긴 상품도 항상 같은 칸 크기(예: 31%)로 맞춘다.
-      style={[
-        { width: maxWidthPercent },
-        isPending ? { borderColor: '#CC2222', borderWidth: 2, backgroundColor: '#FDECEC' } : null,
-      ]}
-    >
-      <Modal visible={showPreview} transparent animationType="fade">
-        <View pointerEvents="none" className="flex-1 items-center justify-center bg-ink/50">
-          <View className="items-center rounded-2xl bg-paper p-4">
-            <Thumbnail uri={product.imageUri} size={220} radius={12} iconSize={64} />
-            <Text className="text-ink mt-2 text-center text-base font-bold">{product.name}</Text>
-          </View>
-        </View>
-      </Modal>
-      <Pressable
-        onPress={onRemove}
-        hitSlop={10}
-        className="absolute right-1 top-1 z-10 h-6 w-6 items-center justify-center rounded-full bg-paper"
-        accessibilityRole="button"
-        accessibilityLabel={`${product.name} 이 구역에서 빼기`}
-      >
-        <MaterialCommunityIcons name="trash-can-outline" size={13} color="#888888" />
-      </Pressable>
-      <Pressable
-        onPress={onOpenSettings}
-        hitSlop={10}
-        className="absolute left-1 top-1 z-10 h-6 w-6 items-center justify-center rounded-full bg-paper"
-        accessibilityRole="button"
-        accessibilityLabel={`${product.name} 설정`}
-      >
-        <MaterialCommunityIcons name="cog-outline" size={13} color="#888888" />
-      </Pressable>
-
-      <Thumbnail uri={product.imageUri} size={64} radius={8} iconSize={22} />
-      <Text className="text-ink mt-1.5 w-full text-center text-xs font-bold" numberOfLines={2}>
-        {product.name}
-      </Text>
-      {/* 아래 모서리의 수량 뱃지·이동 버튼(절대 위치) 높이만큼 비워 상품명이 가려지지 않게 */}
-      <View style={{ height: 26 }} />
-
-      {qty > 0 ? (
-        <Pressable
-          onPress={onDecrement}
-          hitSlop={12}
-          className="bg-primary absolute bottom-1 left-1 items-center justify-center rounded-full active:opacity-70"
-          style={{ minWidth: 24, height: 24, paddingHorizontal: 3 }}
-          accessibilityRole="button"
-          accessibilityLabel={`${product.name} 수량 감소`}
-        >
-          <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' }}>{qty}</Text>
-        </Pressable>
-      ) : null}
-
-      <Pressable
-        onPress={onToggleMove}
-        hitSlop={10}
-        className="absolute bottom-1 right-1 h-6 w-6 items-center justify-center rounded-full border border-line bg-bg active:opacity-70"
-        style={isPending ? { borderColor: '#CC2222', backgroundColor: '#CC2222' } : null}
-        accessibilityRole="button"
-        accessibilityLabel={isPending ? `${product.name} 이동 취소` : `${product.name} 위치 이동`}
-      >
-        <MaterialCommunityIcons name="arrow-all" size={13} color={isPending ? '#FFFFFF' : '#1A1A1A'} />
-      </Pressable>
-    </Pressable>
-  );
-});
-
 const QuickOrderHelpModal = memo(function QuickOrderHelpModal({
   visible,
   onClose,
@@ -1391,7 +1267,7 @@ const QuickOrderHelpModal = memo(function QuickOrderHelpModal({
   ];
   const buttons: { icon: keyof typeof MaterialCommunityIcons.glyphMap; color?: string; text: string }[] = [
     { icon: 'gesture-tap', text: '상품 탭 — 1박스 담기' },
-    { icon: 'numeric-1-circle', color: '#CC2222', text: '빨간 숫자 탭 — 1박스 빼기' },
+    { icon: 'numeric-1-circle', color: '#CC2222', text: '빨간 숫자 탭 — 수량 조절(빼기·여러 박스)' },
     { icon: 'magnify-plus-outline', text: '상품을 꾹 누르고 있기 — 사진 크게 보기' },
     { icon: 'cog-outline', text: '톱니바퀴 — 상품 수정 · 다른 구역으로 이동 · 줄 아래 구분선' },
     { icon: 'arrow-all', text: '화살표 — 누른 뒤 옮길 자리의 상품을 탭하면 서로 자리가 바뀌어요' },
@@ -1531,6 +1407,9 @@ const ProductSettingsModal = memo(function ProductSettingsModal({
   onMove,
   onToggleDivider,
   onClose,
+  autoColor,
+  pickedColor,
+  onPickColor,
 }: {
   visible: boolean;
   productName: string;
@@ -1539,6 +1418,10 @@ const ProductSettingsModal = memo(function ProductSettingsModal({
   onMove: () => void;
   onToggleDivider: () => void;
   onClose: () => void;
+  autoColor?: string;
+  pickedColor: string | null;
+  /** null이면 자동 색으로 되돌림 */
+  onPickColor: (color: string | null) => void;
 }) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -1584,6 +1467,117 @@ const ProductSettingsModal = memo(function ProductSettingsModal({
               {hasDivider ? '이 줄 아래 구분선 제거' : '이 줄 아래 구분선 추가'}
             </Text>
           </Pressable>
+          {/* 카드 색: 색 위치로 냉동고를 기억하니 매장마다 손에 익은 색으로 바꿀 수 있게 */}
+          <View className="mt-1 border-t border-line px-3 pt-3">
+            <View className="mb-2 flex-row items-center" style={{ gap: 10 }}>
+              <MaterialCommunityIcons name="palette-outline" size={18} color="#1A1A1A" />
+              <Text className="text-ink text-sm font-medium">카드 색</Text>
+            </View>
+            <View className="flex-row flex-wrap" style={{ gap: 8 }}>
+              <Pressable
+                onPress={() => onPickColor(null)}
+                className="items-center justify-center rounded-full"
+                style={{
+                  height: 36,
+                  paddingHorizontal: 10,
+                  backgroundColor: autoColor ?? '#F7F7F7',
+                  borderWidth: pickedColor ? 1 : 3,
+                  borderColor: pickedColor ? '#E5E5E5' : '#1A1A1A',
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="카드 색 자동"
+                accessibilityState={{ selected: !pickedColor }}
+              >
+                <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#1A1A1A', backgroundColor: 'rgba(255,255,255,0.8)', paddingHorizontal: 4, borderRadius: 4 }}>
+                  자동
+                </Text>
+              </Pressable>
+              {TILE_COLOR_CHOICES.map((c) => (
+                <Pressable
+                  key={c}
+                  onPress={() => onPickColor(c)}
+                  hitSlop={4}
+                  className="items-center justify-center rounded-full"
+                  style={{ width: 36, height: 36, backgroundColor: c, borderWidth: pickedColor === c ? 3 : 1, borderColor: pickedColor === c ? '#1A1A1A' : '#E5E5E5' }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`카드 색 ${c}`}
+                  accessibilityState={{ selected: pickedColor === c }}
+                >
+                  {pickedColor === c ? <MaterialCommunityIcons name="check" size={16} color={tileColor('', c).fg} /> : null}
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+});
+
+/** 빨간 숫자를 누르면 여는 수량 조절 창 — 수량을 크게 바꾸거나 줄일 때만 쓰고, 평소엔 타일 누르기(+1)로 끝낸다 */
+const QtySheet = memo(function QtySheet({
+  visible,
+  productName,
+  qty,
+  onConfirm,
+  onClose,
+}: {
+  visible: boolean;
+  productName: string;
+  qty: number;
+  onConfirm: (next: number) => void;
+  onClose: () => void;
+}) {
+  const insets = useSafeAreaInsets();
+  const [value, setValue] = useState(String(qty));
+  useEffect(() => {
+    if (visible) setValue(String(qty));
+  }, [visible, qty]);
+  const num = Math.max(0, Math.min(999, parseInt(value, 10) || 0));
+  const step = (d: number) => setValue(String(Math.max(0, Math.min(999, num + d))));
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable className="flex-1 justify-end bg-ink/40" onPress={onClose}>
+        <Pressable
+          onPress={(e) => e.stopPropagation()}
+          className="rounded-t-3xl bg-paper px-5 pt-5"
+          style={{ paddingBottom: Math.max(insets.bottom, 16) + 8 }}
+        >
+          <Text className="text-ink text-center text-lg font-bold" numberOfLines={1}>
+            {productName}
+          </Text>
+          <Text className="text-muted mt-0.5 text-center text-xs">수량을 정하고 확인을 누르세요</Text>
+          <View className="my-5 flex-row items-center justify-center" style={{ gap: 16 }}>
+            <Pressable onPress={() => step(-1)} className="h-16 w-16 items-center justify-center rounded-2xl bg-bg active:opacity-70" accessibilityRole="button" accessibilityLabel="1박스 빼기">
+              <MaterialCommunityIcons name="minus" size={30} color="#1A1A1A" />
+            </Pressable>
+            <TextInput
+              value={value}
+              onChangeText={(t) => setValue(t.replace(/[^0-9]/g, '').slice(0, 3))}
+              keyboardType="number-pad"
+              selectTextOnFocus
+              className="text-ink h-16 w-24 rounded-2xl border-2 border-line text-center text-3xl font-bold"
+              accessibilityLabel="수량"
+            />
+            <Pressable onPress={() => step(1)} className="h-16 w-16 items-center justify-center rounded-2xl bg-bg active:opacity-70" accessibilityRole="button" accessibilityLabel="1박스 더하기">
+              <MaterialCommunityIcons name="plus" size={30} color="#1A1A1A" />
+            </Pressable>
+          </View>
+          <View className="mb-4 flex-row justify-center" style={{ gap: 8 }}>
+            {[1, 2, 3, 5, 10].map((n) => (
+              <Pressable key={n} onPress={() => setValue(String(n))} className="rounded-full border border-line px-4 py-2 active:bg-bg" accessibilityRole="button" accessibilityLabel={`${n}박스`}>
+                <Text className="text-ink text-sm font-bold">{n}</Text>
+              </Pressable>
+            ))}
+          </View>
+          <View className="flex-row" style={{ gap: 10 }}>
+            <Pressable onPress={() => onConfirm(0)} className="items-center justify-center rounded-2xl bg-bg py-4 active:opacity-70" style={{ flex: 0.6 }} accessibilityRole="button" accessibilityLabel="발주에서 빼기">
+              <Text style={{ color: '#B00020', fontWeight: 'bold', fontSize: 16 }}>빼기</Text>
+            </Pressable>
+            <Pressable onPress={() => onConfirm(num)} className="bg-primary flex-1 items-center justify-center rounded-2xl py-4 active:opacity-80" accessibilityRole="button" accessibilityLabel="수량 확인">
+              <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 16 }}>확인</Text>
+            </Pressable>
+          </View>
         </Pressable>
       </Pressable>
     </Modal>

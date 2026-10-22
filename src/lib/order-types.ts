@@ -1,4 +1,12 @@
+import type { FridgeBackground, FridgeColumns, TileSpan } from './fridge-layout';
+
 export type OrderStatus = 'active' | 'discontinued' | 'paused';
+
+/** 매장별 빠른발주 화면 설정: 구역마다 열 수, 냉동고 배경 */
+export interface FridgeLayoutSettings {
+  columns: Record<string, FridgeColumns>;
+  background: FridgeBackground;
+}
 
 export interface OrderProduct {
   id: string;
@@ -25,6 +33,9 @@ export interface Store {
 export type FridgeSection = string;
 
 export interface FridgeAssignment {
+  /** 상품 id, 또는 진열대 빈 자리면 'spacer:…'(fridge-layout.ts isSpacerId) */
   productId: string;
   section: FridgeSection;
+  /** 빠른발주 카드가 차지하는 칸(없으면 1칸). 옛 버전 앱은 이 값을 모른다 */
+  span?: TileSpan;
 }
