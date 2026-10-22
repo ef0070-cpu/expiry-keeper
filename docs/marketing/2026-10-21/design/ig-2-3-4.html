@@ -1,0 +1,46 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<link rel="stylesheet" href="promo.css">
+<style>
+  h2 { position: absolute; left: 88px; top: 180px; font-size: 70px; font-weight: 800; line-height: 1.3; letter-spacing: -0.045em; white-space: nowrap; }
+  .fam { position: absolute; left: 0; right: 0; top: 440px; display: flex; justify-content: center; gap: 56px; }
+  .av { width: 132px; height: 132px; border-radius: 50%; background: #FFF; position: relative; overflow: hidden; box-shadow: 0 16px 32px rgba(80,50,20,.18); }
+  .av::before { content: ''; position: absolute; left: 50%; top: 26px; width: 44px; height: 44px; margin-left: -22px; border-radius: 50%; background: var(--c); }
+  .av::after { content: ''; position: absolute; left: 50%; top: 80px; width: 84px; height: 84px; margin-left: -42px; border-radius: 50%; background: var(--c); }
+  .lines { position: absolute; left: 0; top: 572px; }
+  .code { position: absolute; left: 270px; width: 540px; top: 640px; height: 170px; border-radius: 36px; background: #FFF; color: #1A1A1A;
+          display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; box-shadow: 0 24px 48px rgba(80,50,20,.18); }
+  .code .lbl { font-size: 28px; font-weight: 700; color: #CC2222; }
+  .digits { display: flex; gap: 12px; }
+  .digits i { width: 56px; height: 64px; border-radius: 14px; background: #F7F7F7; border: 3px solid #EAEAEA; position: relative; }
+  .digits i::after { content: ''; position: absolute; left: 50%; top: 50%; width: 14px; height: 14px; margin: -7px; border-radius: 50%; background: #1A1A1A; }
+  .cta { position: absolute; left: 88px; right: 88px; top: 880px; height: 370px; border-radius: 48px; background: #FFF; color: #1A1A1A;
+         display: flex; flex-direction: column; justify-content: center; gap: 30px; padding: 0 56px; box-shadow: 0 32px 64px rgba(80,50,20,.2); }
+  .row { display: flex; align-items: center; gap: 32px; }
+  .icon { flex: none; width: 128px; height: 128px; border-radius: 32px; background: #FFF url(../../../../assets/images/icon.png) 50% 36% / 170% no-repeat;
+          box-shadow: 0 0 0 3px #EAEAEA; }
+  .cta-t { font-size: 44px; font-weight: 800; white-space: nowrap; }
+  .search { display: flex; justify-content: center; align-items: center; gap: 16px; padding: 22px 30px; border-radius: 999px; background: #F7F7F7; border: 3px solid #CC2222;
+            font-size: 44px; font-weight: 800; white-space: nowrap; }
+  .search::before { content: ''; flex: none; width: 26px; height: 26px; border: 6px solid #CC2222; border-radius: 50%; margin-right: 8px; position: relative;
+                    box-shadow: 14px 14px 0 -9px #CC2222; }
+</style></head><body>
+<div class="bg soft"></div><div class="veil"></div>
+<div class="top"><div class="brand"><div class="logo"></div>유통기한 매니저</div><div class="page"><i></i><i></i><i></i><i class="on"></i></div></div>
+
+<h2>초대 코드로 가족과<br>같은 냉장고 목록 함께 보기</h2>
+
+<div class="fam">
+  <div class="av" style="--c:#CC2222"></div>
+  <div class="av" style="--c:#1A1A1A"></div>
+  <div class="av" style="--c:#CC2222"></div>
+</div>
+<svg class="lines" width="1080" height="70"><g stroke="#CC2222" stroke-width="5" stroke-dasharray="4 12" stroke-linecap="round" fill="none" opacity=".8">
+  <path d="M352 0 L470 68"/><path d="M540 0 L540 68"/><path d="M728 0 L610 68"/></g></svg>
+<div class="code"><div class="lbl">초대 코드</div><div class="digits"><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+
+<div class="cta">
+  <div class="row"><div class="icon"></div><div class="cta-t">플레이스토어에서</div></div>
+  <div class="search">'유통기한 매니저'를 검색해 보세요</div>
+</div>
+</body></html>

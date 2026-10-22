@@ -1,0 +1,55 @@
+/* ig-2-3 / th-2-3 공통 — 1080×1350, 바깥 여백 88px, Pretendard 하나 */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 1080px; height: 1350px; overflow: hidden; }
+body { position: relative; font-family: 'Pretendard', sans-serif; color: #1A1A1A; background: #F7F7F7;
+       word-break: keep-all; letter-spacing: -0.03em; -webkit-font-smoothing: antialiased; }
+body.red { background: #CC2222; color: #FFFFFF; }
+.abs { position: absolute; }
+.nw { white-space: nowrap; }
+.hl { color: #CC2222; }
+
+/* 상단 바: 로고 + 페이지 표시 (전 장 동일) */
+.top { position: absolute; left: 88px; right: 88px; top: 64px; height: 56px; display: flex; align-items: center; justify-content: space-between; }
+.brand { display: flex; align-items: center; gap: 16px; font-size: 28px; font-weight: 700; }
+.logo { width: 56px; height: 56px; border-radius: 16px; background: #FFF url(../../../../assets/images/icon.png) 50% 36% / 170% no-repeat;
+        box-shadow: 0 2px 8px rgba(0,0,0,.12); }
+.page { display: flex; align-items: center; gap: 8px; }
+.page i { display: block; width: 28px; height: 6px; border-radius: 3px; background: rgba(26,26,26,.15); }
+.page i.on { width: 48px; background: #CC2222; }
+.red .page i { background: rgba(255,255,255,.35); }
+.red .page i.on { background: #FFF; }
+
+/* 스크린샷 잘라 확대: --x --y --w --h(원본 581×1426 기준 px), --s(배율) */
+.crop { position: relative; overflow: hidden; width: calc(var(--w) * var(--s) * 1px); height: calc(var(--h) * var(--s) * 1px); }
+.crop img { position: absolute; max-width: none; width: calc(581px * var(--s));
+            left: calc(var(--x) * var(--s) * -1px); top: calc(var(--y) * var(--s) * -1px); }
+
+/* 폰 프레임: .stage 원점 = 화면 왼쪽 위, 화면 폭 608px(배율 1.0465) */
+.stage { position: absolute; width: 608px; }
+.phone { position: absolute; left: -16px; top: -16px; width: 640px; height: 1200px; padding: 16px; border-radius: 72px;
+         background: #1A1A1A; box-shadow: 0 40px 80px rgba(0,0,0,.22), inset 0 0 0 2px #3A3A3A; }
+.screen { position: relative; width: 608px; height: 1168px; border-radius: 56px; overflow: hidden; background: #F7F7F7; }
+.screen img { display: block; width: 608px; }
+.screen .sbar { position: absolute; left: 0; top: 0; width: 100%; height: 66px; background: #FFF; } /* 상태바 알림 아이콘 가림 */
+.screen .sbar::after { content: ''; position: absolute; left: 50%; top: 22px; width: 22px; height: 22px; margin-left: -11px; border-radius: 50%; background: #1A1A1A; }
+
+/* 짚기 */
+.ring { position: absolute; border: 6px solid #CC2222; border-radius: 999px; box-shadow: 0 0 0 10px rgba(204,34,34,.15); }
+.box { position: absolute; border: 6px solid #CC2222; border-radius: 34px; box-shadow: 0 0 0 10px rgba(204,34,34,.12); }
+.pill { position: absolute; padding: 12px 26px; border-radius: 999px; background: #CC2222; color: #FFF;
+        font-size: 30px; font-weight: 700; white-space: nowrap; box-shadow: 0 8px 20px rgba(204,34,34,.35); }
+.pop { position: absolute; border-radius: 28px; overflow: hidden; background: #FFF; border: 4px solid #CC2222;
+       box-shadow: 0 24px 48px rgba(0,0,0,.25); }
+.tap { position: absolute; width: 96px; height: 96px; border-radius: 50%; background: rgba(204,34,34,.18); }
+.tap::before { content: ''; position: absolute; inset: 24px; border-radius: 50%; background: #CC2222; opacity: .85; }
+.tap::after { content: ''; position: absolute; inset: -22px; border-radius: 50%; border: 4px solid rgba(204,34,34,.35); }
+
+/* 컨셉 5 "식재료 심폐소생술" 사진 배경 — 표지는 선명하게, 2~4장은 같은 사진을 흐리고 크림으로 눌러 이어 간다 */
+.bg { position: absolute; inset: 0; background: url(assets/hero-recipe.jpg) 50% 50% / cover no-repeat; }
+.bg.soft { inset: -80px; filter: blur(30px) saturate(.9); }
+.veil { position: absolute; inset: 0; background: rgba(250,244,234,.80); }
+.fadetop { position: absolute; left: 0; right: 0; top: 0; height: 700px;
+           background: linear-gradient(to bottom, rgba(250,244,234,.97) 0, rgba(250,244,234,.93) 62%, rgba(250,244,234,0) 100%); }
+.scaled { transform: scale(.7); transform-origin: 0 0; }
+.next { position: absolute; width: 72px; height: 72px; border-radius: 50%; background: #CC2222; box-shadow: 0 10px 24px rgba(120,20,20,.35); }
+.next::after { content: ''; position: absolute; left: 22px; top: 25px; width: 16px; height: 16px; border: solid #FFF; border-width: 6px 6px 0 0; transform: rotate(45deg); }
