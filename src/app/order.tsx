@@ -65,6 +65,8 @@ import {
 } from '@/lib/order-repo';
 import { TILE_COLOR_CHOICES, tileColor } from '@/lib/tile-color';
 import FridgeGrid, { FridgeGridItem } from '@/components/FridgeGrid';
+import CoachMarks, { CoachStep } from '@/components/CoachMarks';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DEFAULT_COLUMNS, isSpacerId, normalizeSpan, packRows } from '@/lib/fridge-layout';
 import { FridgeAssignment, FridgeLayoutSettings, FridgeSection, OrderCart, OrderProduct, OrderStatus, Store } from '@/lib/order-types';
 import { buildProductSearchIndex, searchOrderProducts } from '@/lib/order-search';
@@ -81,6 +83,10 @@ const UPDATE_BADGE_META: Record<CatalogUpdateBadge, { label: string; color: stri
   new: { label: '신규', color: '#2962FF' },
   updated: { label: '수정', color: '#F9A825' },
 };
+
+// 따라하기 안내를 마쳤는지(기기별), 1.1.1 새 기능 말풍선을 봤는지
+const COACH_DONE_KEY = 'orderCoachDone:v1';
+const WHATS_NEW_KEY = 'orderWhatsNew:1.1.1';
 
 export default function Order() {
   const insets = useSafeAreaInsets();
@@ -105,6 +111,32 @@ export default function Order() {
   // 매장별 빠른발주 설정(구역 열 수·냉동고 배경)과 배치 편집 모드
   const [layoutSettings, setLayoutSettings] = useState<FridgeLayoutSettings>({ columns: {}, background: 'none' });
   const [layoutEditing, setLayoutEditing] = useState(false);
+  // 따라하기 안내(2026-10-22): 처음 쓰는 사람에게 버튼을 하나씩 강조해 순서대로 누르게 한다.
+  // 이미 쓰던 사람에겐 새 기능 말풍선만 한 번. [사용법] → "따라하기 다시 보기"로 언제든 다시.
+  const coachRefs = {
+    store: useRef<View>(null),
+    quick: useRef<View>(null),
+    zone: useRef<View>(null),
+    add: useRef<View>(null),
+    card: useRef<View>(null),
+    cart: useRef<View>(null),
+    edit: useRef<View>(null),
+  };
+  const [coachDone, setCoachDone] = useState<boolean | null>(null);
+  const [whatsNewDone, setWhatsNewDone] = useState<boolean | null>(null);
+  const [coachRunning, setCoachRunning] = useState<'tour' | 'replay' | null>(null);
+  const [coachAck, setCoachAck] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    AsyncStorage.multiGet([COACH_DONE_KEY, WHATS_NEW_KEY])
+      .then(([a, b]) => {
+        setCoachDone(!!a[1]);
+        setWhatsNewDone(!!b[1]);
+      })
+      .catch(() => {
+        setCoachDone(true);
+        setWhatsNewDone(true);
+      });
+  }, []);
   const [tileColors, setTileColors] = useState<Record<string, string>>({});
   const [tileFontLoaded] = useFonts({ DoHyeon: require('../../assets/fonts/DoHyeon-Regular.ttf') });
   useEffect(() => {
@@ -694,6 +726,59 @@ export default function Order() {
     setLayoutEditing(false);
   }, [activeSection, activeStoreId, mode]);
 
+  // ── 따라하기 안내 단계 ──
+  const storeProductCount = fridgeAssignments.filter((a) => !isSpacerId(a.productId)).length;
+  useEffect(() => {
+    if (coachDone !== false || coachRunning || syncing) return;
+    // 이미 진열해 둔 매장이 있으면 쓰던 사람 — 처음 안내는 건너뛰고 새 기능 말풍선만
+    if (activeStoreId && storeProductCount > 0) {
+      setCoachDone(true);
+      AsyncStorage.setItem(COACH_DONE_KEY, '1').catch(() => {});
+      return;
+    }
+    setCoachRunning('tour');
+  }, [coachDone, coachRunning, syncing, activeStoreId, storeProductCount]);
+
+  const finishCoach = useCallback(() => {
+    setCoachRunning(null);
+    setCoachAck(new Set());
+    setCoachDone(true);
+    setWhatsNewDone(true); // 처음 안내를 본 사람에겐 새 기능 말풍선을 또 띄우지 않는다
+    AsyncStorage.multiSet([
+      [COACH_DONE_KEY, '1'],
+      [WHATS_NEW_KEY, '1'],
+    ]).catch(() => {});
+  }, []);
+  const finishWhatsNew = useCallback(() => {
+    setCoachAck(new Set());
+    setWhatsNewDone(true);
+    AsyncStorage.setItem(WHATS_NEW_KEY, '1').catch(() => {});
+  }, []);
+
+  const replay = coachRunning === 'replay';
+  const tourSteps: (CoachStep & { done: boolean })[] = [
+    { key: 'store', target: coachRefs.store, ack: replay, done: replay ? coachAck.has('store') : !!activeStoreId, title: '매장을 먼저 골라 주세요', body: '처음이면 매장 이름을 하나 만들어요 (예: 1호점)' },
+    { key: 'quick', target: coachRefs.quick, ack: replay, done: replay ? coachAck.has('quick') : mode === 'quick', title: '빠른발주를 눌러요', body: '냉동고 칸 모양 그대로 보면서 담는 화면이에요' },
+    { key: 'zone', target: coachRefs.zone, ack: true, done: coachAck.has('zone'), title: '냉동고 칸(구역)은 여기서 관리해요', body: '예: 600바-1, 콘류 — 실제 칸 이름으로 바꾸거나 더 만들 수 있어요' },
+    { key: 'add', target: coachRefs.add, ack: replay, done: replay ? coachAck.has('add') : fridgeItems.some((i) => i.product), title: '이 칸에 있는 상품을 넣어요', body: '실제 진열 순서대로 넣으면 화면도 냉동고처럼 보여요' },
+    { key: 'card', target: coachRefs.card, ack: replay, done: replay ? coachAck.has('card') : totalCount > 0, title: '빈 칸 상품을 눌러 담아요', body: '한 번 누를 때마다 1박스 · 빨간 숫자를 누르면 수량 조절' },
+    { key: 'cart', target: coachRefs.cart, ack: true, done: coachAck.has('cart'), title: '다 담았으면 발주 내역을 확인해요', body: "수량을 보고 '공유하기'로 거래처에 보내요" },
+  ];
+  // 다시 보기에선 지금 화면에 없는 버튼(예: 담은 게 없으면 발주 내역 바)은 건너뛴다
+  const visibleTour = replay ? tourSteps.filter((st) => st.key !== 'cart' || totalCount > 0).filter((st) => st.key !== 'card' || fridgeItems.some((i) => i.product)) : tourSteps;
+  const whatsNewSteps: (CoachStep & { done: boolean })[] = [
+    { key: 'wn-edit', target: coachRefs.edit, ack: true, done: coachAck.has('wn-edit'), title: '새 기능: 배치 편집', body: '열 수·칸 크기(1칸/2칸/줄)·빈칸, 끌어서 옮기기까지 실제 냉동고처럼 맞춰요' },
+    { key: 'wn-qty', target: coachRefs.card, ack: true, done: coachAck.has('wn-qty'), title: '누르면 1박스, 빨간 숫자는 수량 조절', body: '빨간 숫자를 누르면 여러 박스를 한 번에 넣거나 뺄 수 있어요' },
+    { key: 'wn-long', target: coachRefs.card, ack: true, done: coachAck.has('wn-long'), title: '길게 누르면 실제 사진', body: '계속 누르고 있으면(1초) 배치 편집이 바로 켜져요' },
+  ];
+  const showWhatsNew = !coachRunning && coachDone === true && whatsNewDone === false && mode === 'quick' && !layoutEditing && fridgeItems.some((i) => i.product);
+  const coachList = coachRunning ? visibleTour : showWhatsNew ? whatsNewSteps : [];
+  const coachIndex = coachList.findIndex((st) => !st.done);
+  useEffect(() => {
+    if (coachList.length && coachIndex < 0) (coachRunning ? finishCoach : finishWhatsNew)();
+  }, [coachList.length, coachIndex, coachRunning, finishCoach, finishWhatsNew]);
+  const coachStep = coachIndex >= 0 ? coachList[coachIndex] : null;
+
   const onRemoveFridgeTile = useCallback(
     (p: OrderProduct) => {
       Alert.alert('구역에서 빼기', `'${p.name}'을(를) '${activeSection}' 구역에서 뺄까요?`, [
@@ -783,6 +868,8 @@ export default function Order() {
           className="flex-row items-center self-start rounded-full border border-line bg-paper px-3 py-1.5 active:opacity-70"
           accessibilityRole="button"
           accessibilityLabel="매장 선택"
+          ref={coachRefs.store}
+          collapsable={false}
         >
           <MaterialCommunityIcons name="storefront-outline" size={16} color="#1A1A1A" />
           <Text className="text-ink ml-1.5 text-sm font-medium">
@@ -798,7 +885,20 @@ export default function Order() {
           <View className="flex-row items-center" style={{ gap: 8 }}>
             {fridgeSections.length > 0 ? (
               <Pressable
-                onPress={() => setShowQuickHelp(true)}
+                onPress={() =>
+                  Alert.alert('사용법', '어떻게 볼까요?', [
+                    { text: '닫기', style: 'cancel' },
+                    { text: '버튼 설명 보기', onPress: () => setShowQuickHelp(true) },
+                    {
+                      text: '따라하기 다시 보기',
+                      onPress: () => {
+                        setLayoutEditing(false);
+                        setCoachAck(new Set());
+                        setCoachRunning('replay');
+                      },
+                    },
+                  ])
+                }
                 hitSlop={8}
                 className="h-9 flex-row items-center justify-center rounded-full border border-line bg-paper px-3 active:opacity-70"
                 accessibilityRole="button"
@@ -815,6 +915,8 @@ export default function Order() {
                 className="flex-row items-center gap-1 rounded-full bg-primary px-3 py-1.5 active:opacity-80"
                 accessibilityRole="button"
                 accessibilityLabel={`${activeSection} 구역에 상품 진열하기`}
+                ref={coachRefs.add}
+                collapsable={false}
               >
                 <MaterialCommunityIcons name="plus" size={18} color="#FFFFFF" />
                 <Text className="text-sm font-bold" style={{ color: '#FFFFFF' }}>
@@ -872,6 +974,8 @@ export default function Order() {
         </Pressable>
         <Pressable
           onPress={() => setMode('quick')}
+          ref={coachRefs.quick}
+          collapsable={false}
           accessibilityRole="tab"
           accessibilityState={{ selected: mode === 'quick' }}
           className={`flex-1 items-center rounded-xl border py-2.5 ${
@@ -1139,6 +1243,8 @@ export default function Order() {
                         className="flex-row items-center self-start rounded-full border border-dashed border-line bg-paper px-3 py-1.5 active:opacity-70"
                         accessibilityRole="button"
                         accessibilityLabel="냉동고 구역 관리"
+                        ref={coachRefs.zone}
+                        collapsable={false}
                       >
                         <MaterialCommunityIcons name="plus" size={16} color="#888888" />
                         <Text className="text-muted ml-0.5 text-sm font-medium">구역 관리</Text>
@@ -1172,6 +1278,8 @@ export default function Order() {
                 onOpenSettings={setSettingsProduct}
                 onRemove={onRemoveFridgeTile}
                 onOpenQty={setQtyProduct}
+                firstCardRef={coachRefs.card}
+                editButtonRef={coachRefs.edit}
               />
               <AddToFridgeModal
                 visible={showAddToFridge}
@@ -1234,7 +1342,12 @@ export default function Order() {
           style={{ paddingBottom: Math.max(insets.bottom, 16) + 16 }}
         >
           <Pressable
-            onPress={() => router.push('/order-cart')}
+            onPress={() => {
+              setCoachAck((prev) => new Set(prev).add('cart'));
+              router.push('/order-cart');
+            }}
+            ref={coachRefs.cart}
+            collapsable={false}
             className="flex-row items-center justify-between rounded-2xl bg-ink px-5 py-4 active:opacity-80"
             style={{ elevation: 6 }}
           >
@@ -1246,6 +1359,13 @@ export default function Order() {
     </View>
       {/* 매장 무료 사용자 하단 배너(구독·이벤트·테스터는 안 보임) */}
       <HomeBanner />
+      <CoachMarks
+        step={coachStep}
+        index={Math.max(0, coachIndex)}
+        total={coachList.length}
+        onNext={() => coachStep && setCoachAck((prev) => new Set(prev).add(coachStep.key))}
+        onSkip={coachRunning ? finishCoach : finishWhatsNew}
+      />
     </View>
   );
 }

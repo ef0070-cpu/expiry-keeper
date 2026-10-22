@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { ReactNode, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ReactNode, Ref, RefObject, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, LayoutAnimation, Modal, Platform, Pressable, ScrollView, Text, UIManager, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Thumbnail from '@/components/Thumbnail';
@@ -107,6 +107,7 @@ type TileProps = {
   onDragStart: (absX: number, absY: number) => void;
   onDragMove: (absX: number, absY: number) => void;
   onDragEnd: () => void;
+  cardRef?: Ref<View>;
 };
 
 const GridTile = memo(function GridTile(p: TileProps) {
@@ -214,6 +215,8 @@ const GridTile = memo(function GridTile(p: TileProps) {
   return (
     <GestureDetector gesture={pan}>
       <Pressable
+        ref={p.cardRef}
+        collapsable={false}
         onPressIn={() => {
           if (editing) return;
           longFired.current = false;
@@ -379,6 +382,9 @@ export default function FridgeGrid(props: {
   onOpenSettings: (p: OrderProduct) => void;
   onRemove: (p: OrderProduct) => void;
   onOpenQty: (p: OrderProduct) => void;
+  /** 따라하기 안내가 가리킬 첫 상품 카드·배치 편집 버튼 */
+  firstCardRef?: RefObject<View | null>;
+  editButtonRef?: RefObject<View | null>;
 }) {
   const { cols, background, editing } = props;
   const [draft, setDraft] = useState<FridgeGridItem[]>(props.items);
@@ -543,6 +549,7 @@ export default function FridgeGrid(props: {
         : null;
   const draggingItem = dragId ? draft.find((i) => i.id === dragId) : undefined;
   const ghostRect = draggingItem ? rects.find((r) => list[r.index]?.id === dragId) : undefined;
+  const firstProductId = list.find((i) => i.product)?.id;
   const ghostColor = draggingItem?.product ? tileColor(draggingItem.product.name, props.tileColors[draggingItem.product.id]) : null;
 
   return (
@@ -586,6 +593,8 @@ export default function FridgeGrid(props: {
             </Pressable>
           ) : (
             <Pressable
+              ref={props.editButtonRef}
+              collapsable={false}
               onPress={() => props.onEditingChange(true)}
               className="flex-row items-center rounded-full border border-ink bg-paper px-3 py-1.5 active:opacity-70"
               accessibilityRole="button"
@@ -697,6 +706,7 @@ export default function FridgeGrid(props: {
                               onDragStart={startFor(it.id)}
                               onDragMove={applyMove}
                               onDragEnd={onDragEnd}
+                              cardRef={it.id === firstProductId ? props.firstCardRef : undefined}
                             />
                           );
                         })}
