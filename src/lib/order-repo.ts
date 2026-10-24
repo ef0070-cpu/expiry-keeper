@@ -3,6 +3,7 @@ import { upsertBarcodeCatalog } from './barcode-catalog';
 import {
   PUBLIC_ID_PREFIX,
   applyBarcodeMoves,
+  findMissingCategories,
   mergeCatalogIntoProducts,
   pruneBadges,
   type BadgeEntry,
@@ -57,7 +58,7 @@ const ACTIVE_STORE_KEY = 'activeStoreId:v1';
 
 export type { CatalogUpdateBadge } from './order-catalog-merge';
 
-export const DEFAULT_CATEGORIES = ['바', '콘', '튜브', '샌드/기타', '홈/컵'];
+export const DEFAULT_CATEGORIES = ['바', '펜슬', '콘', '컵', '샌드', '홈', '벌크', '기타'];
 
 // ---------- 카탈로그 ----------
 
@@ -398,6 +399,14 @@ export async function renameOrderCategory(from: string, to: string): Promise<voi
 export async function deleteOrderCategory(name: string): Promise<void> {
   const items = await listOrderCategories();
   await writeOrderCategories(items.filter((c) => c !== name));
+}
+
+/** 공용 카탈로그가 새로 넣거나 바꾼 상품의 카테고리가 칩 목록에 없으면 목록 끝에 추가한다 (칩이 없으면 그 상품이 "전체"에서만 보인다). */
+async function addMissingCategories(items: OrderProduct[], changedBarcodes: string[]): Promise<void> {
+  if (changedBarcodes.length === 0) return;
+  const current = await listOrderCategories();
+  const missing = findMissingCategories(items, changedBarcodes, current);
+  if (missing.length > 0) await writeOrderCategories([...current, ...missing]);
 }
 
 // ---------- 매장 ----------
@@ -863,6 +872,7 @@ export async function syncOrderCatalog(): Promise<void> {
       const merged = mergeCatalogIntoProducts(items, rows, removedBarcodes);
       const changed = merged.changed || moved.length > 0;
       if (changed) await writeOrderProducts(merged.items);
+      await addMissingCategories(merged.items, [...merged.newBarcodes, ...merged.updatedBarcodes]);
       // 처음 채우는 것(로컬 목록이 비어 있던 새 설치)은 "신규"가 아니다 — 안 그러면 공용 목록 약 400개가
       // 하루 내내 전부 "신규"로 보여 표시가 의미 없어진다
       const newBarcodes = rawItems.length === 0 ? [] : merged.newBarcodes;

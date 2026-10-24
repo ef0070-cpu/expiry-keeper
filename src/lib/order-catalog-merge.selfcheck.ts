@@ -1,4 +1,10 @@
-import { BADGE_KEEP_MS, applyBarcodeMoves, mergeCatalogIntoProducts, pruneBadges } from './order-catalog-merge';
+import {
+  BADGE_KEEP_MS,
+  applyBarcodeMoves,
+  findMissingCategories,
+  mergeCatalogIntoProducts,
+  pruneBadges,
+} from './order-catalog-merge';
 import type { OrderProduct } from './order-types';
 
 const base: OrderProduct = {
@@ -108,6 +114,20 @@ const base: OrderProduct = {
   console.assert(pruneBadges(seen, T + BADGE_KEEP_MS - 1, true).a.seenAt === T, '다시 봐도 처음 본 시각은 그대로');
   console.assert(Object.keys(pruneBadges(seen, T + BADGE_KEEP_MS, true)).length === 0, '하루 지나면 사라진다');
   console.assert(pruneBadges({ c: { kind: 'new' } }, T + 10 * BADGE_KEEP_MS, false).c.seenAt === undefined, '못 본 표시는 며칠이 지나도 남는다');
+}
+
+{
+  // 칩 자동 보충: 공용 카탈로그가 새로 넣거나 바꾼 상품의 카테고리만, 칩 목록에 없을 때 찾는다
+  const mk = (barcode: string | null, category: string): OrderProduct => ({ ...base, id: 'x' + barcode, barcode, category });
+  const items = [mk('1', '펜슬'), mk('2', '펜슬'), mk('3', '컵'), mk('4', '벌크'), mk('5', '튜브'), mk('6', ''), mk(null, '기타'), mk('7', '  ')];
+  const found = findMissingCategories(items, ['1', '2', '3', '5', '6', '7'], ['바', '컵']);
+  console.assert(
+    found.length === 1 && found[0] === '펜슬',
+    '바뀐 상품의 없는 카테고리만 한 번씩 — 이미 있는 칩(컵)·옛 이름(튜브)·빈 값은 제외',
+  );
+  console.assert(!found.includes('벌크'), '바뀌지 않은 상품(바코드 4)의 카테고리는 보지 않는다 — 사용자가 지운 칩이 되살아나지 않게');
+  console.assert(findMissingCategories(items, [], ['바']).length === 0, '바뀐 상품이 없으면 아무것도 찾지 않는다');
+  console.assert(findMissingCategories(items, ['4'], ['바']).join() === '벌크', '바뀐 상품의 새 카테고리는 찾는다');
 }
 
 console.log('order-catalog-merge selfcheck OK');

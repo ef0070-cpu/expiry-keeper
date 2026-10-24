@@ -83,6 +83,25 @@ export function mergeCatalogIntoProducts(
   return { items: next, changed, newBarcodes, updatedBarcodes };
 }
 
+/** 2026-10-24 이전 기본 시드가 쓰던 카테고리 이름. 서버 order_catalog가 아직 옛 값을 줄 때 새 설치에 옛 칩이 붙지 않게 자동 추가에서 뺀다. */
+export const RETIRED_CATEGORIES: readonly string[] = ['튜브', '샌드/기타', '홈/컵'];
+
+/**
+ * 공용 카탈로그가 새로 넣거나 바꾼 상품의 카테고리 중 칩 목록(current)에 없는 것을 찾는다. IO 없는 순수 함수.
+ * 칩이 없으면 그 상품은 "전체"에서만 보인다. 바뀌지 않은 상품은 보지 않아, 사용자가 지운 칩이 되살아나지 않는다.
+ */
+export function findMissingCategories(items: OrderProduct[], changedBarcodes: string[], current: string[]): string[] {
+  const changed = new Set(changedBarcodes);
+  const missing: string[] = [];
+  for (const p of items) {
+    const c = p.category;
+    if (!p.barcode || !changed.has(p.barcode) || !c || !c.trim()) continue;
+    if (current.includes(c) || missing.includes(c) || RETIRED_CATEGORIES.includes(c)) continue;
+    missing.push(c);
+  }
+  return missing;
+}
+
 // ---------- 발주 목록 "신규"·"수정" 표시 ----------
 
 export type CatalogUpdateBadge = 'new' | 'updated';

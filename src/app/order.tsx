@@ -64,6 +64,7 @@ import {
   setTileColor,
 } from '@/lib/order-repo';
 import { TILE_COLOR_CHOICES, tileColor } from '@/lib/tile-color';
+import { DEFAULT_ORDER_PRODUCTS } from '@/lib/order-seed-data';
 import FridgeGrid, { FridgeGridItem } from '@/components/FridgeGrid';
 import CoachMarks, { CoachStep } from '@/components/CoachMarks';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -1163,7 +1164,7 @@ export default function Order() {
                   className="mt-4 rounded-xl border border-line bg-paper px-4 py-2.5 active:opacity-70"
                 >
                   <Text className="text-ink text-sm font-medium">
-                    {seeding ? '불러오는 중...' : '기본 상품 불러오기 (아이스크림 388종)'}
+                    {seeding ? '불러오는 중...' : `기본 상품 불러오기 (아이스크림 ${DEFAULT_ORDER_PRODUCTS.length}종)`}
                   </Text>
                 </Pressable>
               </View>

@@ -38,12 +38,12 @@ function railStyle(bg: FridgeBackground, divider: boolean) {
 function categoryIcon(category: string): keyof typeof MaterialCommunityIcons.glyphMap {
   const c = (category ?? '').trim();
   if (c === '콘') return 'ice-cream';
-  if (c === '홈/컵') return 'cup';
-  if (c === '튜브' || c === '쭈쭈바') return 'bottle-tonic-outline';
+  if (c === '홈/컵' || c === '컵' || c === '홈') return 'cup';
+  if (c === '튜브' || c === '쭈쭈바' || c === '펜슬') return 'bottle-tonic-outline';
   if (c === '치어팩') return 'bottle-soda-outline';
-  if (c === '샌드/기타') return 'cookie-outline';
+  if (c === '샌드/기타' || c === '샌드') return 'cookie-outline';
   if (c === '얼음류') return 'cube-outline';
-  if (c === '상자류') return 'package-variant-closed';
+  if (c === '상자류' || c === '벌크') return 'package-variant-closed';
   if (c.includes('바')) return 'ice-pop';
   return 'food-variant';
 }
