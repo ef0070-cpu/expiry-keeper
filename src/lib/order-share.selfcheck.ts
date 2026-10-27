@@ -12,12 +12,25 @@ console.assert(formatOrderDate(date) === '2026. 8. 26.', 'formatOrderDate 포맷
 
 const text = buildOrderShareText(cart, products, '1호점', date);
 console.assert(text.startsWith('[2026. 8. 26. / 1호점]'), '헤더 포맷 불일치');
-console.assert(text.includes('• 메로나: 2박스'), '품목 라인 누락');
+console.assert(text.includes('• 메로나 2박스'), '품목 라인 누락');
+console.assert(!text.includes(':  ') && !text.includes('메로나:'), '콜론 형식이 남아 있음');
 console.assert(!text.includes('빙그레'), '공유 텍스트에 브랜드명이 들어가면 안 됨');
 console.assert(!text.includes('월드콘'), '수량 0인 품목이 포함됨');
 console.assert(text.includes('총 합계: 2박스'), '합계 라인 불일치');
 
 const textNoBranch = buildOrderShareText(cart, products, null, date);
 console.assert(textNoBranch.startsWith('[2026. 8. 26.]'), '매장 미선택 시 헤더 포맷 불일치');
+
+// 수량 1은 박스 표기 생략, 2 이상만 표기
+const ex: OrderProduct[] = [
+  { id: 'a', name: '메로나', brand: '', price: 0, category: '', barcode: null, imageUri: null },
+  { id: 'b', name: '체리마루바', brand: '', price: 0, category: '', barcode: null, imageUri: null },
+  { id: 'c', name: '녹차마루컵 미니', brand: '', price: 0, category: '', barcode: null, imageUri: null },
+];
+const exText = buildOrderShareText({ a: 1, b: 1, c: 2 }, ex, '1호점', new Date(2026, 9, 21));
+console.assert(
+  exText === '[2026. 10. 21. / 1호점]\n• 메로나\n• 체리마루바\n• 녹차마루컵 미니 2박스\n\n총 합계: 4박스',
+  `수량 1 생략 형식 불일치: ${exText}`,
+);
 
 console.log('order-share selfcheck OK');

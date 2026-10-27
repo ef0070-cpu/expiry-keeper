@@ -51,7 +51,8 @@ const PRICE_OVERRIDE_KEY = 'orderPriceOverrides:v1';
 const BRAND_OVERRIDE_KEY = 'orderBrandOverrides:v1';
 const NAME_OVERRIDE_KEY = 'orderNameOverrides:v1';
 const CATALOG_REFERENCE_PRICE_KEY = 'orderCatalogReferencePrice:v1';
-const CATALOG_UPDATE_BADGE_KEY = 'orderCatalogUpdateBadges:v1';
+import { isBadgeAnimating } from './order-badge-anim';
+const CATALOG_UPDATE_BADGE_KEY ='orderCatalogUpdateBadges:v1';
 const TILE_COLOR_KEY = 'orderTileColors:v1';
 const STORES_KEY = 'stores:v1';
 const ACTIVE_STORE_KEY = 'activeStoreId:v1';
@@ -779,6 +780,12 @@ export async function getOrderCart(): Promise<OrderCart> {
   return raw ? (JSON.parse(raw) as OrderCart) : {};
 }
 
+/** 활성 매장을 바꾸지 않고 특정 매장의 장바구니만 읽는다(이력 다시 담기 확인 창용). */
+export async function getOrderCartForStore(storeId: string): Promise<OrderCart> {
+  const raw = await AsyncStorage.getItem(`orderCart:${storeId}`);
+  return raw ? (JSON.parse(raw) as OrderCart) : {};
+}
+
 export async function writeOrderCart(cart: OrderCart): Promise<void> {
   await AsyncStorage.setItem(await resolveCartKey(), JSON.stringify(cart));
   const storeId = await getActiveStoreId();
@@ -915,6 +922,20 @@ async function writeBadges(badges: Record<string, BadgeEntry>): Promise<void> {
 
 export async function getCatalogUpdateBadges(): Promise<Map<string, CatalogUpdateBadge>> {
   return new Map(Object.entries(await readBadges()).map(([b, e]) => [b, e.kind]));
+}
+
+/** 저장된 표시 중 아직 움직일 것(처음 본 뒤 12시간 이내, 못 본 것 포함)의 바코드. 읽기 실패 시 빈 집합 */
+export async function getCatalogUpdateBadgeAnimating(): Promise<Set<string>> {
+  try {
+    const now = Date.now();
+    return new Set(
+      Object.entries(await readBadges())
+        .filter(([, e]) => isBadgeAnimating(e.seenAt, now))
+        .map(([b]) => b),
+    );
+  } catch {
+    return new Set();
+  }
 }
 
 /** 상품을 직접 열어 봤으면 그 상품 표시만 바로 지운다 */

@@ -14,6 +14,8 @@ import {
 } from '@/lib/order-repo';
 import { bumpMonthlyUsage, withinMonthlyLimit } from '@/lib/entitlement';
 import { buildOrderShareText } from '@/lib/order-share';
+import OrderConfirmSheet from '@/components/OrderConfirmSheet';
+import { addOrderHistory } from '@/lib/order-history';
 import { OrderCart, OrderProduct } from '@/lib/order-types';
 
 export default function OrderCartScreen() {
@@ -21,6 +23,9 @@ export default function OrderCartScreen() {
   const [cart, setCart] = useState<OrderCart>({});
   const [products, setProducts] = useState<OrderProduct[]>([]);
   const [storeName, setStoreName] = useState<string | null>(null);
+  const [activeStoreId, setActiveStoreId] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [sending, setSending] = useState(false);
 
   const load = useCallback(async () => {
     const [cartData, productList, activeStoreId, stores] = await Promise.all([
@@ -31,6 +36,7 @@ export default function OrderCartScreen() {
     ]);
     setCart(cartData);
     setProducts(productList);
+    setActiveStoreId(activeStoreId ?? null);
     setStoreName(stores.find((s) => s.id === activeStoreId)?.name ?? null);
   }, []);
 
@@ -80,24 +86,48 @@ export default function OrderCartScreen() {
     ]);
   };
 
-  const share = async () => {
+  const shareText = useMemo(
+    () => buildOrderShareText(cart, products, storeName, new Date()),
+    [cart, products, storeName],
+  );
+
+  const openConfirm = async () => {
     if (!(await withinMonthlyLimit('order'))) {
       router.push('/premium?reason=order');
       return;
     }
-    const text = buildOrderShareText(cart, products, storeName, new Date());
+    setConfirmOpen(true);
+  };
+
+  const share = async ({ deliveryDate, memo }: { deliveryDate: string; memo: string }) => {
+    if (sending) return;
+    setSending(true);
     try {
-      const result = await Share.share({ message: text });
+      const result = await Share.share({ message: buildOrderShareText(cart, products, storeName, new Date()) });
       // Android는 공유 대상 앱에서 실제로 전송을 완료했는지 알려주지 않는다(공유 시트를
       // 띄운 시점에 곧바로 resolve됨) — sharedAction이면 전달 시도가 이뤄진 것으로 보고 비운다.
       // iOS는 사용자가 취소하면 dismissedAction이 와서 이 분기를 안 타 장바구니가 보존된다.
       if (result.action === Share.sharedAction) {
         await bumpMonthlyUsage('order');
+        try {
+          await addOrderHistory({
+            storeId: activeStoreId,
+            storeName: storeName ?? '',
+            items: items.map((i) => ({ productId: i.product.id, name: i.product.name, qty: i.qty })),
+            deliveryDate,
+            memo,
+          });
+        } catch {
+          // 이력 저장 실패가 발주 흐름을 막지 않는다.
+        }
         await clearOrderCart();
         setCart({});
+        setConfirmOpen(false);
       }
     } catch (e) {
       Alert.alert('공유 실패', e instanceof Error ? e.message : '알 수 없는 오류');
+    } finally {
+      setSending(false);
     }
   };
 
@@ -107,7 +137,7 @@ export default function OrderCartScreen() {
         <View style={{ width: 48, height: 6, borderRadius: 3, backgroundColor: '#9A9A9A' }} />
       </View>
       <View className="flex-row items-center justify-between bg-paper px-4 pb-2">
-        <Text className="text-ink text-lg font-bold">발주 내역</Text>
+        <Text className="text-ink text-lg font-bold">발주서 확인</Text>
         <Pressable
           onPress={() => router.back()}
           hitSlop={11}
@@ -184,7 +214,7 @@ export default function OrderCartScreen() {
       >
         <Text className="text-muted mb-3 text-sm">총 합계: {total}박스</Text>
         <Pressable
-          onPress={share}
+          onPress={openConfirm}
           disabled={items.length === 0}
           className={`items-center rounded-xl py-3.5 ${
             items.length === 0 ? 'bg-line' : 'bg-primary active:opacity-80'
@@ -193,6 +223,14 @@ export default function OrderCartScreen() {
           <Text className="text-paper text-base font-bold">공유하기</Text>
         </Pressable>
       </View>
+      <OrderConfirmSheet
+        visible={confirmOpen}
+        storeName={storeName}
+        message={shareText}
+        onClose={() => setConfirmOpen(false)}
+        onSend={share}
+        sending={sending}
+      />
     </View>
   );
 }

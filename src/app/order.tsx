@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Chip from '@/components/Chip';
 import HeaderIcon from '@/components/HeaderIcon';
 import Thumbnail from '@/components/Thumbnail';
+import UpdateBadge, { UPDATE_BADGE_META } from '@/components/UpdateBadge';
 import {
   addFridgeSection,
   clearFridgeSection,
@@ -37,7 +38,9 @@ import {
   deleteStore,
   getActiveStoreId,
   getCatalogUpdateBadges,
+  getCatalogUpdateBadgeAnimating,
   getOrderCart,
+  getOrderCartForStore,
   listFridgeAssignments,
   listFridgeSectionDividers,
   listFridgeSections,
@@ -72,6 +75,9 @@ import { DEFAULT_COLUMNS, isSpacerId, normalizeSpan, packRows } from '@/lib/frid
 import { FridgeAssignment, FridgeLayoutSettings, FridgeSection, OrderCart, OrderProduct, OrderStatus, Store } from '@/lib/order-types';
 import { buildProductSearchIndex, searchOrderProducts } from '@/lib/order-search';
 import HomeBanner from '@/components/HomeBanner';
+import VoiceOrderModal from '@/components/VoiceOrderModal';
+import OrderHistoryModal from '@/components/OrderHistoryModal';
+import { frequentProductIds, listOrderHistory, OrderHistoryEntry } from '@/lib/order-history';
 
 const STATUS_META: Record<OrderStatus, { label: string; color: string }> = {
   active: { label: '시판중', color: '#2E7D32' },
@@ -80,14 +86,11 @@ const STATUS_META: Record<OrderStatus, { label: string; color: string }> = {
   paused: { label: '생산중단', color: '#B45309' },
 };
 
-const UPDATE_BADGE_META: Record<CatalogUpdateBadge, { label: string; color: string }> = {
-  new: { label: '신규', color: '#2962FF' },
-  updated: { label: '수정', color: '#F9A825' },
-};
 
-// 따라하기 안내를 마쳤는지(기기별), 1.1.1 새 기능 말풍선을 봤는지
+// 따라하기 안내를 마쳤는지(기기별), 1.2.0 새 기능 말풍선을 봤는지(1.1.1 것은 배치 편집·수량 조절 안내 — 본 사람에겐 다시 안 띄움)
 const COACH_DONE_KEY = 'orderCoachDone:v1';
-const WHATS_NEW_KEY = 'orderWhatsNew:1.1.1';
+const WHATS_NEW_KEY = 'orderWhatsNew:1.2.0';
+const WHATS_NEW_LEGACY_KEY = 'orderWhatsNew:1.1.1';
 
 export default function Order() {
   const insets = useSafeAreaInsets();
@@ -95,6 +98,7 @@ export default function Order() {
   const [categories, setCategories] = useState<string[]>([]);
   const [cart, setCart] = useState<OrderCart>({});
   const [updateBadges, setUpdateBadges] = useState<Map<string, CatalogUpdateBadge>>(new Map());
+  const [animatingBadges, setAnimatingBadges] = useState<Set<string>>(new Set());
   const [stores, setStores] = useState<Store[]>([]);
   const [activeStoreId, setActiveStoreIdState] = useState<string | null>(null);
   const [showStoreModal, setShowStoreModal] = useState(false);
@@ -122,16 +126,20 @@ export default function Order() {
     card: useRef<View>(null),
     cart: useRef<View>(null),
     edit: useRef<View>(null),
+    hist: useRef<View>(null),
+    voice: useRef<View>(null),
   };
   const [coachDone, setCoachDone] = useState<boolean | null>(null);
   const [whatsNewDone, setWhatsNewDone] = useState<boolean | null>(null);
   const [coachRunning, setCoachRunning] = useState<'tour' | 'replay' | null>(null);
+  const [legacyWhatsNewSeen, setLegacyWhatsNewSeen] = useState(true);
   const [coachAck, setCoachAck] = useState<Set<string>>(new Set());
   useEffect(() => {
-    AsyncStorage.multiGet([COACH_DONE_KEY, WHATS_NEW_KEY])
-      .then(([a, b]) => {
+    AsyncStorage.multiGet([COACH_DONE_KEY, WHATS_NEW_KEY, WHATS_NEW_LEGACY_KEY])
+      .then(([a, b, c]) => {
         setCoachDone(!!a[1]);
         setWhatsNewDone(!!b[1]);
+        setLegacyWhatsNewSeen(!!c[1]);
       })
       .catch(() => {
         setCoachDone(true);
@@ -146,6 +154,11 @@ export default function Order() {
   const [fridgeSearchQuery, setFridgeSearchQuery] = useState('');
   const [query, setQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('전체');
+  // 검색발주: ⭐ 자주 발주 칩(발주 이력에서 자주 쓴 상품만), 🎙️ 음성 발주, 📅 이력 창
+  const [frequentOnly, setFrequentOnly] = useState(false);
+  const [frequentIds, setFrequentIds] = useState<Set<string> | null>(null);
+  const [showVoice, setShowVoice] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [categoryInput, setCategoryInput] = useState('');
   const [showCategoryInput, setShowCategoryInput] = useState(false);
@@ -167,11 +180,13 @@ export default function Order() {
 
   const loadCatalog = useCallback(async () => {
     const cartVersion = cartVersionRef.current;
-    const [productList, categoryList, cartData, badges, storeList, activeId] = await Promise.all([
+    // 움직임 대상은 markCatalogUpdateBadgesSeen 보다 먼저 읽어야 방금 처음 본 표시도 움직임으로 잡힌다
+    const [productList, categoryList, cartData, badges, animating, storeList, activeId] = await Promise.all([
       listOrderProducts(),
       listOrderCategories(),
       getOrderCart(),
       getCatalogUpdateBadges(),
+      getCatalogUpdateBadgeAnimating(),
       listStores(),
       getActiveStoreId(),
     ]);
@@ -179,6 +194,7 @@ export default function Order() {
     setCategories(categoryList);
     if (cartVersionRef.current === cartVersion) setCart(cartData);
     setUpdateBadges(badges);
+    setAnimatingBadges(animating);
     // 처음 보인 때부터 하루 유지 — 나갔다 들어와도 계속 보인다(예전엔 화면을 한 번 열면 바로 지워졌다)
     if (badges.size > 0) markCatalogUpdateBadgesSeen().catch(() => {});
     setStores(storeList);
@@ -385,8 +401,9 @@ export default function Order() {
 
   const filtered = useMemo(() => {
     const base = searched ?? badgeSorted;
-    return selectedCategory === '전체' ? base : base.filter((p) => p.category === selectedCategory);
-  }, [searched, badgeSorted, selectedCategory]);
+    const byCategory = selectedCategory === '전체' ? base : base.filter((p) => p.category === selectedCategory);
+    return frequentOnly ? byCategory.filter((p) => frequentIds?.has(p.id)) : byCategory;
+  }, [searched, badgeSorted, selectedCategory, frequentOnly, frequentIds]);
 
   // 카테고리 탭과 무관하게 전체 상품에서 찾는 자동완성 제안 — 검색창 바로 아래 드롭다운으로
   // 뜨는 용도라 5개로 제한한다 (스크롤 없는 빠른 담기 목적, 전체 목록은 아래에 그대로 있음).
@@ -537,6 +554,80 @@ export default function Order() {
     [changeQty],
   );
 
+  const showToast = useCallback((message: string) => {
+    setToastMessage(message);
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    toastTimeoutRef.current = setTimeout(() => setToastMessage(null), 2500);
+  }, []);
+
+  // ⭐ 자주 발주: 켤 때마다 발주 이력을 새로 읽어 자주 쓴 상품 id를 모은다
+  const onToggleFrequent = useCallback(() => {
+    if (frequentOnly) {
+      setFrequentOnly(false);
+      return;
+    }
+    setFrequentOnly(true);
+    setFrequentIds(null);
+    listOrderHistory()
+      .then((entries) => setFrequentIds(new Set(frequentProductIds(entries))))
+      .catch(() => setFrequentIds(new Set()));
+  }, [frequentOnly]);
+
+  // 🎙️ 음성 발주: 알아들은 상품을 지금 장바구니에 수량으로 더한다(낙관적 업데이트는 changeQty 그대로)
+  const onVoiceApply = useCallback(
+    (adds: { productId: string; qty: number }[]) => {
+      for (const a of adds) if (a.qty > 0) changeQty(a.productId, a.qty);
+    },
+    [changeQty],
+  );
+  const onVoiceManualSearch = useCallback((keyword: string) => {
+    setShowVoice(false);
+    setQuery(keyword);
+    setSelectedCategory('전체');
+    setFrequentOnly(false);
+  }, []);
+
+  // 📅 이력 '이대로 다시 담기': 장바구니를 그 발주 내용으로 바꾼다(그 매장이 지금과 다르면 매장부터 바꿈)
+  const onReorderHistory = useCallback(
+    async (entry: OrderHistoryEntry) => {
+      const known = new Set(products.map((p) => p.id));
+      const next: OrderCart = {};
+      let skipped = 0;
+      for (const it of entry.items) {
+        const qty = Math.floor(it.qty);
+        if (!known.has(it.productId)) skipped += 1;
+        else if (qty > 0) next[it.productId] = (next[it.productId] ?? 0) + qty;
+      }
+      if (Object.keys(next).length === 0) {
+        Alert.alert('다시 담을 수 없어요', '그때 발주한 상품이 지금 목록에 없어요.');
+        return;
+      }
+      const otherStore = !!entry.storeId && entry.storeId !== activeStoreId && stores.some((s) => s.id === entry.storeId);
+      // 바뀌는 건 '그 매장'의 장바구니 — 확인 전에는 매장을 바꾸지 않고 그 매장의 장바구니만 읽는다
+      const currentBoxes = otherStore
+        ? Object.values(await getOrderCartForStore(entry.storeId!)).reduce((sum, q) => sum + q, 0)
+        : totalCount;
+      const apply = async () => {
+        if (otherStore) await switchStore(entry.storeId!);
+        cartVersionRef.current += 1;
+        setCart(next);
+        writeOrderCart(next).catch(() => {});
+        setShowHistory(false);
+        const boxes = Object.values(next).reduce((sum, q) => sum + q, 0);
+        if (skipped > 0) Alert.alert('다시 담았어요', `${boxes}박스를 담았어요.
+${skipped}개는 지금 목록에 없어 빠졌어요.`);
+        else showToast(`${boxes}박스를 다시 담았어요`);
+      };
+      if (currentBoxes > 0) {
+        Alert.alert('장바구니를 바꿀까요?', `지금 담긴 ${currentBoxes}박스가 이 발주로 바뀌어요.`, [
+          { text: '취소', style: 'cancel' },
+          { text: '바꾸기', style: 'destructive', onPress: apply },
+        ]);
+      } else apply();
+    },
+    [products, activeStoreId, stores, switchStore, totalCount, showToast],
+  );
+
   const submitCategory = async () => {
     const v = categoryInput.trim();
     if (!v) return;
@@ -667,18 +758,23 @@ export default function Order() {
   );
 
   // 줄 그리는 함수를 고정 — 매번 새로 만들면 목록이 보이는 줄 전부를 다시 그린다
+  // 검색어가 있을 때만 사진 대신 글자 카드로 보여 준다(textCard)
+  const searching = deferredQuery.trim() !== '';
   const renderCatalogRow = useCallback(
     ({ item }: { item: OrderProduct }) => (
       <CatalogRow
         product={item}
         qty={cart[item.id] ?? 0}
         badge={item.barcode ? updateBadges.get(item.barcode) : undefined}
+        badgeAnimate={item.barcode ? animatingBadges.has(item.barcode) : false}
+        textCard={searching}
         onChangeQty={changeQty}
+        onOpenQty={setQtyProduct}
         onPress={handleOpenProduct}
         onLongPress={onLongPressProduct}
       />
     ),
-    [cart, updateBadges, changeQty, handleOpenProduct, onLongPressProduct],
+    [cart, updateBadges, animatingBadges, searching, changeQty, handleOpenProduct, onLongPressProduct],
   );
 
   const onEditSettingsProduct = useCallback(() => {
@@ -763,21 +859,29 @@ export default function Order() {
     { key: 'zone', target: coachRefs.zone, ack: true, done: coachAck.has('zone'), title: '냉동고 칸(구역)은 여기서 관리해요', body: '예: 600바-1, 콘류 — 실제 칸 이름으로 바꾸거나 더 만들 수 있어요' },
     { key: 'add', target: coachRefs.add, ack: replay, done: replay ? coachAck.has('add') : fridgeItems.some((i) => i.product), title: '이 칸에 있는 상품을 넣어요', body: '실제 진열 순서대로 넣으면 화면도 냉동고처럼 보여요' },
     { key: 'card', target: coachRefs.card, ack: replay, done: replay ? coachAck.has('card') : totalCount > 0, title: '빈 칸 상품을 눌러 담아요', body: '한 번 누를 때마다 1박스 · 빨간 숫자를 누르면 수량 조절' },
-    { key: 'cart', target: coachRefs.cart, ack: true, done: coachAck.has('cart'), title: '다 담았으면 발주 내역을 확인해요', body: "수량을 보고 '공유하기'로 거래처에 보내요" },
+    { key: 'cart', target: coachRefs.cart, ack: true, done: coachAck.has('cart'), title: '다 담았으면 발주서를 확인해요', body: "아래 '발주서 확인'에서 납품 희망일·배송 메모를 정하고, 카톡/SMS로 보내요" },
   ];
   // 다시 보기에선 지금 화면에 없는 버튼(예: 담은 게 없으면 발주 내역 바)은 건너뛴다
   const visibleTour = replay ? tourSteps.filter((st) => st.key !== 'cart' || totalCount > 0).filter((st) => st.key !== 'card' || fridgeItems.some((i) => i.product)) : tourSteps;
-  const whatsNewSteps: (CoachStep & { done: boolean })[] = [
-    { key: 'wn-edit', target: coachRefs.edit, ack: true, done: coachAck.has('wn-edit'), title: '새 기능: 배치 편집', body: '열 수·칸 크기(1칸/2칸/줄)·빈칸, 끌어서 옮기기까지 실제 냉동고처럼 맞춰요' },
-    { key: 'wn-qty', target: coachRefs.card, ack: true, done: coachAck.has('wn-qty'), title: '누르면 1박스, 빨간 숫자는 수량 조절', body: '빨간 숫자를 누르면 여러 박스를 한 번에 넣거나 뺄 수 있어요' },
-    { key: 'wn-long', target: coachRefs.card, ack: true, done: coachAck.has('wn-long'), title: '길게 누르면 실제 사진', body: '계속 누르고 있으면(1초) 배치 편집이 바로 켜져요' },
+  // 1.1.1 말풍선(배치 편집·수량·길게 누르기)을 이미 본 사람에겐 빼고, 새 기능(이력·음성)은 검색발주 화면에서 보여 준다
+  const whatsNewSteps: (CoachStep & { done: boolean; mode: 'quick' | 'search' })[] = [
+    ...(legacyWhatsNewSeen ? [] : [
+      { key: 'wn-edit', mode: 'quick' as const, target: coachRefs.edit, ack: true, done: coachAck.has('wn-edit'), title: '새 기능: 배치 편집', body: '열 수·칸 크기(1칸/2칸/줄)·빈칸, 끌어서 옮기기까지 실제 냉동고처럼 맞춰요' },
+      { key: 'wn-qty', mode: 'quick' as const, target: coachRefs.card, ack: true, done: coachAck.has('wn-qty'), title: '누르면 1박스, 빨간 숫자는 수량 조절', body: '빨간 숫자를 누르면 여러 박스를 한 번에 넣거나 뺄 수 있어요' },
+      { key: 'wn-long', mode: 'quick' as const, target: coachRefs.card, ack: true, done: coachAck.has('wn-long'), title: '길게 누르면 실제 사진', body: '계속 누르고 있으면(1초) 배치 편집이 바로 켜져요' },
+    ]),
+    { key: 'wn-hist', mode: 'search' as const, target: coachRefs.hist, ack: true, done: coachAck.has('wn-hist'), title: '새 기능: 발주 이력', body: '보낸 발주를 날짜별로 보고, 「이대로 다시 담기」로 한 번에 다시 담을 수 있어요' },
+    { key: 'wn-voice', mode: 'search' as const, target: coachRefs.voice, ack: true, done: coachAck.has('wn-voice'), title: '새 기능: 음성 발주 (Beta)', body: '말로 "메로나 두 박스"처럼 하면 알아듣고 담아 줘요' },
   ];
-  const showWhatsNew = !coachRunning && coachDone === true && whatsNewDone === false && mode === 'quick' && !layoutEditing && fridgeItems.some((i) => i.product);
-  const coachList = coachRunning ? visibleTour : showWhatsNew ? whatsNewSteps : [];
+  const showWhatsNew = !coachRunning && coachDone === true && whatsNewDone === false && !layoutEditing && (mode === 'search' || fridgeItems.some((i) => i.product));
+  const coachList = coachRunning ? visibleTour : showWhatsNew ? whatsNewSteps.filter((st) => st.mode === mode) : [];
   const coachIndex = coachList.findIndex((st) => !st.done);
+  const whatsNewAllDone = whatsNewSteps.every((st) => st.done);
   useEffect(() => {
-    if (coachList.length && coachIndex < 0) (coachRunning ? finishCoach : finishWhatsNew)();
-  }, [coachList.length, coachIndex, coachRunning, finishCoach, finishWhatsNew]);
+    if (!coachList.length || coachIndex >= 0) return;
+    if (coachRunning) finishCoach();
+    else if (whatsNewAllDone) finishWhatsNew(); // 다른 화면에 보여 줄 말풍선이 남았으면 거기서 이어서
+  }, [coachList.length, coachIndex, coachRunning, finishCoach, finishWhatsNew, whatsNewAllDone]);
   const coachStep = coachIndex >= 0 ? coachList[coachIndex] : null;
 
   const onRemoveFridgeTile = useCallback(
@@ -881,6 +985,19 @@ export default function Order() {
           <Text className="text-muted ml-1.5 text-xs">매장 관리</Text>
           <MaterialCommunityIcons name="chevron-down" size={16} color="#888888" />
         </Pressable>
+
+        {mode === 'search' ? (
+          <Pressable
+            onPress={() => setShowHistory(true)}
+            ref={coachRefs.hist}
+            collapsable={false}
+            className="h-12 items-center justify-center rounded-full border border-line bg-paper px-4 active:opacity-70"
+            accessibilityRole="button"
+            accessibilityLabel="발주 이력 보기"
+          >
+            <Text className="text-ink text-sm font-medium">📅 이력</Text>
+          </Pressable>
+        ) : null}
 
         {mode === 'quick' && activeStoreId ? (
           <View className="flex-row items-center" style={{ gap: 8 }}>
@@ -1039,6 +1156,16 @@ export default function Order() {
               >
                 <MaterialCommunityIcons name="barcode-scan" size={22} color="#1A1A1A" />
               </Pressable>
+              <Pressable
+                onPress={() => setShowVoice(true)}
+                ref={coachRefs.voice}
+                collapsable={false}
+                className="h-11 w-11 items-center justify-center rounded-lg active:bg-bg"
+                accessibilityRole="button"
+                accessibilityLabel="음성으로 발주 (Beta)"
+              >
+                <Text style={{ fontSize: 20 }}>🎙️</Text>
+              </Pressable>
               {query ? (
                 <Pressable
                   onPress={() => setQuery('')}
@@ -1084,6 +1211,7 @@ export default function Order() {
 
           <View className="mt-2.5 px-4" style={{ gap: 8 }}>
             <View className="flex-row flex-wrap" style={{ gap: 8 }}>
+              <Chip label="⭐ 자주 발주" active={frequentOnly} onPress={onToggleFrequent} />
               <Chip
                 label="전체"
                 active={selectedCategory === '전체'}
@@ -1152,6 +1280,15 @@ export default function Order() {
             windowSize={5}
             renderItem={renderCatalogRow}
             ListEmptyComponent={
+              frequentOnly ? (
+                frequentIds === null ? null : (
+                  <Text className="text-muted mx-6 mt-16 text-center text-sm">
+                    {frequentIds.size === 0
+                      ? '아직 발주 이력이 없어요. 발주하면 자주 쓰는 상품이 여기 모여요'
+                      : '이 조건에 맞는 자주 발주 상품이 없어요'}
+                  </Text>
+                )
+              ) : (
               <View className="mt-24 items-center">
                 <MaterialCommunityIcons name="cart-outline" size={48} color="#CCCCCC" />
                 <Text className="text-muted mt-4 text-base">등록된 발주 상품이 없습니다</Text>
@@ -1168,6 +1305,7 @@ export default function Order() {
                   </Text>
                 </Pressable>
               </View>
+              )
             }
           />
         </>
@@ -1322,16 +1460,6 @@ export default function Order() {
                   setTileColor(settingsProduct.id, color).then(setTileColors).catch(() => {});
                 }}
               />
-              <QtySheet
-                productName={qtyProduct?.name ?? ''}
-                qty={qtyProduct ? cart[qtyProduct.id] ?? 0 : 0}
-                visible={qtyProduct !== null}
-                onConfirm={(next) => {
-                  if (qtyProduct) changeQty(qtyProduct.id, next - (cart[qtyProduct.id] ?? 0));
-                  setQtyProduct(null);
-                }}
-                onClose={() => setQtyProduct(null)}
-              />
             </>
           )}
         </>
@@ -1349,14 +1477,33 @@ export default function Order() {
             }}
             ref={coachRefs.cart}
             collapsable={false}
-            className="flex-row items-center justify-between rounded-2xl bg-ink px-5 py-4 active:opacity-80"
+            className="flex-row items-center justify-center rounded-2xl bg-ink px-5 py-4 active:opacity-80"
             style={{ elevation: 6 }}
           >
-            <Text className="text-paper text-base font-bold">발주 내역 확인</Text>
-            <Text className="text-paper text-base font-bold">{totalCount}박스</Text>
+            <Text className="text-paper text-base font-bold">[ {totalCount}박스 ] 발주서 확인</Text>
           </Pressable>
         </View>
       ) : null}
+
+      {/* 수량 직접 입력 창 — 빠른발주의 빨간 숫자와 검색발주의 숫자 버튼이 함께 쓴다 */}
+      <QtySheet
+        productName={qtyProduct?.name ?? ''}
+        qty={qtyProduct ? cart[qtyProduct.id] ?? 0 : 0}
+        visible={qtyProduct !== null}
+        onConfirm={(next) => {
+          if (qtyProduct) changeQty(qtyProduct.id, next - (cart[qtyProduct.id] ?? 0));
+          setQtyProduct(null);
+        }}
+        onClose={() => setQtyProduct(null)}
+      />
+      <VoiceOrderModal
+        visible={showVoice}
+        onClose={() => setShowVoice(false)}
+        products={products}
+        onApply={onVoiceApply}
+        onManualSearch={onVoiceManualSearch}
+      />
+      <OrderHistoryModal visible={showHistory} onClose={() => setShowHistory(false)} onReorder={onReorderHistory} />
     </View>
       {/* 매장 무료 사용자 하단 배너(구독·이벤트·테스터는 안 보임) */}
       <HomeBanner />
@@ -1384,7 +1531,8 @@ const QuickOrderHelpModal = memo(function QuickOrderHelpModal({
     "'구역 관리'에서 냉동고 칸을 만들어요 (예: 600바-1, 콘류)",
     "'+ 상품 진열하기'로 그 칸에 있는 상품을 실제 진열 순서대로 넣어요",
     '발주할 상품을 탭해서 담아요 (한 번 탭 = 1박스)',
-    "아래 '발주 내역 확인'에서 수량을 보고 '공유하기'로 보내요",
+    "아래 '[ N박스 ] 발주서 확인'을 눌러요. 납품 희망일을 고르고 배송 메모를 적은 뒤, 보낼 내용을 미리 보고 카톡/SMS로 보내요",
+    "보낸 발주는 위쪽 '📅 이력'(검색발주 화면)에 저장돼요",
   ];
   const buttons: { icon: keyof typeof MaterialCommunityIcons.glyphMap; color?: string; text: string }[] = [
     { icon: 'gesture-tap', text: '상품 탭 — 1박스 담기' },
@@ -1394,6 +1542,18 @@ const QuickOrderHelpModal = memo(function QuickOrderHelpModal({
     { icon: 'arrow-all', text: '화살표 — 누른 뒤 옮길 자리의 상품을 탭하면 서로 자리가 바뀌어요' },
     { icon: 'trash-can-outline', text: '휴지통 — 이 구역에서 빼기 (상품 자체는 지워지지 않아요)' },
     { icon: 'gesture-tap-hold', text: '구역 이름을 꾹 — 이름 변경 · 순서 변경 · 상품 비우기 · 삭제' },
+    { icon: 'pencil-ruler', text: '배치 편집 — 칸 크기·빈칸·순서를 냉동고처럼 맞춰요 (같은 팀 기기에도 같이 바뀌어요)' },
+    { icon: 'card-text-outline', text: '상품 칸은 사진 대신 색깔 글자 카드로 보여요 (톱니바퀴에서 색을 바꿀 수 있어요)' },
+  ];
+  // 검색발주 화면 설명
+  const searchTips: { icon: keyof typeof MaterialCommunityIcons.glyphMap; text: string }[] = [
+    { icon: 'magnify', text: '검색창 — 상품명, 초성(예: ㅁㄹㄴ), 바코드로 찾아요. 검색하는 동안은 사진 대신 글자 카드로 보여요' },
+    { icon: 'barcode-scan', text: '바코드 버튼 — 스캔하면 목록에서 찾아 줘요. 없는 새 상품이면 등록 화면으로 가고, 사진을 못 찾으면 사진 찍기 창이 바로 떠요' },
+    { icon: 'microphone-outline', text: "🎙️ 음성 발주 (Beta) — 말로 '메로나 두 박스'처럼 하면 알아듣고 담아요. 못 찾은 건 직접 검색으로 이어져요" },
+    { icon: 'star-outline', text: '⭐ 자주 발주 — 발주 이력에서 자주 보낸 상품만 모아 봐요. 카테고리 칩과 함께 쓸 수 있어요' },
+    { icon: 'plus-circle-outline', text: "'+ 담기' — 담으면 [−] 숫자 [+]로 바뀌어요. 가운데 숫자를 누르면 수량을 직접 적을 수 있어요" },
+    { icon: 'calendar-month-outline', text: "📅 이력 — 보낸 발주를 날짜별로 봐요(예: '메로나 외 3건'). 누르면 자세히 보이고, '이대로 다시 담기'로 장바구니를 그 발주로 바꿔요" },
+    { icon: 'chat-outline', text: "카톡/SMS 문구 — 1박스는 상품 이름만, 2박스 이상일 때만 'N박스'가 붙어요" },
   ];
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -1441,6 +1601,16 @@ const QuickOrderHelpModal = memo(function QuickOrderHelpModal({
               {buttons.map((b) => (
                 <View key={b.text} className="flex-row items-center" style={{ gap: 10 }}>
                   <MaterialCommunityIcons name={b.icon} size={18} color={b.color ?? '#1A1A1A'} />
+                  <Text className="text-ink flex-1 text-sm">{b.text}</Text>
+                </View>
+              ))}
+            </View>
+
+            <Text className="text-ink mb-2 mt-4 text-sm font-bold">검색발주 화면</Text>
+            <View className="gap-2.5">
+              {searchTips.map((b) => (
+                <View key={b.text} className="flex-row items-center" style={{ gap: 10 }}>
+                  <MaterialCommunityIcons name={b.icon} size={18} color="#1A1A1A" />
                   <Text className="text-ink flex-1 text-sm">{b.text}</Text>
                 </View>
               ))}
@@ -1950,7 +2120,7 @@ const SearchInput = memo(function SearchInput({
   return (
     <TextInput
       className="text-ink ml-1 flex-1 py-2.5 text-base"
-      placeholder="상품명·바코드로 검색하세요"
+      placeholder="상품명·초성(ㅁㄹㄴ)·바코드"
       placeholderTextColor="#BBBBBB"
       value={text}
       onChangeText={onChangeText}
@@ -1962,47 +2132,58 @@ const CatalogRow = memo(function CatalogRow({
   product,
   qty,
   badge,
+  badgeAnimate,
+  textCard,
   onChangeQty,
+  onOpenQty,
   onPress,
   onLongPress,
 }: {
   product: OrderProduct;
   qty: number;
   badge?: CatalogUpdateBadge;
+  badgeAnimate?: boolean;
+  /** 검색어가 있을 때만 true — 사진 대신 상품명 앞 2글자 카드로 보여 준다 */
+  textCard: boolean;
   onChangeQty: (id: string, delta: number) => void;
+  onOpenQty: (product: OrderProduct) => void;
   onPress: (id: string, barcode: string | null) => void;
   onLongPress: (product: OrderProduct) => void;
 }) {
   const statusMeta = STATUS_META[product.status ?? 'active'];
-  const badgeMeta = badge ? UPDATE_BADGE_META[badge] : null;
+  // 글자 카드 색은 브랜드 기준(같은 브랜드는 늘 같은 색)
+  const card = textCard ? tileColor(product.brand || product.name) : null;
   return (
     <Pressable
       onPress={() => onPress(product.id, product.barcode)}
       onLongPress={() => onLongPress(product)}
       className="mx-4 mb-2.5 flex-row items-center rounded-xl border border-line bg-paper p-3 active:opacity-70"
     >
-      <Thumbnail uri={product.imageUri} size={56} radius={8} iconSize={22} />
+      <View style={{ overflow: 'visible' }}>
+        {card ? (
+          <View className="items-center justify-center" style={{ width: 56, height: 56, borderRadius: 8, backgroundColor: card.bg }}>
+            <Text style={{ color: card.fg, fontSize: 18, fontWeight: 'bold' }} numberOfLines={1}>
+              {[...product.name.replace(/\s/g, '')].slice(0, 2).join('')}
+            </Text>
+          </View>
+        ) : (
+          <Thumbnail uri={product.imageUri} size={56} radius={8} iconSize={22} />
+        )}
+        {badge ? (
+          <View style={{ position: 'absolute', top: -6, left: -6, zIndex: 1, elevation: 2 }}>
+            <UpdateBadge kind={badge} animate={!!badgeAnimate} />
+          </View>
+        ) : null}
+      </View>
       <View className="ml-3 flex-1">
-        <View className="flex-row items-center gap-1.5">
-          {badgeMeta ? (
-            <View
-              className="rounded px-1.5 py-0.5"
-              style={{ backgroundColor: badgeMeta.color }}
-            >
-              <Text className="text-xs font-bold" style={{ color: '#FFFFFF' }}>
-                {badgeMeta.label}
-              </Text>
-            </View>
-          ) : null}
-          <Text className="text-ink text-base font-bold" numberOfLines={1}>
-            {product.name}
-          </Text>
-        </View>
+        <Text className="text-ink text-base font-bold" numberOfLines={1}>
+          {product.name}
+        </Text>
         <Text className="text-muted mt-0.5 text-sm">
           {product.brand} · {product.price > 0 ? `${product.price.toLocaleString()}원` : '가격 미등록'}
         </Text>
         {product.barcode ? (
-          <Text className="text-muted mt-0.5 text-xs">{product.barcode}</Text>
+          <Text className="text-muted mt-0.5 text-xs">…{product.barcode.slice(-4)}</Text>
         ) : null}
         <View
           className="mt-1 flex-row items-center self-start rounded px-1.5 py-0.5"
@@ -2014,25 +2195,48 @@ const CatalogRow = memo(function CatalogRow({
           <MaterialCommunityIcons name="chevron-down" size={12} color="#FFFFFF" />
         </View>
       </View>
-      <View className="flex-row items-center">
-        <Pressable
-          onPress={() => onChangeQty(product.id, -1)}
-          className="h-11 w-11 items-center justify-center rounded-lg border border-line bg-bg active:opacity-70"
-        >
-          <MaterialCommunityIcons name="minus" size={20} color="#1A1A1A" />
-        </Pressable>
-        <Text
-          className="text-ink mx-3 w-7 text-center text-lg font-bold"
-          style={{ fontVariant: ['tabular-nums'] }}
-        >
-          {qty}
-        </Text>
-        <Pressable
-          onPress={() => onChangeQty(product.id, 1)}
-          className="h-11 w-11 items-center justify-center rounded-lg border border-line bg-bg active:opacity-70"
-        >
-          <MaterialCommunityIcons name="plus" size={20} color="#1A1A1A" />
-        </Pressable>
+      <View style={{ width: 132, marginLeft: 8 }}>
+        {qty <= 0 ? (
+          <Pressable
+            onPress={() => onChangeQty(product.id, 1)}
+            className="h-12 items-center justify-center rounded-xl active:opacity-80"
+            style={{ backgroundColor: '#3A8B40' }}
+            accessibilityRole="button"
+            accessibilityLabel={`${product.name} 담기`}
+          >
+            <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: 'bold' }}>+ 담기</Text>
+          </Pressable>
+        ) : (
+          <View className="h-12 flex-row items-center overflow-hidden rounded-xl border border-line bg-paper">
+            <Pressable
+              onPress={() => onChangeQty(product.id, -1)}
+              className="h-12 flex-1 items-center justify-center active:bg-bg"
+              accessibilityRole="button"
+              accessibilityLabel="하나 빼기"
+            >
+              <MaterialCommunityIcons name="minus" size={20} color="#1A1A1A" />
+            </Pressable>
+            <Pressable
+              onPress={() => onOpenQty(product)}
+              className="h-12 items-center justify-center border-x border-line px-1 active:bg-bg"
+              style={{ flex: 1.2 }}
+              accessibilityRole="button"
+              accessibilityLabel={`${product.name} ${qty}박스, 눌러서 수량 직접 입력`}
+            >
+              <Text className="text-ink text-lg font-bold" style={{ fontVariant: ['tabular-nums'] }}>
+                {qty}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => onChangeQty(product.id, 1)}
+              className="h-12 flex-1 items-center justify-center active:bg-bg"
+              accessibilityRole="button"
+              accessibilityLabel="하나 더하기"
+            >
+              <MaterialCommunityIcons name="plus" size={20} color="#1A1A1A" />
+            </Pressable>
+          </View>
+        )}
       </View>
     </Pressable>
   );

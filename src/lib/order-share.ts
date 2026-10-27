@@ -19,7 +19,7 @@ export function buildOrderShareText(
     if (qty <= 0) return;
     const product = products.find((p) => p.id === id);
     if (!product) return;
-    lines.push(`• ${product.name}: ${qty}박스`);
+    lines.push(qty >= 2 ? `• ${product.name} ${qty}박스` : `• ${product.name}`);
     total += qty;
   });
   lines.push('');
