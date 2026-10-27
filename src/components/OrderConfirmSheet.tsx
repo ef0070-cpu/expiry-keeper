@@ -3,8 +3,6 @@ import { Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-nativ
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { addDaysYmd, kstNow } from '@/lib/order-history';
 
-// 주문 마감 시각(KST, 24시간제). 확정 아님 — 실제 마감 시간 확인 필요.
-const ORDER_CUTOFF_HOUR = 18;
 const DATE_CHIPS = 5;
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -32,15 +30,9 @@ export default function OrderConfirmSheet({ visible, storeName, message, onClose
   // 열릴 때마다 현재 KST 기준으로 다시 계산한다.
   const info = useMemo(() => {
     if (!visible) return null;
-    const now = kstNow();
-    const passed = now.hour >= ORDER_CUTOFF_HOUR;
-    const first = addDaysYmd(now.ymd, passed ? 2 : 1);
-    const leftMin = (ORDER_CUTOFF_HOUR - now.hour) * 60 - now.minute;
-    return {
-      passed,
-      leftMin,
-      days: Array.from({ length: DATE_CHIPS }, (_, i) => addDaysYmd(first, i)),
-    };
+    // 주문 마감 시간이 없으므로 납품 희망일은 언제나 내일부터 고른다.
+    const first = addDaysYmd(kstNow().ymd, 1);
+    return { days: Array.from({ length: DATE_CHIPS }, (_, i) => addDaysYmd(first, i)) };
   }, [visible]);
 
   useEffect(() => {
@@ -52,7 +44,6 @@ export default function OrderConfirmSheet({ visible, storeName, message, onClose
 
   if (!info) return null;
   const selected = picked ?? info.days[0];
-  const cutoff = `${ORDER_CUTOFF_HOUR}:00`;
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={sending ? undefined : onClose}>
@@ -84,15 +75,6 @@ export default function OrderConfirmSheet({ visible, storeName, message, onClose
                   </Pressable>
                 );
               })}
-            </View>
-
-            <View className="mb-3 flex-row items-center justify-between rounded-xl bg-bg px-3 py-3">
-              <Text className="text-muted text-sm">주문 마감</Text>
-              <Text className="text-ink text-sm font-bold">
-                {info.passed
-                  ? `오늘 ${cutoff} 지남 → 내일 ${cutoff}`
-                  : `오늘 ${cutoff} (${Math.floor(info.leftMin / 60)}시간 ${info.leftMin % 60}분 남음)`}
-              </Text>
             </View>
 
             <Text className="text-muted mb-2 text-sm">카톡/SMS로 보낼 내용 (1박스는 생략)</Text>
