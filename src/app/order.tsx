@@ -2106,13 +2106,13 @@ const CatalogRow = memo(function CatalogRow({
     >
       <View style={{ overflow: 'visible' }}>
         {card ? (
-          <View className="items-center justify-center" style={{ width: 44, height: 44, borderRadius: 8, backgroundColor: card.bg }}>
-            <Text style={{ color: card.fg, fontSize: 15, fontWeight: 'bold' }} numberOfLines={1}>
+          <View className="items-center justify-center" style={{ width: 56, height: 56, borderRadius: 8, backgroundColor: card.bg }}>
+            <Text style={{ color: card.fg, fontSize: 18, fontWeight: 'bold' }} numberOfLines={1}>
               {[...product.name.replace(/\s/g, '')].slice(0, 2).join('')}
             </Text>
           </View>
         ) : (
-          <Thumbnail uri={product.imageUri} size={44} radius={8} iconSize={18} />
+          <Thumbnail uri={product.imageUri} size={56} radius={8} iconSize={22} />
         )}
         {badge ? (
           <View style={{ position: 'absolute', top: -6, left: -6, zIndex: 1, elevation: 2 }}>
