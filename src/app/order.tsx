@@ -167,7 +167,6 @@ export default function Order() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [lastAdd, setLastAdd] = useState<{ id: string; name: string } | null>(null);
   const lastAddTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [suggestionsCollapsed, setSuggestionsCollapsed] = useState(false);
   const [showQuickHelp, setShowQuickHelp] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [resetting, setResetting] = useState(false);
@@ -364,11 +363,6 @@ export default function Order() {
     };
   }, []);
 
-  // 검색어를 지우면(새로 검색 시작) 접었던 드롭다운도 다음 검색부터는 기본적으로 다시 펼쳐지게 초기화.
-  useEffect(() => {
-    if (!query.trim()) setSuggestionsCollapsed(false);
-  }, [query]);
-
   // 검색어를 낮은 우선순위로 반영 — 388종 카탈로그에서 매 키 입력마다 즉시 전체
   // 재필터링하면 저사양 기기에서 입력이 밀릴 수 있어, React가 재계산을 뒤로 미루게 한다.
   const deferredQuery = useDeferredValue(query);
@@ -388,9 +382,8 @@ export default function Order() {
     [products, hasBadge],
   );
 
-  // 검색은 카테고리와 무관하게 전체 카탈로그를 대상으로 한 번만 수행한다 — 아래 filtered(카테고리
-  // 필터 적용)와 suggestions(카테고리 무관 상위 5개)가 이 결과를 나눠 쓴다. 예전에는 같은 검색을
-  // filtered용/suggestions용으로 각각 한 번씩 총 두 번 돌려서 입력 지연이 두 배로 커졌다.
+  // 검색은 카테고리와 무관하게 전체 카탈로그를 대상으로 한 번만 수행하고, 아래 filtered가 이 결과에
+  // 카테고리·자주 발주 필터를 적용한다.
   const searched = useMemo(() => {
     const q = deferredQuery.trim();
     if (!q) return null;
@@ -404,10 +397,6 @@ export default function Order() {
     const byCategory = selectedCategory === '전체' ? base : base.filter((p) => p.category === selectedCategory);
     return frequentOnly ? byCategory.filter((p) => frequentIds?.has(p.id)) : byCategory;
   }, [searched, badgeSorted, selectedCategory, frequentOnly, frequentIds]);
-
-  // 카테고리 탭과 무관하게 전체 상품에서 찾는 자동완성 제안 — 검색창 바로 아래 드롭다운으로
-  // 뜨는 용도라 5개로 제한한다 (스크롤 없는 빠른 담기 목적, 전체 목록은 아래에 그대로 있음).
-  const suggestions = useMemo(() => (searched ? searched.slice(0, 5) : []), [searched]);
 
   // 빠른발주: 현재 구역에 배정되고 상태가 시판중인 상품만 그리드에 보여준다(단종/일시중지는
   // 자동 숨김 — 다시 active로 바꾸면 배정 정보가 남아 있어 별도 조작 없이 재노출됨).
@@ -539,20 +528,6 @@ export default function Order() {
     setLastAdd(null);
     if (lastAddTimeoutRef.current) clearTimeout(lastAddTimeoutRef.current);
   }, [lastAdd, changeQty]);
-
-  // 자동완성 드롭다운의 상품명 탭 전용: 1개 담고 검색어를 지워 드롭다운도 함께 닫는다.
-  // 2개 이상 담고 싶으면 드롭다운 안의 -/+ 스테퍼(changeQty)로 닫지 않고 조절한다.
-  // 담긴 뒤 검색어가 바로 지워져 화면이 바뀌므로, 실제로 담겼다는 걸 알려주는 짧은 토스트를 띄운다.
-  const quickAdd = useCallback(
-    (productId: string, name: string) => {
-      changeQty(productId, 1);
-      setQuery('');
-      setToastMessage(`${name} 담았어요`);
-      if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
-      toastTimeoutRef.current = setTimeout(() => setToastMessage(null), 1500);
-    },
-    [changeQty],
-  );
 
   const showToast = useCallback((message: string) => {
     setToastMessage(message);
@@ -1106,12 +1081,6 @@ ${skipped}개는 지금 목록에 없어 빠졌어요.`);
         </Pressable>
       </View>
 
-      {mode === 'search' ? (
-        <Text className="text-muted mx-4 mt-2 text-xs">
-          상품명으로 검색해서 담아요. 전체 상품 중에서 찾을 때 편해요.
-        </Text>
-      ) : null}
-
       {toastMessage ? (
         <View
           pointerEvents="none"
@@ -1140,7 +1109,7 @@ ${skipped}개는 지금 목록에 없어 빠졌어요.`);
       {mode === 'search' ? (
         <>
           <View className="relative mx-4 mt-3" style={{ zIndex: 10 }}>
-            {/* 오른쪽 버튼(바코드·지우기·목록 접기)은 붙어 있고 터치 영역(hitSlop)이 서로 겹쳐 옆
+            {/* 오른쪽 버튼(바코드·음성·지우기)은 붙어 있고 터치 영역(hitSlop)이 서로 겹쳐 옆
                 버튼이 눌리기 쉬웠다 — 버튼마다 44×44 칸을 따로 주고 칸 사이를 띄운다(hitSlop 없음) */}
             <View
               className="flex-row items-center rounded-xl border border-line bg-paper pl-3 pr-1"
@@ -1176,41 +1145,17 @@ ${skipped}개는 지금 목록에 없어 빠졌어요.`);
                   <MaterialCommunityIcons name="close-circle" size={24} color="#888888" />
                 </Pressable>
               ) : null}
-              {suggestions.length > 0 ? (
-                <Pressable
-                  onPress={() => setSuggestionsCollapsed((v) => !v)}
-                  className="h-11 w-11 items-center justify-center rounded-lg active:bg-bg"
-                  accessibilityRole="button"
-                  accessibilityLabel={suggestionsCollapsed ? '추천 목록 펼치기' : '추천 목록 접기'}
-                >
-                  <MaterialCommunityIcons
-                    name={suggestionsCollapsed ? 'chevron-down' : 'chevron-up'}
-                    size={20}
-                    color="#888888"
-                  />
-                </Pressable>
-              ) : null}
             </View>
-            {suggestions.length > 0 && !suggestionsCollapsed ? (
-              <View
-                className="absolute left-0 right-0 top-full mt-1 overflow-hidden rounded-xl border border-line bg-paper"
-                style={{ elevation: 6 }}
-              >
-                {suggestions.map((p) => (
-                  <SuggestionRow
-                    key={p.id}
-                    product={p}
-                    qty={cart[p.id] ?? 0}
-                    onChangeQty={changeQty}
-                    onQuickAdd={quickAdd}
-                  />
-                ))}
-              </View>
-            ) : null}
           </View>
 
-          <View className="mt-2.5 px-4" style={{ gap: 8 }}>
-            <View className="flex-row flex-wrap" style={{ gap: 8 }}>
+          {/* 칩이 여러 줄로 줄바꿈되면 상품 목록이 밀려 2개밖에 안 보였다 — 한 줄 가로 스크롤 */}
+          <View className="mt-2" style={{ gap: 6 }}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
+            >
               <Chip label="⭐ 자주 발주" active={frequentOnly} onPress={onToggleFrequent} />
               <Chip
                 label="전체"
@@ -1233,12 +1178,12 @@ ${skipped}개는 지금 목록에 없어 빠졌어요.`);
                 active={categoryEditMode}
                 onPress={() => setCategoryEditMode((v) => !v)}
               />
-            </View>
+            </ScrollView>
             {categoryEditMode ? (
-              <Text className="text-muted text-xs">이름을 고치거나 지울 카테고리를 누르세요</Text>
+              <Text className="text-muted mx-4 text-xs">이름을 고치거나 지울 카테고리를 누르세요</Text>
             ) : null}
             {showCategoryInput || editingCategory ? (
-              <View className="flex-row gap-2">
+              <View className="mx-4 flex-row gap-2">
                 <TextInput
                   className="text-ink flex-1 rounded-xl border border-line bg-paper px-3 py-2 text-sm"
                   placeholder="새 카테고리 입력 (예: 컵)"
@@ -2157,17 +2102,17 @@ const CatalogRow = memo(function CatalogRow({
     <Pressable
       onPress={() => onPress(product.id, product.barcode)}
       onLongPress={() => onLongPress(product)}
-      className="mx-4 mb-2.5 flex-row items-center rounded-xl border border-line bg-paper p-3 active:opacity-70"
+      className="mx-4 mb-1.5 flex-row items-center rounded-xl border border-line bg-paper px-3 py-2 active:opacity-70"
     >
       <View style={{ overflow: 'visible' }}>
         {card ? (
-          <View className="items-center justify-center" style={{ width: 56, height: 56, borderRadius: 8, backgroundColor: card.bg }}>
-            <Text style={{ color: card.fg, fontSize: 18, fontWeight: 'bold' }} numberOfLines={1}>
+          <View className="items-center justify-center" style={{ width: 44, height: 44, borderRadius: 8, backgroundColor: card.bg }}>
+            <Text style={{ color: card.fg, fontSize: 15, fontWeight: 'bold' }} numberOfLines={1}>
               {[...product.name.replace(/\s/g, '')].slice(0, 2).join('')}
             </Text>
           </View>
         ) : (
-          <Thumbnail uri={product.imageUri} size={56} radius={8} iconSize={22} />
+          <Thumbnail uri={product.imageUri} size={44} radius={8} iconSize={18} />
         )}
         {badge ? (
           <View style={{ position: 'absolute', top: -6, left: -6, zIndex: 1, elevation: 2 }}>
@@ -2176,26 +2121,23 @@ const CatalogRow = memo(function CatalogRow({
         ) : null}
       </View>
       <View className="ml-3 flex-1">
-        <Text className="text-ink text-base font-bold" numberOfLines={1}>
-          {product.name}
-        </Text>
-        <Text className="text-muted mt-0.5 text-sm">
-          {product.brand} · {product.price > 0 ? `${product.price.toLocaleString()}원` : '가격 미등록'}
-        </Text>
-        {product.barcode ? (
-          <Text className="text-muted mt-0.5 text-xs">…{product.barcode.slice(-4)}</Text>
-        ) : null}
-        <View
-          className="mt-1 flex-row items-center self-start rounded px-1.5 py-0.5"
-          style={{ backgroundColor: statusMeta.color, gap: 2 }}
-        >
-          <Text className="text-xs font-bold" style={{ color: '#FFFFFF' }}>
-            {statusMeta.label}
+        <Text className="text-ink text-[15px] font-bold leading-5">{product.name}</Text>
+        {/* 브랜드·가격·바코드 끝자리를 한 줄에 — 상태는 '시판중'(기본값)이 아닐 때만 표시 */}
+        <View className="mt-0.5 flex-row flex-wrap items-center" style={{ columnGap: 6 }}>
+          <Text className="text-muted text-xs">
+            {product.brand} · {product.price > 0 ? `${product.price.toLocaleString()}원` : '가격 미등록'}
+            {product.barcode ? ` · …${product.barcode.slice(-4)}` : ''}
           </Text>
-          <MaterialCommunityIcons name="chevron-down" size={12} color="#FFFFFF" />
+          {product.status && product.status !== 'active' ? (
+            <View className="rounded px-1.5 py-0.5" style={{ backgroundColor: statusMeta.color }}>
+              <Text className="text-xs font-bold" style={{ color: '#FFFFFF' }}>
+                {statusMeta.label}
+              </Text>
+            </View>
+          ) : null}
         </View>
       </View>
-      <View style={{ width: 132, marginLeft: 8 }}>
+      <View style={{ width: qty <= 0 ? 76 : 120, marginLeft: 8 }}>
         {qty <= 0 ? (
           <Pressable
             onPress={() => onChangeQty(product.id, 1)}
@@ -2239,60 +2181,6 @@ const CatalogRow = memo(function CatalogRow({
         )}
       </View>
     </Pressable>
-  );
-});
-
-const SuggestionRow = memo(function SuggestionRow({
-  product,
-  qty,
-  onChangeQty,
-  onQuickAdd,
-}: {
-  product: OrderProduct;
-  qty: number;
-  onChangeQty: (id: string, delta: number) => void;
-  onQuickAdd: (id: string, name: string) => void;
-}) {
-  return (
-    <View className="flex-row items-center border-b border-line px-3 py-2">
-      <Pressable
-        onPress={() => onQuickAdd(product.id, product.name)}
-        className="flex-1 pr-2 active:opacity-60"
-        accessibilityRole="button"
-        accessibilityLabel={`${product.name} 1개 담기`}
-      >
-        <Text className="text-ink text-sm font-bold" numberOfLines={1}>
-          {product.name}
-        </Text>
-        <Text className="text-muted mt-0.5 text-xs" numberOfLines={1}>
-          {product.brand} · {product.price > 0 ? `${product.price.toLocaleString()}원` : '가격 미등록'}
-        </Text>
-      </Pressable>
-      <View className="flex-row items-center">
-        <Pressable
-          onPress={() => onChangeQty(product.id, -1)}
-          className="h-11 w-11 items-center justify-center rounded-lg border border-line bg-bg active:opacity-70"
-          accessibilityRole="button"
-          accessibilityLabel="수량 감소"
-        >
-          <MaterialCommunityIcons name="minus" size={20} color="#1A1A1A" />
-        </Pressable>
-        <Text
-          className="text-ink mx-2.5 w-6 text-center text-base font-bold"
-          style={{ fontVariant: ['tabular-nums'] }}
-        >
-          {qty}
-        </Text>
-        <Pressable
-          onPress={() => onChangeQty(product.id, 1)}
-          className="h-11 w-11 items-center justify-center rounded-lg border border-line bg-bg active:opacity-70"
-          accessibilityRole="button"
-          accessibilityLabel="수량 증가"
-        >
-          <MaterialCommunityIcons name="plus" size={20} color="#1A1A1A" />
-        </Pressable>
-      </View>
-    </View>
   );
 });
 
