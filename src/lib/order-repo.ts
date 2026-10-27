@@ -54,6 +54,7 @@ const CATALOG_REFERENCE_PRICE_KEY = 'orderCatalogReferencePrice:v1';
 import { isBadgeAnimating } from './order-badge-anim';
 const CATALOG_UPDATE_BADGE_KEY ='orderCatalogUpdateBadges:v1';
 const TILE_COLOR_KEY = 'orderTileColors:v1';
+const TILE_ART_KEY = 'orderTileArts:v1';
 const STORES_KEY = 'stores:v1';
 const ACTIVE_STORE_KEY = 'activeStoreId:v1';
 
@@ -183,6 +184,22 @@ export async function setTileColor(productId: string, color: string | null): Pro
   else delete colors[productId];
   await AsyncStorage.setItem(TILE_COLOR_KEY, JSON.stringify(colors));
   return colors;
+}
+
+/** 상품 id → 카드에 사장님이 직접 고른 제품 그림(이모지). 없으면 이름 속 맛 단어로 정한 그림(tile-art.ts).
+ * 색(getTileColors)과 같은 방식으로 이 기기에만 저장한다. */
+export async function getTileArts(): Promise<Record<string, string>> {
+  const raw = await AsyncStorage.getItem(TILE_ART_KEY);
+  return raw ? (JSON.parse(raw) as Record<string, string>) : {};
+}
+
+/** art가 null이면 자동 그림으로 되돌린다 */
+export async function setTileArt(productId: string, art: string | null): Promise<Record<string, string>> {
+  const arts = await getTileArts();
+  if (art) arts[productId] = art;
+  else delete arts[productId];
+  await AsyncStorage.setItem(TILE_ART_KEY, JSON.stringify(arts));
+  return arts;
 }
 
 export async function getRemovedBarcodes(): Promise<Set<string>> {

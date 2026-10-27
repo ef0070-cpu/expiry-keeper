@@ -65,8 +65,11 @@ import {
   writeOrderCart,
   getTileColors,
   setTileColor,
+  getTileArts,
+  setTileArt,
 } from '@/lib/order-repo';
 import { TILE_COLOR_CHOICES, tileColor } from '@/lib/tile-color';
+import { TILE_ART_CHOICES, tileArt } from '@/lib/tile-art';
 import { DEFAULT_ORDER_PRODUCTS } from '@/lib/order-seed-data';
 import FridgeGrid, { FridgeGridItem } from '@/components/FridgeGrid';
 import CoachMarks, { CoachStep } from '@/components/CoachMarks';
@@ -150,6 +153,10 @@ export default function Order() {
   const [tileFontLoaded] = useFonts({ DoHyeon: require('../../assets/fonts/DoHyeon-Regular.ttf') });
   useEffect(() => {
     getTileColors().then(setTileColors).catch(() => {});
+  }, []);
+  const [tileArts, setTileArts] = useState<Record<string, string>>({});
+  useEffect(() => {
+    getTileArts().then(setTileArts).catch(() => {});
   }, []);
   const [fridgeSearchQuery, setFridgeSearchQuery] = useState('');
   const [query, setQuery] = useState('');
@@ -743,13 +750,14 @@ ${skipped}개는 지금 목록에 없어 빠졌어요.`);
         badge={item.barcode ? updateBadges.get(item.barcode) : undefined}
         badgeAnimate={item.barcode ? animatingBadges.has(item.barcode) : false}
         textCard={searching}
+        art={tileArt(item.name, tileArts[item.id])}
         onChangeQty={changeQty}
         onOpenQty={setQtyProduct}
         onPress={handleOpenProduct}
         onLongPress={onLongPressProduct}
       />
     ),
-    [cart, updateBadges, animatingBadges, searching, changeQty, handleOpenProduct, onLongPressProduct],
+    [cart, updateBadges, animatingBadges, searching, tileArts, changeQty, handleOpenProduct, onLongPressProduct],
   );
 
   const onEditSettingsProduct = useCallback(() => {
@@ -1317,6 +1325,7 @@ ${skipped}개는 지금 목록에 없어 빠졌어요.`);
                 label={`${stores.find((st) => st.id === activeStoreId)?.name ?? '냉동고'} · ${activeSection}`}
                 cart={cart}
                 tileColors={tileColors}
+                tileArts={tileArts}
                 fontFamily={tileFontLoaded ? 'DoHyeon' : undefined}
                 header={<>
                     <ScrollView
@@ -1416,6 +1425,12 @@ ${skipped}개는 지금 목록에 없어 빠졌어요.`);
                 onPickColor={(color) => {
                   if (!settingsProduct) return;
                   setTileColor(settingsProduct.id, color).then(setTileColors).catch(() => {});
+                }}
+                autoArt={settingsProduct ? tileArt(settingsProduct.name) : null}
+                pickedArt={settingsProduct ? tileArts[settingsProduct.id] ?? null : null}
+                onPickArt={(art) => {
+                  if (!settingsProduct) return;
+                  setTileArt(settingsProduct.id, art).then(setTileArts).catch(() => {});
                 }}
               />
             </>
@@ -1659,6 +1674,9 @@ const ProductSettingsModal = memo(function ProductSettingsModal({
   autoColor,
   pickedColor,
   onPickColor,
+  autoArt,
+  pickedArt,
+  onPickArt,
 }: {
   visible: boolean;
   productName: string;
@@ -1671,6 +1689,11 @@ const ProductSettingsModal = memo(function ProductSettingsModal({
   pickedColor: string | null;
   /** null이면 자동 색으로 되돌림 */
   onPickColor: (color: string | null) => void;
+  /** 이름으로 정한 그림(없으면 null), 사장님이 고른 그림(없으면 null) */
+  autoArt: string | null;
+  pickedArt: string | null;
+  /** null이면 자동 그림으로 되돌림 */
+  onPickArt: (art: string | null) => void;
 }) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -1753,6 +1776,39 @@ const ProductSettingsModal = memo(function ProductSettingsModal({
                   accessibilityState={{ selected: pickedColor === c }}
                 >
                   {pickedColor === c ? <MaterialCommunityIcons name="check" size={16} color={tileColor('', c).fg} /> : null}
+                </Pressable>
+              ))}
+            </View>
+          </View>
+          {/* 제품 그림: 이름에 맛 단어가 없는 상품은 직접 고른다. '자동'은 이름으로 정한 그림(없으면 그림 없음) */}
+          <View className="mt-3 border-t border-line px-3 pt-3">
+            <View className="mb-2 flex-row items-center" style={{ gap: 10 }}>
+              <MaterialCommunityIcons name="emoticon-outline" size={18} color="#1A1A1A" />
+              <Text className="text-ink text-sm font-medium">제품 그림</Text>
+            </View>
+            <View className="flex-row flex-wrap" style={{ gap: 8 }}>
+              <Pressable
+                onPress={() => onPickArt(null)}
+                className="items-center justify-center rounded-full"
+                style={{ height: 36, paddingHorizontal: 12, backgroundColor: '#F7F7F7', borderWidth: pickedArt ? 1 : 3, borderColor: pickedArt ? '#E5E5E5' : '#1A1A1A' }}
+                accessibilityRole="button"
+                accessibilityLabel="제품 그림 자동"
+                accessibilityState={{ selected: !pickedArt }}
+              >
+                <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#1A1A1A' }}>자동 {autoArt ?? '없음'}</Text>
+              </Pressable>
+              {TILE_ART_CHOICES.map((a) => (
+                <Pressable
+                  key={a}
+                  onPress={() => onPickArt(a)}
+                  hitSlop={4}
+                  className="items-center justify-center rounded-full"
+                  style={{ width: 36, height: 36, backgroundColor: '#F7F7F7', borderWidth: pickedArt === a ? 3 : 1, borderColor: pickedArt === a ? '#1A1A1A' : '#E5E5E5' }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`제품 그림 ${a}`}
+                  accessibilityState={{ selected: pickedArt === a }}
+                >
+                  <Text style={{ fontSize: 18 }}>{a}</Text>
                 </Pressable>
               ))}
             </View>
@@ -2092,6 +2148,7 @@ const CatalogRow = memo(function CatalogRow({
   badge,
   badgeAnimate,
   textCard,
+  art,
   onChangeQty,
   onOpenQty,
   onPress,
@@ -2101,8 +2158,10 @@ const CatalogRow = memo(function CatalogRow({
   qty: number;
   badge?: CatalogUpdateBadge;
   badgeAnimate?: boolean;
-  /** 검색어가 있을 때만 true — 사진 대신 상품명 앞 2글자 카드로 보여 준다 */
+  /** 검색어가 있을 때만 true — 사진 대신 색 카드로 보여 준다 */
   textCard: boolean;
+  /** 제품 그림(이모지). 없으면 상품명 앞 2글자 */
+  art: string | null;
   onChangeQty: (id: string, delta: number) => void;
   onOpenQty: (product: OrderProduct) => void;
   onPress: (id: string, barcode: string | null) => void;
@@ -2115,17 +2174,18 @@ const CatalogRow = memo(function CatalogRow({
     <Pressable
       onPress={() => onPress(product.id, product.barcode)}
       onLongPress={() => onLongPress(product)}
-      className="mx-4 mb-1.5 flex-row items-center rounded-xl border border-line bg-paper px-3 py-2 active:opacity-70"
+      className="mx-4 mb-2 flex-row items-center rounded-2xl bg-paper px-3 py-2 active:opacity-70"
+      style={{ elevation: 2, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } }}
     >
       <View style={{ overflow: 'visible' }}>
         {card ? (
-          <View className="items-center justify-center" style={{ width: 56, height: 56, borderRadius: 8, backgroundColor: card.bg }}>
-            <Text style={{ color: card.fg, fontSize: 18, fontWeight: 'bold' }} numberOfLines={1}>
-              {[...product.name.replace(/\s/g, '')].slice(0, 2).join('')}
+          <View className="items-center justify-center" style={{ width: 56, height: 56, borderRadius: 14, backgroundColor: card.bg }}>
+            <Text style={{ color: card.fg, fontSize: art ? 30 : 18, fontWeight: 'bold' }} numberOfLines={1}>
+              {art ?? [...product.name.replace(/\s/g, '')].slice(0, 2).join('')}
             </Text>
           </View>
         ) : (
-          <Thumbnail uri={product.imageUri} size={56} radius={8} iconSize={22} />
+          <Thumbnail uri={product.imageUri} size={56} radius={14} iconSize={22} />
         )}
         {badge ? (
           <View style={{ position: 'absolute', top: -6, left: -6, zIndex: 1, elevation: 2 }}>

@@ -17,6 +17,7 @@ import {
 } from '@/lib/fridge-layout';
 import type { OrderCart, OrderProduct } from '@/lib/order-types';
 import { splitTileName, tileColor } from '@/lib/tile-color';
+import { tileArt } from '@/lib/tile-art';
 
 if (Platform.OS === 'android') UIManager.setLayoutAnimationEnabledExperimental?.(true);
 
@@ -96,6 +97,7 @@ type TileProps = {
   dragging: boolean;
   pendingMove: boolean;
   tileColorOverride?: string;
+  tileArtOverride?: string;
   fontFamily?: string;
   onTap: () => void;
   onLongEdit: () => void;
@@ -211,6 +213,12 @@ const GridTile = memo(function GridTile(p: TileProps) {
   const w = spanWidth(item.span, p.cols);
   const headSize = Math.max(14, Math.min(w > 1 ? 40 : p.cols >= 4 ? 21 : p.cols === 2 ? 32 : 28, Math.floor((width / Math.max(head.length, 2)) * 0.95)));
   const iconBg = color.fg === '#FFFFFF' ? 'rgba(255,255,255,0.88)' : 'rgba(255,255,255,0.7)';
+  const art = tileArt(product.name, p.tileArtOverride);
+  // 어두운 카드엔 어두운 그림자, 밝은 카드엔 흰 그림자로 글자 윤곽을 살린다
+  const textShadow =
+    color.fg === '#FFFFFF'
+      ? { textShadowColor: 'rgba(0,0,0,0.28)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }
+      : { textShadowColor: 'rgba(255,255,255,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 };
 
   return (
     <GestureDetector gesture={pan}>
@@ -247,7 +255,7 @@ const GridTile = memo(function GridTile(p: TileProps) {
         style={{
           width,
           height,
-          borderRadius: 14,
+          borderRadius: 16,
           backgroundColor: color.bg,
           alignItems: 'center',
           paddingHorizontal: 6,
@@ -257,9 +265,9 @@ const GridTile = memo(function GridTile(p: TileProps) {
           borderColor: p.pendingMove ? '#CC2222' : 'rgba(255,255,255,0.95)',
           elevation: 3,
           shadowColor: '#000',
-          shadowOpacity: 0.15,
-          shadowRadius: 4,
-          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.08,
+          shadowRadius: 12,
+          shadowOffset: { width: 0, height: 4 },
         }}
       >
         <Modal visible={peek} transparent animationType="fade">
@@ -312,7 +320,7 @@ const GridTile = memo(function GridTile(p: TileProps) {
             numberOfLines={1}
             adjustsFontSizeToFit
             minimumFontScale={0.6}
-            style={{ color: color.fg, fontSize: headSize, textAlign: 'center', ...(p.fontFamily ? { fontFamily: p.fontFamily } : { fontWeight: 'bold' }) }}
+            style={{ color: color.fg, fontSize: headSize, textAlign: 'center', ...textShadow, ...(p.fontFamily ? { fontFamily: p.fontFamily } : { fontWeight: 'bold' }) }}
           >
             {head}
           </Text>
@@ -336,6 +344,15 @@ const GridTile = memo(function GridTile(p: TileProps) {
             </Text>
           ) : null}
         </View>
+
+        {art ? (
+          <Text
+            pointerEvents="none"
+            style={{ position: 'absolute', bottom: 2, right: 4, fontSize: w > 1 ? 34 : 28, opacity: 0.95, transform: [{ rotate: '-8deg' }] }}
+          >
+            {art}
+          </Text>
+        ) : null}
 
         {!editing && p.qty > 0 ? (
           <Pressable
@@ -369,6 +386,7 @@ export default function FridgeGrid(props: {
   label: string;
   cart: OrderCart;
   tileColors: Record<string, string>;
+  tileArts: Record<string, string>;
   fontFamily?: string;
   header: ReactNode;
   empty: ReactNode;
@@ -693,6 +711,7 @@ export default function FridgeGrid(props: {
                               dragging={dragId === it.id}
                               pendingMove={pendingMoveId === it.id}
                               tileColorOverride={it.product ? props.tileColors[it.product.id] : undefined}
+                              tileArtOverride={it.product ? props.tileArts[it.product.id] : undefined}
                               fontFamily={props.fontFamily}
                               onTap={() => (editing ? tapInEdit(it.id) : it.product && props.onTap(it.product))}
                               onLongEdit={() => props.onEditingChange(true)}
