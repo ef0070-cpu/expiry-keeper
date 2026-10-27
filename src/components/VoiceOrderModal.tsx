@@ -92,6 +92,7 @@ const VoiceOrderModal = memo(function VoiceOrderModal({
               value={text}
               onChangeText={setText}
               multiline
+              maxLength={500}
               placeholder="예: 메로나 두 박스 하겐다즈 세 개"
               className="text-ink mt-3 min-h-[96px] rounded-xl border border-muted/30 p-3 text-base"
               style={{ textAlignVertical: 'top' }}

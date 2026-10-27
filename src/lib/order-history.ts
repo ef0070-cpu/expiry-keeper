@@ -13,7 +13,8 @@ export type OrderHistoryEntry = {
 };
 
 const KEY = 'orderHistory:v1';
-const MAX = 500;
+// 한 키에 전부 저장하므로 상한이 크면 Android 저장소 한 행 용량(약 2MB)에 닿는다 — 발주 1건 40품목 기준 200건이면 약 0.8MB
+const MAX = 200;
 const KST_MS = 9 * 3600 * 1000;
 
 export function summarizeItems(names: string[]): string {
@@ -41,14 +42,25 @@ export function kstNow(): { ymd: string; hour: number; minute: number } {
   return { ymd: s.slice(0, 10), hour: Number(s.slice(11, 13)), minute: Number(s.slice(14, 16)) };
 }
 
+const isValidEntry = (e: OrderHistoryEntry) =>
+  !!e && typeof e.ts === 'string' && Array.isArray(e.items) && e.items.every((i) => !!i && typeof i.productId === 'string');
+
+/** 저장소 읽기 자체가 실패하면 던진다. 깨진 JSON은 복구할 수 없으니 빈 목록으로 본다. */
+async function readEntries(): Promise<OrderHistoryEntry[]> {
+  const raw = await AsyncStorage.getItem(KEY);
+  let arr: unknown;
+  try {
+    arr = raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(arr)) return [];
+  return (arr as OrderHistoryEntry[]).filter(isValidEntry).sort((a, b) => (a.ts < b.ts ? 1 : a.ts > b.ts ? -1 : 0));
+}
+
 export async function listOrderHistory(): Promise<OrderHistoryEntry[]> {
   try {
-    const raw = await AsyncStorage.getItem(KEY);
-    const arr = raw ? JSON.parse(raw) : [];
-    if (!Array.isArray(arr)) return [];
-    return (arr as OrderHistoryEntry[])
-      .filter((e) => e && typeof e.ts === 'string' && Array.isArray(e.items))
-      .sort((a, b) => (a.ts < b.ts ? 1 : a.ts > b.ts ? -1 : 0));
+    return await readEntries();
   } catch {
     return [];
   }
@@ -68,7 +80,8 @@ export async function addOrderHistory(e: {
     ts,
     summary: summarizeItems(e.items.map((i) => i.name)),
   };
-  const list = await listOrderHistory();
+  // 일시적으로 읽기에 실패했는데 빈 목록으로 덮어쓰면 기존 이력이 통째로 사라진다 — 읽기 실패면 던져서 저장하지 않는다(호출부가 무시하고 발주는 계속)
+  const list = await readEntries();
   const next = [entry, ...list].slice(0, MAX); // 최신순 유지, 오래된 것부터 버림
   await AsyncStorage.setItem(KEY, JSON.stringify(next));
   return entry;
