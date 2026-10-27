@@ -942,40 +942,83 @@ ${skipped}개는 지금 목록에 없어 빠졌어요.`);
         }}
       />
 
-      <View className="mx-4 mt-3 flex-row items-center justify-between">
+      {/* 한 줄: 매장 · 검색발주/빠른발주 전환 · 이력. 전환 탭 줄을 따로 두지 않아 목록 자리를 넓힌다 */}
+      <View className="mx-4 mt-3 flex-row items-center" style={{ gap: 8 }}>
         <Pressable
           onPress={() => setShowStoreModal(true)}
-          className="flex-row items-center self-start rounded-full border border-line bg-paper px-3 py-1.5 active:opacity-70"
+          className="flex-row items-center rounded-full border border-line bg-paper px-2.5 py-1.5 active:opacity-70"
+          style={{ flexShrink: 1, maxWidth: '34%' }}
           accessibilityRole="button"
-          accessibilityLabel="매장 선택"
+          accessibilityLabel="매장 선택·관리"
           ref={coachRefs.store}
           collapsable={false}
         >
           <MaterialCommunityIcons name="storefront-outline" size={16} color="#1A1A1A" />
-          <Text className="text-ink ml-1.5 text-sm font-medium">
+          <Text numberOfLines={1} className="text-ink ml-1 shrink text-sm font-medium">
             {stores.find((s) => s.id === activeStoreId)?.name ??
               (stores.length > 0 ? '매장 선택' : '매장 추가하기')}
           </Text>
-          {/* 매장 이름이 버튼인 줄 몰라 매장 추가·변경을 못 찾았다 — 무엇을 하는 버튼인지 글자로 보인다 */}
-          <Text className="text-muted ml-1.5 text-xs">매장 관리</Text>
           <MaterialCommunityIcons name="chevron-down" size={16} color="#888888" />
         </Pressable>
+
+        {/* 세그먼트 컨트롤: 한 덩어리 안에서 선택된 쪽만 채워진다 */}
+        <View
+          className="flex-1 flex-row overflow-hidden rounded-full border border-line bg-paper"
+          style={{ minWidth: 0 }}
+          accessibilityRole="tablist"
+        >
+          <Pressable
+            onPress={() => setMode('search')}
+            accessibilityLabel="검색발주"
+            accessibilityRole="tab"
+            accessibilityState={{ selected: mode === 'search' }}
+            className={`flex-1 items-center justify-center py-2 ${mode === 'search' ? 'bg-primary' : ''}`}
+          >
+            <Text
+              numberOfLines={1}
+              className={`text-sm font-bold ${mode === 'search' ? '' : 'text-ink'}`}
+              style={mode === 'search' ? { color: '#FFFFFF' } : undefined}
+            >
+              검색
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setMode('quick')}
+            ref={coachRefs.quick}
+            collapsable={false}
+            accessibilityLabel="빠른발주"
+            accessibilityRole="tab"
+            accessibilityState={{ selected: mode === 'quick' }}
+            className={`flex-1 items-center justify-center py-2 ${mode === 'quick' ? 'bg-primary' : ''}`}
+          >
+            <Text
+              numberOfLines={1}
+              className={`text-sm font-bold ${mode === 'quick' ? '' : 'text-ink'}`}
+              style={mode === 'quick' ? { color: '#FFFFFF' } : undefined}
+            >
+              빠른
+            </Text>
+          </Pressable>
+        </View>
 
         {mode === 'search' ? (
           <Pressable
             onPress={() => setShowHistory(true)}
             ref={coachRefs.hist}
             collapsable={false}
-            className="h-12 items-center justify-center rounded-full border border-line bg-paper px-4 active:opacity-70"
+            hitSlop={6}
+            className="shrink-0 flex-row items-center justify-center rounded-full border border-line bg-paper px-3 py-2 active:opacity-70"
             accessibilityRole="button"
             accessibilityLabel="발주 이력 보기"
           >
-            <Text className="text-ink text-sm font-medium">📅 이력</Text>
+            <MaterialCommunityIcons name="calendar-month-outline" size={16} color="#1A1A1A" />
+            <Text className="text-ink ml-1 text-sm font-medium">이력</Text>
           </Pressable>
         ) : null}
+      </View>
 
-        {mode === 'quick' && activeStoreId ? (
-          <View className="flex-row items-center" style={{ gap: 8 }}>
+      {mode === 'quick' && activeStoreId ? (
+        <View className="mx-4 mt-2 flex-row items-center justify-end" style={{ gap: 8 }}>
             {fridgeSections.length > 0 ? (
               <Pressable
                 onPress={() =>
@@ -1029,9 +1072,8 @@ ${skipped}개는 지금 목록에 없어 빠졌어요.`);
                 </Text>
               </Pressable>
             )}
-          </View>
-        ) : null}
-      </View>
+        </View>
+      ) : null}
 
       <StoreSwitcherModal
         visible={showStoreModal}
@@ -1051,35 +1093,6 @@ ${skipped}개는 지금 목록에 없어 빠졌어요.`);
         onConfirm={onConfirmResetProducts}
         onClose={() => setShowResetConfirm(false)}
       />
-
-      <View className="mx-4 mt-3 flex-row gap-2">
-        <Pressable
-          onPress={() => setMode('search')}
-          accessibilityRole="tab"
-          accessibilityState={{ selected: mode === 'search' }}
-          className={`flex-1 items-center rounded-xl border py-2.5 ${
-            mode === 'search' ? 'border-primary' : 'border-line'
-          }`}
-        >
-          <Text className={`text-sm font-bold ${mode === 'search' ? 'text-primary' : 'text-ink'}`}>
-            검색발주
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={() => setMode('quick')}
-          ref={coachRefs.quick}
-          collapsable={false}
-          accessibilityRole="tab"
-          accessibilityState={{ selected: mode === 'quick' }}
-          className={`flex-1 items-center rounded-xl border py-2.5 ${
-            mode === 'quick' ? 'border-primary' : 'border-line'
-          }`}
-        >
-          <Text className={`text-sm font-bold ${mode === 'quick' ? 'text-primary' : 'text-ink'}`}>
-            빠른발주
-          </Text>
-        </Pressable>
-      </View>
 
       {toastMessage ? (
         <View
