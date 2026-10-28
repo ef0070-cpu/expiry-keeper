@@ -105,6 +105,16 @@
           "delayAppMeasurementInit": true
         }
       ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "상품 이름을 말로 검색하기 위해 마이크를 사용합니다.",
+          "speechRecognitionPermission": "상품 이름을 말로 검색하기 위해 음성 인식을 사용합니다.",
+          "androidSpeechServicePackages": [
+            "com.google.android.googlequicksearchbox"
+          ]
+        }
+      ],
       "expo-iap"
     ],
     "experiments": {

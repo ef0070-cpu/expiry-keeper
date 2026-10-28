@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Keyboard,
   Modal,
   Pressable,
   ScrollView,
@@ -79,7 +80,7 @@ import { DEFAULT_COLUMNS, isSpacerId, normalizeSpan, packRows } from '@/lib/frid
 import { FridgeAssignment, FridgeLayoutSettings, FridgeSection, OrderCart, OrderProduct, OrderStatus, Store } from '@/lib/order-types';
 import { buildProductSearchIndex, searchOrderProducts } from '@/lib/order-search';
 import HomeBanner from '@/components/HomeBanner';
-import VoiceOrderModal from '@/components/VoiceOrderModal';
+import VoicePressBar from '@/components/VoicePressBar';
 import OrderHistoryModal from '@/components/OrderHistoryModal';
 import { frequentProductIds, listOrderHistory, OrderHistoryEntry } from '@/lib/order-history';
 
@@ -131,7 +132,6 @@ export default function Order() {
     cart: useRef<View>(null),
     edit: useRef<View>(null),
     hist: useRef<View>(null),
-    voice: useRef<View>(null),
   };
   const [coachDone, setCoachDone] = useState<boolean | null>(null);
   const [whatsNewDone, setWhatsNewDone] = useState<boolean | null>(null);
@@ -162,10 +162,21 @@ export default function Order() {
   const [fridgeSearchQuery, setFridgeSearchQuery] = useState('');
   const [query, setQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('전체');
-  // 검색발주: ⭐ 자주 발주 칩(발주 이력에서 자주 쓴 상품만), 🎙️ 음성 발주, 📅 이력 창
+  // 검색발주: ⭐ 자주 발주 칩(발주 이력에서 자주 쓴 상품만), 🎙️ 누르고 말하기(들은 말은 검색창에 넣고 사람이 고름), 📅 이력 창
   const [frequentOnly, setFrequentOnly] = useState(false);
   const [frequentIds, setFrequentIds] = useState<Set<string> | null>(null);
-  const [showVoice, setShowVoice] = useState(false);
+  // 마이크로 들은 말(검색창에 넣은 글자). 검색어가 그대로인 동안만 "맞는 상품을 눌러 담으세요" 안내를 보인다
+  const [heardText, setHeardText] = useState<string | null>(null);
+  // 키보드가 떠 있으면 마이크 바·카테고리 줄을 숨겨 목록 자리를 넓힌다(키보드 자체에 마이크가 있다)
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
   const [showHistory, setShowHistory] = useState(false);
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [categoryInput, setCategoryInput] = useState('');
@@ -563,16 +574,10 @@ export default function Order() {
       .catch(() => setFrequentIds(new Set()));
   }, [frequentOnly]);
 
-  // 🎙️ 음성 발주: 알아들은 상품을 지금 장바구니에 수량으로 더한다(낙관적 업데이트는 changeQty 그대로)
-  const onVoiceApply = useCallback(
-    (adds: { productId: string; qty: number }[]) => {
-      for (const a of adds) if (a.qty > 0) changeQty(a.productId, a.qty);
-    },
-    [changeQty],
-  );
-  const onVoiceManualSearch = useCallback((keyword: string) => {
-    setShowVoice(false);
-    setQuery(keyword);
+  // 🎙️ 누르고 말하기: 들은 말을 검색창에 넣고 후보를 보여 준다. 바로 담지 않고 사람이 눌러 고른다(오인식 방지)
+  const onHeard = useCallback((text: string) => {
+    setQuery(text);
+    setHeardText(text);
     setSelectedCategory('전체');
     setFrequentOnly(false);
   }, []);
@@ -862,7 +867,6 @@ ${skipped}개는 지금 목록에 없어 빠졌어요.`);
       { key: 'wn-long', mode: 'quick' as const, target: coachRefs.card, ack: true, done: coachAck.has('wn-long'), title: '길게 누르면 실제 사진', body: '계속 누르고 있으면(1초) 배치 편집이 바로 켜져요' },
     ]),
     { key: 'wn-hist', mode: 'search' as const, target: coachRefs.hist, ack: true, done: coachAck.has('wn-hist'), title: '새 기능: 발주 이력', body: '보낸 발주를 날짜별로 보고, 「이대로 다시 담기」로 한 번에 다시 담을 수 있어요' },
-    { key: 'wn-voice', mode: 'search' as const, target: coachRefs.voice, ack: true, done: coachAck.has('wn-voice'), title: '새 기능: 음성 발주 (Beta)', body: '말로 "메로나 두 박스"처럼 하면 알아듣고 담아 줘요' },
   ];
   const showWhatsNew = !coachRunning && coachDone === true && whatsNewDone === false && !layoutEditing && (mode === 'search' || fridgeItems.some((i) => i.product));
   const coachList = coachRunning ? visibleTour : showWhatsNew ? whatsNewSteps.filter((st) => st.mode === mode) : [];
@@ -1154,16 +1158,6 @@ ${skipped}개는 지금 목록에 없어 빠졌어요.`);
               >
                 <MaterialCommunityIcons name="barcode-scan" size={22} color="#1A1A1A" />
               </Pressable>
-              <Pressable
-                onPress={() => setShowVoice(true)}
-                ref={coachRefs.voice}
-                collapsable={false}
-                className="h-11 w-11 items-center justify-center rounded-lg active:bg-bg"
-                accessibilityRole="button"
-                accessibilityLabel="음성으로 발주 (Beta)"
-              >
-                <Text style={{ fontSize: 20 }}>🎙️</Text>
-              </Pressable>
               {query ? (
                 <Pressable
                   onPress={() => setQuery('')}
@@ -1180,6 +1174,7 @@ ${skipped}개는 지금 목록에 없어 빠졌어요.`);
           {/* 카테고리는 칩 줄 대신 콤보박스(칩이 많아 옆으로 밀어야 했다). ⭐ 자주 발주는 옆에 둔다.
               "+ 카테고리"·"편집"은 콤보박스 목록 맨 아래 */}
           <View className="mt-2" style={{ gap: 6 }}>
+            {keyboardVisible ? null : (
             <View className="mx-4 flex-row items-center" style={{ gap: 8 }}>
               <Chip label="⭐ 자주 발주" active={frequentOnly} onPress={onToggleFrequent} />
               <View style={{ flex: 1, minWidth: 0 }}>
@@ -1196,6 +1191,7 @@ ${skipped}개는 지금 목록에 없어 빠졌어요.`);
                 />
               </View>
             </View>
+            )}
             {categoryEditMode ? (
               <Text className="text-muted mx-4 text-xs">이름을 고치거나 지울 카테고리를 누르세요</Text>
             ) : null}
@@ -1227,12 +1223,21 @@ ${skipped}개는 지금 목록에 없어 빠졌어요.`);
             ) : null}
           </View>
 
+          {heardText && heardText === query.trim() ? (
+            <View className="mx-4 mt-2 rounded-xl px-3 py-2" style={{ backgroundColor: '#FFF4D6' }}>
+              <Text style={{ color: '#8A5A00', fontWeight: 'bold', fontSize: 14 }}>
+                "{heardText}"로 들었어요 · 맞는 상품을 눌러 담으세요
+              </Text>
+            </View>
+          ) : null}
+
           <FlatList
             key="search-list"
             data={filtered}
             keyExtractor={(item) => item.id}
             keyboardShouldPersistTaps="handled"
-            contentContainerStyle={{ paddingTop: 12, paddingBottom: 120 + insets.bottom }}
+            // 아래에 떠 있는 마이크 바(64)와 발주서 확인 바에 마지막 상품이 가리지 않게 여백을 넉넉히
+            contentContainerStyle={{ paddingTop: 12, paddingBottom: 200 + insets.bottom }}
             // 폴드 실측(2026-10-10): 검색어로 목록 개수가 크게 바뀔 때(388→208개) 한 번에 316ms 멈췄다.
             // 기본값은 화면 위아래 10화면(약 150줄)을 미리 만들어 두어, 검색할 때마다 그만큼 지우고 새로 만들었다.
             // 위아래 2화면만 미리 만든다. (removeClippedSubviews는 목록이 크게 바뀔 때 줄이 빈칸으로 남는
@@ -1465,13 +1470,12 @@ ${skipped}개는 지금 목록에 없어 빠졌어요.`);
         }}
         onClose={() => setQtyProduct(null)}
       />
-      <VoiceOrderModal
-        visible={showVoice}
-        onClose={() => setShowVoice(false)}
-        products={products}
-        onApply={onVoiceApply}
-        onManualSearch={onVoiceManualSearch}
-      />
+      {mode === 'search' && !keyboardVisible ? (
+        <VoicePressBar
+          bottom={Math.max(insets.bottom, 16) + 16 + (totalCount > 0 ? 72 : 0)}
+          onHeard={onHeard}
+        />
+      ) : null}
       <OrderHistoryModal visible={showHistory} onClose={() => setShowHistory(false)} onReorder={onReorderHistory} />
     </View>
       {/* 매장 무료 사용자 하단 배너(구독·이벤트·테스터는 안 보임) */}
@@ -1518,7 +1522,6 @@ const QuickOrderHelpModal = memo(function QuickOrderHelpModal({
   const searchTips: { icon: keyof typeof MaterialCommunityIcons.glyphMap; text: string }[] = [
     { icon: 'magnify', text: '검색창 — 상품명, 초성(예: ㅁㄹㄴ), 바코드로 찾아요. 검색하는 동안은 사진 대신 글자 카드로 보여요' },
     { icon: 'barcode-scan', text: '바코드 버튼 — 스캔하면 목록에서 찾아 줘요. 없는 새 상품이면 등록 화면으로 가고, 사진을 못 찾으면 사진 찍기 창이 바로 떠요' },
-    { icon: 'microphone-outline', text: "🎙️ 음성 발주 (Beta) — 말로 '메로나 두 박스'처럼 하면 알아듣고 담아요. 못 찾은 건 직접 검색으로 이어져요" },
     { icon: 'star-outline', text: '⭐ 자주 발주 — 발주 이력에서 자주 보낸 상품만 모아 봐요. 카테고리 칩과 함께 쓸 수 있어요' },
     { icon: 'plus-circle-outline', text: "'+ 담기' — 담으면 [−] 숫자 [+]로 바뀌어요. 가운데 숫자를 누르면 수량을 직접 적을 수 있어요" },
     { icon: 'calendar-month-outline', text: "📅 이력 — 보낸 발주를 날짜별로 봐요(예: '메로나 외 3건'). 누르면 자세히 보이고, '이대로 다시 담기'로 장바구니를 그 발주로 바꿔요" },
@@ -2149,7 +2152,7 @@ const SearchInput = memo(function SearchInput({
   return (
     <TextInput
       className="text-ink ml-1 flex-1 py-2.5 text-base"
-      placeholder="상품명·초성(ㅁㄹㄴ)·바코드"
+      placeholder="상품명·초성 검색"
       placeholderTextColor="#BBBBBB"
       value={text}
       onChangeText={onChangeText}
