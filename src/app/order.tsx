@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Chip from '@/components/Chip';
+import CategoryCombo from '@/components/CategoryCombo';
 import HeaderIcon from '@/components/HeaderIcon';
 import Thumbnail from '@/components/Thumbnail';
 import UpdateBadge, { UPDATE_BADGE_META } from '@/components/UpdateBadge';
@@ -404,6 +405,13 @@ export default function Order() {
     const byCategory = selectedCategory === '전체' ? base : base.filter((p) => p.category === selectedCategory);
     return frequentOnly ? byCategory.filter((p) => frequentIds?.has(p.id)) : byCategory;
   }, [searched, badgeSorted, selectedCategory, frequentOnly, frequentIds]);
+
+  // 카테고리 콤보박스에 보여 줄 카테고리별 상품 개수
+  const categoryCounts = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const p of products) m[p.category] = (m[p.category] ?? 0) + 1;
+    return m;
+  }, [products]);
 
   // 빠른발주: 현재 구역에 배정되고 상태가 시판중인 상품만 그리드에 보여준다(단종/일시중지는
   // 자동 숨김 — 다시 active로 바꾸면 배정 정보가 남아 있어 별도 조작 없이 재노출됨).
@@ -1169,37 +1177,25 @@ ${skipped}개는 지금 목록에 없어 빠졌어요.`);
             </View>
           </View>
 
-          {/* 칩이 여러 줄로 줄바꿈되면 상품 목록이 밀려 2개밖에 안 보였다 — 한 줄 가로 스크롤 */}
+          {/* 카테고리는 칩 줄 대신 콤보박스(칩이 많아 옆으로 밀어야 했다). ⭐ 자주 발주는 옆에 둔다.
+              "+ 카테고리"·"편집"은 콤보박스 목록 맨 아래 */}
           <View className="mt-2" style={{ gap: 6 }}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
-            >
+            <View className="mx-4 flex-row items-center" style={{ gap: 8 }}>
               <Chip label="⭐ 자주 발주" active={frequentOnly} onPress={onToggleFrequent} />
-              <Chip
-                label="전체"
-                active={selectedCategory === '전체'}
-                onPress={() => setSelectedCategory('전체')}
-              />
-              {categories.map((c) => (
-                <Chip
-                  key={c}
-                  label={categoryEditMode ? `✎ ${c}` : c}
-                  active={!categoryEditMode && selectedCategory === c}
-                  onPress={() => (categoryEditMode ? onLongPressCategory(c) : setSelectedCategory(c))}
-                  onLongPress={() => onLongPressCategory(c)}
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <CategoryCombo
+                  value={selectedCategory}
+                  categories={categories}
+                  counts={categoryCounts}
+                  total={products.length}
+                  onChange={setSelectedCategory}
+                  editMode={categoryEditMode}
+                  onPickForEdit={onLongPressCategory}
+                  onAdd={() => setShowCategoryInput(true)}
+                  onToggleEdit={() => setCategoryEditMode((v) => !v)}
                 />
-              ))}
-              {/* "+"만으론 무엇을 추가하는지, 길게 누르기는 있는 줄도 몰랐다 — 글자로 보이는 추가·편집 버튼 */}
-              <Chip label="+ 카테고리" active={false} onPress={() => setShowCategoryInput(true)} />
-              <Chip
-                label={categoryEditMode ? '편집 끝' : '편집'}
-                active={categoryEditMode}
-                onPress={() => setCategoryEditMode((v) => !v)}
-              />
-            </ScrollView>
+              </View>
+            </View>
             {categoryEditMode ? (
               <Text className="text-muted mx-4 text-xs">이름을 고치거나 지울 카테고리를 누르세요</Text>
             ) : null}
@@ -1989,8 +1985,21 @@ const AddToFridgeModal = memo(function AddToFridgeModal({
       seenNames.add(p.name);
       return true;
     });
-    return deduped.slice(0, 30);
+    // 예전엔 30개까지만 보여 카테고리를 골라도 나머지 상품은 검색해야만 나왔다 — 해당 카테고리 상품 전부 보여 준다
+    return deduped;
   }, [allProducts, assignedIds, hasBadge, deferredQuery, selectedCategory]);
+
+  // 콤보박스에 보여 줄 카테고리별 개수(이미 진열한 상품은 뺀 "진열할 수 있는" 상품 수)
+  const comboCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    let total = 0;
+    for (const p of allProducts) {
+      if (assignedIds.has(p.id)) continue;
+      counts[p.category] = (counts[p.category] ?? 0) + 1;
+      total += 1;
+    }
+    return { counts, total };
+  }, [allProducts, assignedIds]);
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -2036,12 +2045,18 @@ const AddToFridgeModal = memo(function AddToFridgeModal({
               </Pressable>
             ) : null}
           </View>
-          <View className="mb-2 flex-row flex-wrap" style={{ gap: 6 }}>
-            <Chip label="전체" active={selectedCategory === '전체'} onPress={() => setSelectedCategory('전체')} />
-            {categories.map((c) => (
-              <Chip key={c} label={c} active={selectedCategory === c} onPress={() => setSelectedCategory(c)} />
-            ))}
+          <View className="mb-1">
+            <CategoryCombo
+              value={selectedCategory}
+              categories={categories}
+              counts={comboCounts.counts}
+              total={comboCounts.total}
+              onChange={setSelectedCategory}
+            />
           </View>
+          <Text className="text-muted mb-1 text-xs">
+            진열할 수 있는 상품 <Text className="text-primary font-bold">{results.length}개</Text>
+          </Text>
           <FlatList
             data={results}
             keyExtractor={(item) => item.id}
@@ -2175,18 +2190,20 @@ const CatalogRow = memo(function CatalogRow({
     <Pressable
       onPress={() => onPress(product.id, product.barcode)}
       onLongPress={() => onLongPress(product)}
-      className="mx-4 mb-2 flex-row items-center rounded-2xl bg-paper px-3 py-2 active:opacity-70"
+      className="mx-4 mb-2 rounded-2xl bg-paper px-3 py-3 active:opacity-70"
       style={{ elevation: 2, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } }}
     >
+      {/* 1.5배 카드(2026-10-28): 위 줄에 사진과 상품 정보, 아래 줄에 담기·수량 버튼을 가득 채운다 */}
+      <View className="flex-row items-center">
       <View style={{ overflow: 'visible' }}>
         {card ? (
-          <View className="items-center justify-center" style={{ width: 56, height: 56, borderRadius: 14, backgroundColor: card.bg }}>
-            <Text style={{ color: card.fg, fontSize: art ? 30 : 18, fontWeight: 'bold' }} numberOfLines={1}>
+          <View className="items-center justify-center" style={{ width: 84, height: 84, borderRadius: 18, backgroundColor: card.bg }}>
+            <Text style={{ color: card.fg, fontSize: art ? 45 : 27, fontWeight: 'bold' }} numberOfLines={1}>
               {art ?? [...product.name.replace(/\s/g, '')].slice(0, 2).join('')}
             </Text>
           </View>
         ) : (
-          <Thumbnail uri={product.imageUri} size={56} radius={14} iconSize={22} />
+          <Thumbnail uri={product.imageUri} size={84} radius={18} iconSize={32} />
         )}
         {badge ? (
           <View style={{ position: 'absolute', top: -6, left: -6, zIndex: 1, elevation: 2 }}>
@@ -2195,10 +2212,12 @@ const CatalogRow = memo(function CatalogRow({
         ) : null}
       </View>
       <View className="ml-3 flex-1">
-        <Text className="text-ink text-[15px] font-bold leading-5">{product.name}</Text>
+        <Text className="text-ink font-bold" style={{ fontSize: 22, lineHeight: 28 }}>
+          {product.name}
+        </Text>
         {/* 브랜드·가격·바코드 끝자리를 한 줄에 — 상태는 '시판중'(기본값)이 아닐 때만 표시 */}
         <View className="mt-0.5 flex-row flex-wrap items-center" style={{ columnGap: 6 }}>
-          <Text className="text-muted text-xs">
+          <Text className="text-muted" style={{ fontSize: 16 }}>
             {product.brand} · {product.price > 0 ? `${product.price.toLocaleString()}원` : '가격 미등록'}
             {product.barcode ? ` · …${product.barcode.slice(-4)}` : ''}
           </Text>
@@ -2211,45 +2230,46 @@ const CatalogRow = memo(function CatalogRow({
           ) : null}
         </View>
       </View>
-      <View style={{ width: qty <= 0 ? 76 : 120, marginLeft: 8 }}>
+      </View>
+      <View style={{ marginTop: 10 }}>
         {qty <= 0 ? (
           <Pressable
             onPress={() => onChangeQty(product.id, 1)}
-            className="h-12 items-center justify-center rounded-xl active:opacity-80"
+            className="h-16 items-center justify-center rounded-xl active:opacity-80"
             style={{ backgroundColor: '#3A8B40' }}
             accessibilityRole="button"
             accessibilityLabel={`${product.name} 담기`}
           >
-            <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: 'bold' }}>+ 담기</Text>
+            <Text style={{ color: '#FFFFFF', fontSize: 22, fontWeight: 'bold' }}>+ 담기</Text>
           </Pressable>
         ) : (
-          <View className="h-12 flex-row items-center overflow-hidden rounded-xl border border-line bg-paper">
+          <View className="h-16 flex-row items-center overflow-hidden rounded-xl border border-line bg-paper">
             <Pressable
               onPress={() => onChangeQty(product.id, -1)}
-              className="h-12 flex-1 items-center justify-center active:bg-bg"
+              className="h-16 flex-1 items-center justify-center active:bg-bg"
               accessibilityRole="button"
               accessibilityLabel="하나 빼기"
             >
-              <MaterialCommunityIcons name="minus" size={20} color="#1A1A1A" />
+              <MaterialCommunityIcons name="minus" size={30} color="#1A1A1A" />
             </Pressable>
             <Pressable
               onPress={() => onOpenQty(product)}
-              className="h-12 items-center justify-center border-x border-line px-1 active:bg-bg"
+              className="h-16 items-center justify-center border-x border-line px-1 active:bg-bg"
               style={{ flex: 1.2 }}
               accessibilityRole="button"
               accessibilityLabel={`${product.name} ${qty}박스, 눌러서 수량 직접 입력`}
             >
-              <Text className="text-ink text-lg font-bold" style={{ fontVariant: ['tabular-nums'] }}>
+              <Text className="text-ink text-2xl font-bold" style={{ fontVariant: ['tabular-nums'] }}>
                 {qty}
               </Text>
             </Pressable>
             <Pressable
               onPress={() => onChangeQty(product.id, 1)}
-              className="h-12 flex-1 items-center justify-center active:bg-bg"
+              className="h-16 flex-1 items-center justify-center active:bg-bg"
               accessibilityRole="button"
               accessibilityLabel="하나 더하기"
             >
-              <MaterialCommunityIcons name="plus" size={20} color="#1A1A1A" />
+              <MaterialCommunityIcons name="plus" size={30} color="#1A1A1A" />
             </Pressable>
           </View>
         )}
