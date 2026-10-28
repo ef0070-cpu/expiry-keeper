@@ -2169,7 +2169,8 @@ const CatalogRow = memo(function CatalogRow({
 }) {
   const statusMeta = STATUS_META[product.status ?? 'active'];
   // 글자 카드 색은 브랜드 기준(같은 브랜드는 늘 같은 색)
-  const card = textCard ? tileColor(product.brand || product.name) : null;
+  // 검색 중이거나, 사진이 없는 상품이면 글자 카드(사진 없음 아이콘 대신 상품 구분이 되는 글자·그림)
+  const card = textCard || !product.imageUri ? tileColor(product.brand || product.name) : null;
   return (
     <Pressable
       onPress={() => onPress(product.id, product.barcode)}
