@@ -60,7 +60,10 @@ const ACTIVE_STORE_KEY = 'activeStoreId:v1';
 
 export type { CatalogUpdateBadge } from './order-catalog-merge';
 
-export const DEFAULT_CATEGORIES = ['바', '펜슬', '콘', '컵', '샌드', '홈', '벌크', '기타'];
+// 서버 order_catalog가 쓰는 카테고리 17개(2026-10-29 기준)를 가격대·종류 순으로 — 새로 설치하면 이 순서로 시작한다
+export const DEFAULT_CATEGORIES = [
+  '600바', '800바', '1000바', '1500바', '고급아이스바', '쭈쭈바', '펜슬', '콘', '컵', '샌드', '홈', '빙수류', '파우치류', '얼음류', '벌크', '기타', '바',
+];
 
 // ---------- 카탈로그 ----------
 
@@ -414,9 +417,42 @@ export async function renameOrderCategory(from: string, to: string): Promise<voi
   for (const p of changed) pushOrderProduct({ ...p, category: to }).catch(() => {});
 }
 
+/** 카테고리 하나를 목록에서 한 칸 위(-1)·아래(1)로 옮긴다. 옮긴 순서가 곧 칩/콤보박스에 보이는 순서 */
+export async function moveOrderCategory(name: string, delta: -1 | 1): Promise<string[]> {
+  const items = await listOrderCategories();
+  const from = items.indexOf(name);
+  const to = from + delta;
+  if (from < 0 || to < 0 || to >= items.length) return items;
+  const next = items.slice();
+  [next[from], next[to]] = [next[to], next[from]];
+  await writeOrderCategories(next);
+  return next;
+}
+
 export async function deleteOrderCategory(name: string): Promise<void> {
   const items = await listOrderCategories();
   await writeOrderCategories(items.filter((c) => c !== name));
+}
+
+const CATEGORIES_NORMALIZED_KEY = 'orderCategoriesNormalized:2026-10-29';
+
+/**
+ * 서버 카테고리 기준으로 이 폰의 카테고리 목록을 딱 한 번 맞춘다(사용자가 적을 때 정리하는 용도).
+ * - 순서: 기본 순서(DEFAULT_CATEGORIES)에 있는 서버 카테고리 → 그 밖의 서버 카테고리 → 서버에 없지만 상품이 든 사용자 카테고리
+ * - 서버에 없고 상품도 0개인 카테고리(옛 이름·빈 카테고리)는 뺀다
+ * 한 번 하고 나면 표시를 남겨, 이후 사용자가 ▲▼로 바꾼 순서·이름은 건드리지 않는다. 서버를 못 읽었으면(빈 목록) 하지 않는다.
+ */
+async function normalizeCategoriesOnce(serverCategories: string[]): Promise<void> {
+  if (serverCategories.length === 0) return;
+  if (await AsyncStorage.getItem(CATEGORIES_NORMALIZED_KEY)) return;
+  const [current, products] = await Promise.all([listOrderCategories(), listOrderProducts()]);
+  const serverSet = new Set(serverCategories);
+  const used = new Set(products.map((p) => p.category).filter(Boolean));
+  const head = DEFAULT_CATEGORIES.filter((c) => serverSet.has(c));
+  const otherServer = serverCategories.filter((c) => !head.includes(c));
+  const userOwn = current.filter((c) => !serverSet.has(c) && used.has(c));
+  await writeOrderCategories([...head, ...otherServer, ...userOwn]);
+  await AsyncStorage.setItem(CATEGORIES_NORMALIZED_KEY, '1');
 }
 
 /** 공용 카탈로그가 새로 넣거나 바꾼 상품의 카테고리가 칩 목록에 없으면 목록 끝에 추가한다 (칩이 없으면 그 상품이 "전체"에서만 보인다). */
@@ -905,6 +941,7 @@ export async function syncOrderCatalog(): Promise<void> {
     // 옮긴 상품은 클라우드 사본(order_products)도 새 바코드로 맞춘다 — 다른 기기 pull이 예전 값으로 되돌리지 않게
     for (const p of moved) pushOrderProduct(p).catch(() => {});
     if (changed) await dedupeOrderProductsByBarcode();
+    await normalizeCategoriesOnce([...new Set((data as OrderCatalogRow[]).map((r) => r.category).filter((c): c is string => !!c && !!c.trim()))]);
     if (newBarcodes.length || updatedBarcodes.length) {
       await addCatalogUpdateBadges([
         ...newBarcodes.map((b): [string, CatalogUpdateBadge] => [b, 'new']),

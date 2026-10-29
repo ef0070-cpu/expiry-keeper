@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 
 // 사진 불러오기가 한 번 실패하면(순간 네트워크 끊김 등) 화면을 새로 그리기 전까지 회색 칸으로 남았다
@@ -12,11 +12,14 @@ export default function Thumbnail({
   size,
   radius = 8,
   iconSize,
+  fallback,
 }: {
   uri: string | null | undefined;
   size: number;
   radius?: number;
   iconSize?: number;
+  /** 사진이 없거나 끝내 못 불러올 때 "사진 없음" 아이콘 대신 보여 줄 것(예: 글자 카드) */
+  fallback?: ReactNode;
 }) {
   const [attempt, setAttempt] = useState(0);
   const [failed, setFailed] = useState(false);
@@ -36,6 +39,7 @@ export default function Thumbnail({
   };
 
   if (!uri || failed) {
+    if (fallback) return <>{fallback}</>;
     return (
       <View
         className="items-center justify-center bg-bg"

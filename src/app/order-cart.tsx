@@ -86,8 +86,8 @@ export default function OrderCartScreen() {
     ]);
   };
 
-  const shareText = useMemo(
-    () => buildOrderShareText(cart, products, storeName, new Date()),
+  const buildMessage = useCallback(
+    (extra: { deliveryDate: string; memo: string }) => buildOrderShareText(cart, products, storeName, new Date(), extra),
     [cart, products, storeName],
   );
 
@@ -99,30 +99,37 @@ export default function OrderCartScreen() {
     setConfirmOpen(true);
   };
 
-  const share = async ({ deliveryDate, memo }: { deliveryDate: string; memo: string }) => {
+  // 이력·장바구니 비움·월 사용량은 "실제로 보냈다"고 사용자가 확인했을 때만 처리한다.
+  // (안드로이드는 공유 창을 띄운 순간 곧바로 '공유됨'으로 돌아와, 카톡·문자에서 보냈는지 앱이 알 수 없다.)
+  const finishSent = async ({ deliveryDate, memo }: { deliveryDate: string; memo: string }) => {
+    await bumpMonthlyUsage('order');
+    try {
+      await addOrderHistory({
+        storeId: activeStoreId,
+        storeName: storeName ?? '',
+        items: items.map((i) => ({ productId: i.product.id, name: i.product.name, qty: i.qty })),
+        deliveryDate,
+        memo,
+      });
+    } catch {
+      // 이력 저장 실패가 발주 흐름을 막지 않는다.
+    }
+    await clearOrderCart();
+    setCart({});
+    setConfirmOpen(false);
+  };
+
+  const share = async (opts: { deliveryDate: string; memo: string }) => {
     if (sending) return;
     setSending(true);
     try {
-      const result = await Share.share({ message: buildOrderShareText(cart, products, storeName, new Date()) });
-      // Android는 공유 대상 앱에서 실제로 전송을 완료했는지 알려주지 않는다(공유 시트를
-      // 띄운 시점에 곧바로 resolve됨) — sharedAction이면 전달 시도가 이뤄진 것으로 보고 비운다.
-      // iOS는 사용자가 취소하면 dismissedAction이 와서 이 분기를 안 타 장바구니가 보존된다.
+      const result = await Share.share({ message: buildOrderShareText(cart, products, storeName, new Date(), opts) });
+      // iOS는 사용자가 공유를 취소하면 dismissedAction이 와서 여기서 끝난다(아무것도 저장하지 않음).
       if (result.action === Share.sharedAction) {
-        await bumpMonthlyUsage('order');
-        try {
-          await addOrderHistory({
-            storeId: activeStoreId,
-            storeName: storeName ?? '',
-            items: items.map((i) => ({ productId: i.product.id, name: i.product.name, qty: i.qty })),
-            deliveryDate,
-            memo,
-          });
-        } catch {
-          // 이력 저장 실패가 발주 흐름을 막지 않는다.
-        }
-        await clearOrderCart();
-        setCart({});
-        setConfirmOpen(false);
+        Alert.alert('발주서를 보내셨나요?', '보냈다고 확인하면 발주 이력에 저장하고 장바구니를 비워요.', [
+          { text: '아직 안 보냈어요', style: 'cancel' }, // 장바구니·이력 그대로 — 다시 보낼 수 있다
+          { text: '보냈어요', onPress: () => finishSent(opts) },
+        ]);
       }
     } catch (e) {
       Alert.alert('공유 실패', e instanceof Error ? e.message : '알 수 없는 오류');
@@ -226,7 +233,7 @@ export default function OrderCartScreen() {
       <OrderConfirmSheet
         visible={confirmOpen}
         storeName={storeName}
-        message={shareText}
+        buildMessage={buildMessage}
         onClose={() => setConfirmOpen(false)}
         onSend={share}
         sending={sending}

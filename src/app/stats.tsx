@@ -2,6 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Alert, FlatList, Pressable, Text, View } from 'react-native';
+import HomeBanner from '@/components/HomeBanner';
 import { listProducts, restoreProduct } from '@/lib/repo';
 import { Product, STATUS_LABELS } from '@/lib/types';
 
@@ -63,6 +64,8 @@ export default function Stats() {
   };
 
   return (
+    // 소진·폐기 기록을 읽는 화면 — 누를 버튼이 거의 없어 실수 클릭이 적다. 배너는 목록 밖 아래에 고정(스크롤돼도 안 움직임)
+    <View className="flex-1 bg-bg">
     <FlatList
       className="flex-1 bg-bg"
       contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
@@ -129,6 +132,8 @@ export default function Stats() {
         </View>
       }
     />
+    <HomeBanner />
+    </View>
   );
 }
 

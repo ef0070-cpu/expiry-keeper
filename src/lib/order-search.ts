@@ -36,6 +36,11 @@ function candidatesOf(p: OrderProduct): Candidate[] {
   return c;
 }
 
+/** 검색 전에 상품별 후보 문자열 분해를 미리 해 둔다(첫 검색이 느려지지 않게). 이미 해 둔 상품은 건너뛴다. */
+export function warmSearchCache(products: OrderProduct[]): void {
+  for (const p of products) candidatesOf(p);
+}
+
 /** 여러 후보 문자열(상품명/브랜드/별칭) 중 query와 가장 잘 맞는 등급을 찾는다. 등급과 함께
  * 그 등급에서 매칭된 문자열의 길이도 반환한다 — 같은 등급이면 짧은(=query에 더 가까운, 예:
  * "ㅂㅂㅂ"에 대해 "비비빅"이 "비비빅 흑임자"보다) 문자열이 더 정확한 일치이기 때문이다.

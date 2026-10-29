@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  InteractionManager,
   Keyboard,
   Modal,
   Pressable,
@@ -49,6 +50,7 @@ import {
   listOrderCategories,
   listOrderProducts,
   listStores,
+  moveOrderCategory,
   removeFromFridgeSection,
   renameFridgeSection,
   renameOrderCategory,
@@ -78,9 +80,11 @@ import CoachMarks, { CoachStep } from '@/components/CoachMarks';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DEFAULT_COLUMNS, isSpacerId, normalizeSpan, packRows } from '@/lib/fridge-layout';
 import { FridgeAssignment, FridgeLayoutSettings, FridgeSection, OrderCart, OrderProduct, OrderStatus, Store } from '@/lib/order-types';
-import { buildProductSearchIndex, searchOrderProducts } from '@/lib/order-search';
+import { buildProductSearchIndex, searchOrderProducts, warmSearchCache } from '@/lib/order-search';
 import HomeBanner from '@/components/HomeBanner';
-import VoicePressBar from '@/components/VoicePressBar';
+import FloatingMic from '@/components/FloatingMic';
+import VoiceMicButton from '@/components/VoiceMicButton';
+import { DEFAULT_MIC_FAB, type MicFabSettings, getMicFab, setMicFab } from '@/lib/mic-fab';
 import OrderHistoryModal from '@/components/OrderHistoryModal';
 import { frequentProductIds, listOrderHistory, OrderHistoryEntry } from '@/lib/order-history';
 
@@ -162,12 +166,12 @@ export default function Order() {
   const [fridgeSearchQuery, setFridgeSearchQuery] = useState('');
   const [query, setQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('전체');
-  // 검색발주: ⭐ 자주 발주 칩(발주 이력에서 자주 쓴 상품만), 🎙️ 누르고 말하기(들은 말은 검색창에 넣고 사람이 고름), 📅 이력 창
+  // 이력(📅)은 검색·빠른발주 모두에서 보인다. 검색발주: ⭐ 자주 발주 칩(발주 이력에서 자주 쓴 상품만), 🎙️ 검색창 마이크(누르고 말하기 — 들은 말은 검색창에 넣고 사람이 고름), 📅 이력 창
   const [frequentOnly, setFrequentOnly] = useState(false);
   const [frequentIds, setFrequentIds] = useState<Set<string> | null>(null);
   // 마이크로 들은 말(검색창에 넣은 글자). 검색어가 그대로인 동안만 "맞는 상품을 눌러 담으세요" 안내를 보인다
   const [heardText, setHeardText] = useState<string | null>(null);
-  // 키보드가 떠 있으면 마이크 바·카테고리 줄을 숨겨 목록 자리를 넓힌다(키보드 자체에 마이크가 있다)
+  // 키보드가 떠 있으면 카테고리 줄을 숨겨 목록 자리를 넓힌다
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   useEffect(() => {
     const show = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
@@ -395,6 +399,11 @@ export default function Order() {
   // 오타 허용(fuzzy) 검색용 색인은 상품 목록이 바뀔 때만 다시 만든다 — 매 키 입력마다 새로
   // 만들면(388종 카탈로그 기준 색인 구축 자체가 무거움) 그게 입력 지연의 주된 원인이었다.
   const fuseIndex = useMemo(() => buildProductSearchIndex(products), [products]);
+  // 상품 목록이 새로 만들어진 직후(동기화 등) 첫 검색에서 상품마다 글자를 분해하느라 느려지지 않게, 화면이 한가할 때 미리 분해해 둔다
+  useEffect(() => {
+    const h = InteractionManager.runAfterInteractions(() => warmSearchCache(products));
+    return () => h.cancel();
+  }, [products]);
 
   const badgeSorted = useMemo(
     () => [...products].sort((a, b) => Number(hasBadge(b)) - Number(hasBadge(a))),
@@ -753,8 +762,6 @@ ${skipped}개는 지금 목록에 없어 빠졌어요.`);
   );
 
   // 줄 그리는 함수를 고정 — 매번 새로 만들면 목록이 보이는 줄 전부를 다시 그린다
-  // 검색어가 있을 때만 사진 대신 글자 카드로 보여 준다(textCard)
-  const searching = deferredQuery.trim() !== '';
   const renderCatalogRow = useCallback(
     ({ item }: { item: OrderProduct }) => (
       <CatalogRow
@@ -762,7 +769,6 @@ ${skipped}개는 지금 목록에 없어 빠졌어요.`);
         qty={cart[item.id] ?? 0}
         badge={item.barcode ? updateBadges.get(item.barcode) : undefined}
         badgeAnimate={item.barcode ? animatingBadges.has(item.barcode) : false}
-        textCard={searching}
         art={tileArt(item.name, tileArts[item.id])}
         onChangeQty={changeQty}
         onOpenQty={setQtyProduct}
@@ -770,7 +776,7 @@ ${skipped}개는 지금 목록에 없어 빠졌어요.`);
         onLongPress={onLongPressProduct}
       />
     ),
-    [cart, updateBadges, animatingBadges, searching, tileArts, changeQty, handleOpenProduct, onLongPressProduct],
+    [cart, updateBadges, animatingBadges, tileArts, changeQty, handleOpenProduct, onLongPressProduct],
   );
 
   const onEditSettingsProduct = useCallback(() => {
@@ -924,6 +930,28 @@ ${skipped}개는 지금 목록에 없어 빠졌어요.`);
     }
   }, [load]);
 
+  // 서버(공용 목록)에서 빠진 상품이 폰에 남아 검색에 계속 나오는 것을 정리한다. 목록을 보여 주고 지울 것만 고르게 한다.
+  // 화면에 띄우는 마이크 버튼: 켬/끔·위치는 이 기기에만 저장한다
+  const [micFab, setMicFabState] = useState<MicFabSettings>(DEFAULT_MIC_FAB);
+  const micFabRef = useRef(micFab);
+  micFabRef.current = micFab;
+  useEffect(() => {
+    getMicFab().then(setMicFabState);
+  }, []);
+  const updateMicFab = useCallback((next: MicFabSettings) => {
+    setMicFabState(next);
+    setMicFab(next);
+  }, []);
+  const onMicPos = useCallback((x: number, y: number) => updateMicFab({ ...micFabRef.current, x, y }), [updateMicFab]);
+  // 검색창 마이크를 톡 누르면 켜고 끈다. 최신 값은 ref로 읽는다(메모된 버튼이 옛 값을 붙잡아 늘 같은 값으로 바꾸던 문제)
+  const onMicToggle = useCallback(() => {
+    const cur = micFabRef.current;
+    updateMicFab({ ...cur, enabled: !cur.enabled });
+    setToastMessage(cur.enabled ? '마이크 버튼을 껐어요' : '마이크 버튼을 켰어요');
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    toastTimeoutRef.current = setTimeout(() => setToastMessage(null), 1500);
+  }, [updateMicFab]);
+
   return (
     <View className="flex-1 bg-bg">
     {/* 본문(떠 있는 [발주 내역 확인] 버튼 포함)과 하단 배너를 나눠, 버튼이 배너를 가리지 않고 그 위에 오게 */}
@@ -933,11 +961,7 @@ ${skipped}개는 지금 목록에 없어 빠졌어요.`);
           headerRight: () => (
             <View className="flex-row items-center" style={{ gap: 8 }}>
               {products.length > 0 ? (
-                <HeaderIcon
-                  icon="delete-sweep-outline"
-                  label="초기화"
-                  onPress={() => setShowResetConfirm(true)}
-                />
+                <HeaderIcon icon="delete-sweep-outline" label="초기화" onPress={() => setShowResetConfirm(true)} />
               ) : null}
               <HeaderIcon
                 icon="file-excel-outline"
@@ -1021,7 +1045,7 @@ ${skipped}개는 지금 목록에 없어 빠졌어요.`);
           </Pressable>
         </View>
 
-        {mode === 'search' ? (
+        {(
           <Pressable
             onPress={() => setShowHistory(true)}
             ref={coachRefs.hist}
@@ -1034,7 +1058,7 @@ ${skipped}개는 지금 목록에 없어 빠졌어요.`);
             <MaterialCommunityIcons name="calendar-month-outline" size={16} color="#1A1A1A" />
             <Text className="text-ink ml-1 text-sm font-medium">이력</Text>
           </Pressable>
-        ) : null}
+        )}
       </View>
 
       {mode === 'quick' && activeStoreId ? (
@@ -1150,6 +1174,13 @@ ${skipped}개는 지금 목록에 없어 빠졌어요.`);
             >
               <MaterialCommunityIcons name="magnify" size={20} color="#888888" />
               <SearchInput value={query} onCommit={setQuery} />
+              <View style={{ marginVertical: -4 }}>
+              <VoiceMicButton
+                onHeard={onHeard}
+                active={micFab.enabled}
+                onTap={onMicToggle}
+              />
+              </View>
               <Pressable
                 onPress={() => router.push('/scan?mode=order-search')}
                 className="h-11 w-11 items-center justify-center rounded-lg active:bg-bg"
@@ -1188,13 +1219,11 @@ ${skipped}개는 지금 목록에 없어 빠졌어요.`);
                   onPickForEdit={onLongPressCategory}
                   onAdd={() => setShowCategoryInput(true)}
                   onToggleEdit={() => setCategoryEditMode((v) => !v)}
+                  onMove={async (c, d) => setCategories(await moveOrderCategory(c, d))}
                 />
               </View>
             </View>
             )}
-            {categoryEditMode ? (
-              <Text className="text-muted mx-4 text-xs">이름을 고치거나 지울 카테고리를 누르세요</Text>
-            ) : null}
             {showCategoryInput || editingCategory ? (
               <View className="mx-4 flex-row gap-2">
                 <TextInput
@@ -1236,8 +1265,8 @@ ${skipped}개는 지금 목록에 없어 빠졌어요.`);
             data={filtered}
             keyExtractor={(item) => item.id}
             keyboardShouldPersistTaps="handled"
-            // 아래에 떠 있는 마이크 바(64)와 발주서 확인 바에 마지막 상품이 가리지 않게 여백을 넉넉히
-            contentContainerStyle={{ paddingTop: 12, paddingBottom: 200 + insets.bottom }}
+            // 아래에 떠 있는 발주서 확인 바에 마지막 상품이 가리지 않게 여백을 둔다
+            contentContainerStyle={{ paddingTop: 12, paddingBottom: 120 + insets.bottom }}
             // 폴드 실측(2026-10-10): 검색어로 목록 개수가 크게 바뀔 때(388→208개) 한 번에 316ms 멈췄다.
             // 기본값은 화면 위아래 10화면(약 150줄)을 미리 만들어 두어, 검색할 때마다 그만큼 지우고 새로 만들었다.
             // 위아래 2화면만 미리 만든다. (removeClippedSubviews는 목록이 크게 바뀔 때 줄이 빈칸으로 남는
@@ -1470,10 +1499,11 @@ ${skipped}개는 지금 목록에 없어 빠졌어요.`);
         }}
         onClose={() => setQtyProduct(null)}
       />
-      {mode === 'search' && !keyboardVisible ? (
-        <VoicePressBar
-          bottom={Math.max(insets.bottom, 16) + 16 + (totalCount > 0 ? 72 : 0)}
+      {mode === 'search' && micFab.enabled ? (
+        <FloatingMic
           onHeard={onHeard}
+          pos={micFab.x != null && micFab.y != null ? { x: micFab.x, y: micFab.y } : null}
+          onPosChange={onMicPos}
         />
       ) : null}
       <OrderHistoryModal visible={showHistory} onClose={() => setShowHistory(false)} onReorder={onReorderHistory} />
@@ -1505,14 +1535,13 @@ const QuickOrderHelpModal = memo(function QuickOrderHelpModal({
     "'+ 상품 진열하기'로 그 칸에 있는 상품을 실제 진열 순서대로 넣어요",
     '발주할 상품을 탭해서 담아요 (한 번 탭 = 1박스)',
     "아래 '[ N박스 ] 발주서 확인'을 눌러요. 납품 희망일을 고르고 배송 메모를 적은 뒤, 보낼 내용을 미리 보고 카톡/SMS로 보내요",
-    "보낸 발주는 위쪽 '📅 이력'(검색발주 화면)에 저장돼요",
+    "보낸 발주는 위쪽 '📅 이력'에 저장돼요",
   ];
   const buttons: { icon: keyof typeof MaterialCommunityIcons.glyphMap; color?: string; text: string }[] = [
     { icon: 'gesture-tap', text: '상품 탭 — 1박스 담기' },
     { icon: 'numeric-1-circle', color: '#CC2222', text: '빨간 숫자 탭 — 수량 조절(빼기·여러 박스)' },
     { icon: 'magnify-plus-outline', text: '상품을 꾹 누르고 있기 — 사진 크게 보기' },
     { icon: 'cog-outline', text: '톱니바퀴 — 상품 수정 · 다른 구역으로 이동 · 줄 아래 구분선' },
-    { icon: 'arrow-all', text: '화살표 — 누른 뒤 옮길 자리의 상품을 탭하면 서로 자리가 바뀌어요' },
     { icon: 'trash-can-outline', text: '휴지통 — 이 구역에서 빼기 (상품 자체는 지워지지 않아요)' },
     { icon: 'gesture-tap-hold', text: '구역 이름을 꾹 — 이름 변경 · 순서 변경 · 상품 비우기 · 삭제' },
     { icon: 'pencil-ruler', text: '배치 편집 — 칸 크기·빈칸·순서를 냉동고처럼 맞춰요 (같은 팀 기기에도 같이 바뀌어요)' },
@@ -2146,7 +2175,7 @@ const SearchInput = memo(function SearchInput({
     timerRef.current = setTimeout(() => {
       lastCommittedRef.current = t;
       onCommit(t);
-    }, 150);
+    }, 90);
   };
 
   return (
@@ -2165,7 +2194,6 @@ const CatalogRow = memo(function CatalogRow({
   qty,
   badge,
   badgeAnimate,
-  textCard,
   art,
   onChangeQty,
   onOpenQty,
@@ -2176,8 +2204,6 @@ const CatalogRow = memo(function CatalogRow({
   qty: number;
   badge?: CatalogUpdateBadge;
   badgeAnimate?: boolean;
-  /** 검색어가 있을 때만 true — 사진 대신 색 카드로 보여 준다 */
-  textCard: boolean;
   /** 제품 그림(이모지). 없으면 상품명 앞 2글자 */
   art: string | null;
   onChangeQty: (id: string, delta: number) => void;
@@ -2187,27 +2213,24 @@ const CatalogRow = memo(function CatalogRow({
 }) {
   const statusMeta = STATUS_META[product.status ?? 'active'];
   // 글자 카드 색은 브랜드 기준(같은 브랜드는 늘 같은 색)
-  // 검색 중이거나, 사진이 없는 상품이면 글자 카드(사진 없음 아이콘 대신 상품 구분이 되는 글자·그림)
-  const card = textCard || !product.imageUri ? tileColor(product.brand || product.name) : null;
+  // 사진이 있으면 사진(공용 사진 → 직접 등록한 사진 순으로 이미 imageUri에 담겨 있다). 없거나 못 불러오면 글자 카드.
+  const card = tileColor(product.brand || product.name);
+  const textNode = (
+    <View className="items-center justify-center" style={{ width: 56, height: 56, borderRadius: 14, backgroundColor: card.bg }}>
+      <Text style={{ color: card.fg, fontSize: art ? 30 : 18, fontWeight: 'bold' }} numberOfLines={1}>
+        {art ?? [...product.name.replace(/\s/g, '')].slice(0, 2).join('')}
+      </Text>
+    </View>
+  );
   return (
     <Pressable
       onPress={() => onPress(product.id, product.barcode)}
       onLongPress={() => onLongPress(product)}
-      className="mx-4 mb-2 rounded-2xl bg-paper px-3 py-3 active:opacity-70"
+      className="mx-4 mb-2 flex-row items-center rounded-2xl bg-paper px-3 py-2 active:opacity-70"
       style={{ elevation: 2, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } }}
     >
-      {/* 1.5배 카드(2026-10-28): 위 줄에 사진과 상품 정보, 아래 줄에 담기·수량 버튼을 가득 채운다 */}
-      <View className="flex-row items-center">
       <View style={{ overflow: 'visible' }}>
-        {card ? (
-          <View className="items-center justify-center" style={{ width: 84, height: 84, borderRadius: 18, backgroundColor: card.bg }}>
-            <Text style={{ color: card.fg, fontSize: art ? 45 : 27, fontWeight: 'bold' }} numberOfLines={1}>
-              {art ?? [...product.name.replace(/\s/g, '')].slice(0, 2).join('')}
-            </Text>
-          </View>
-        ) : (
-          <Thumbnail uri={product.imageUri} size={84} radius={18} iconSize={32} />
-        )}
+        <Thumbnail uri={product.imageUri} size={56} radius={14} iconSize={22} fallback={textNode} />
         {badge ? (
           <View style={{ position: 'absolute', top: -6, left: -6, zIndex: 1, elevation: 2 }}>
             <UpdateBadge kind={badge} animate={!!badgeAnimate} />
@@ -2215,12 +2238,10 @@ const CatalogRow = memo(function CatalogRow({
         ) : null}
       </View>
       <View className="ml-3 flex-1">
-        <Text className="text-ink font-bold" style={{ fontSize: 22, lineHeight: 28 }}>
-          {product.name}
-        </Text>
+        <Text className="text-ink text-[15px] font-bold leading-5">{product.name}</Text>
         {/* 브랜드·가격·바코드 끝자리를 한 줄에 — 상태는 '시판중'(기본값)이 아닐 때만 표시 */}
         <View className="mt-0.5 flex-row flex-wrap items-center" style={{ columnGap: 6 }}>
-          <Text className="text-muted" style={{ fontSize: 16 }}>
+          <Text className="text-muted text-xs">
             {product.brand} · {product.price > 0 ? `${product.price.toLocaleString()}원` : '가격 미등록'}
             {product.barcode ? ` · …${product.barcode.slice(-4)}` : ''}
           </Text>
@@ -2233,46 +2254,45 @@ const CatalogRow = memo(function CatalogRow({
           ) : null}
         </View>
       </View>
-      </View>
-      <View style={{ marginTop: 10 }}>
+      <View style={{ width: qty <= 0 ? 76 : 120, marginLeft: 8 }}>
         {qty <= 0 ? (
           <Pressable
             onPress={() => onChangeQty(product.id, 1)}
-            className="h-16 items-center justify-center rounded-xl active:opacity-80"
+            className="h-12 items-center justify-center rounded-xl active:opacity-80"
             style={{ backgroundColor: '#3A8B40' }}
             accessibilityRole="button"
             accessibilityLabel={`${product.name} 담기`}
           >
-            <Text style={{ color: '#FFFFFF', fontSize: 22, fontWeight: 'bold' }}>+ 담기</Text>
+            <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: 'bold' }}>+ 담기</Text>
           </Pressable>
         ) : (
-          <View className="h-16 flex-row items-center overflow-hidden rounded-xl border border-line bg-paper">
+          <View className="h-12 flex-row items-center overflow-hidden rounded-xl border border-line bg-paper">
             <Pressable
               onPress={() => onChangeQty(product.id, -1)}
-              className="h-16 flex-1 items-center justify-center active:bg-bg"
+              className="h-12 flex-1 items-center justify-center active:bg-bg"
               accessibilityRole="button"
               accessibilityLabel="하나 빼기"
             >
-              <MaterialCommunityIcons name="minus" size={30} color="#1A1A1A" />
+              <MaterialCommunityIcons name="minus" size={20} color="#1A1A1A" />
             </Pressable>
             <Pressable
               onPress={() => onOpenQty(product)}
-              className="h-16 items-center justify-center border-x border-line px-1 active:bg-bg"
+              className="h-12 items-center justify-center border-x border-line px-1 active:bg-bg"
               style={{ flex: 1.2 }}
               accessibilityRole="button"
               accessibilityLabel={`${product.name} ${qty}박스, 눌러서 수량 직접 입력`}
             >
-              <Text className="text-ink text-2xl font-bold" style={{ fontVariant: ['tabular-nums'] }}>
+              <Text className="text-ink text-lg font-bold" style={{ fontVariant: ['tabular-nums'] }}>
                 {qty}
               </Text>
             </Pressable>
             <Pressable
               onPress={() => onChangeQty(product.id, 1)}
-              className="h-16 flex-1 items-center justify-center active:bg-bg"
+              className="h-12 flex-1 items-center justify-center active:bg-bg"
               accessibilityRole="button"
               accessibilityLabel="하나 더하기"
             >
-              <MaterialCommunityIcons name="plus" size={30} color="#1A1A1A" />
+              <MaterialCommunityIcons name="plus" size={20} color="#1A1A1A" />
             </Pressable>
           </View>
         )}

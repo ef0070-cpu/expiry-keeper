@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Keyboard, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { addDaysYmd, kstNow } from '@/lib/order-history';
 
@@ -9,8 +9,8 @@ const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 type Props = {
   visible: boolean;
   storeName: string | null;
-  /** buildOrderShareText 결과 — 카톡/SMS로 나갈 본문 그대로 */
-  message: string;
+  /** 카톡/SMS로 나갈 본문을 만든다 — 고른 납품 희망일·배송 메모까지 넣은 그대로 */
+  buildMessage: (extra: { deliveryDate: string; memo: string }) => string;
   onClose(): void;
   onSend(opts: { deliveryDate: string; memo: string }): void;
   sending: boolean;
@@ -22,10 +22,25 @@ function chipLabel(ymd: string): string {
   return `${m}/${d}(${WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]})`;
 }
 
-export default function OrderConfirmSheet({ visible, storeName, message, onClose, onSend, sending }: Props) {
+export default function OrderConfirmSheet({ visible, storeName, buildMessage, onClose, onSend, sending }: Props) {
   const insets = useSafeAreaInsets();
   const [picked, setPicked] = useState<string | null>(null);
   const [memo, setMemo] = useState('');
+  // Modal 안에서는 키보드가 뜰 때 화면 크기가 자동으로 줄지 않아, 배송 메모 입력창이 키보드 뒤에 가려졌다.
+  // 키보드 높이를 직접 읽어 시트를 그만큼 위로 올린다.
+  const [kbHeight, setKbHeight] = useState(0);
+  const scrollRef = useRef<ScrollView>(null);
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', (e) => {
+      setKbHeight(e.endCoordinates.height);
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
+    });
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKbHeight(0));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
 
   // 열릴 때마다 현재 KST 기준으로 다시 계산한다.
   const info = useMemo(() => {
@@ -39,23 +54,25 @@ export default function OrderConfirmSheet({ visible, storeName, message, onClose
     if (visible) {
       setPicked(null);
       setMemo('');
+      setKbHeight(0);
     }
   }, [visible]);
 
   if (!info) return null;
   const selected = picked ?? info.days[0];
+  const message = buildMessage({ deliveryDate: selected, memo });
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={sending ? undefined : onClose}>
       <View className="flex-1 justify-end bg-black/50">
         <View
           className="max-h-[90%] rounded-t-2xl bg-paper px-4 pt-4"
-          style={{ paddingBottom: Math.max(insets.bottom, 16) + 8 }}
+          style={{ paddingBottom: kbHeight > 0 ? kbHeight + 8 : Math.max(insets.bottom, 16) + 8 }}
         >
           <Text className="text-ink mb-3 text-lg font-bold">
             {storeName ? `${storeName} 발주서 확인` : '발주서 확인'}
           </Text>
-          <ScrollView keyboardShouldPersistTaps="handled">
+          <ScrollView ref={scrollRef} keyboardShouldPersistTaps="handled">
             <Text className="text-muted mb-2 text-sm">납품 희망일</Text>
             <View className="mb-3 flex-row flex-wrap">
               {info.days.map((d) => {
@@ -80,7 +97,7 @@ export default function OrderConfirmSheet({ visible, storeName, message, onClose
             <Text className="text-muted mb-2 text-sm">카톡/SMS로 보낼 내용 (1박스는 생략)</Text>
             <ScrollView
               nestedScrollEnabled
-              className="mb-3 max-h-48 rounded-xl border border-line bg-bg"
+              className={`mb-3 rounded-xl border border-line bg-bg ${kbHeight > 0 ? 'max-h-24' : 'max-h-48'}`}
               contentContainerStyle={{ padding: 12 }}
             >
               <Text className="text-ink text-sm leading-5">{message}</Text>

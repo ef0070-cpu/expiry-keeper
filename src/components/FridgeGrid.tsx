@@ -1,8 +1,10 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { ReactNode, Ref, RefObject, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, LayoutAnimation, Modal, Platform, Pressable, ScrollView, Text, UIManager, View } from 'react-native';
+import { LayoutAnimation, Modal, Platform, Pressable, ScrollView, Text, UIManager, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, { type SharedValue, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 import Thumbnail from '@/components/Thumbnail';
 import {
   FridgeBackground,
@@ -25,6 +27,7 @@ if (Platform.OS === 'android') UIManager.setLayoutAnimationEnabledExperimental?.
 export type FridgeGridItem = { id: string; product: OrderProduct | null; span: TileSpan };
 
 const GAP = 10;
+const MIN_ONE_LINE_SIZE = 18; // 한 줄 이름 글자가 이보다 작아지면 2줄로 나눈다
 const PEEK_MS = 300; // 길게 누르면 사진 보기
 const EDIT_MS = 1000; // 계속 누르고 있으면 배치 편집 시작(명세 2026-10-22)
 
@@ -35,24 +38,10 @@ function railStyle(bg: FridgeBackground, divider: boolean) {
   return { gap: divider ? 20 : GAP, bar: divider ? 4 : 0, color: '#888888', edge: '#888888' };
 }
 
-/** 상품 분류 → 카드 위쪽 작은 아이콘(분류 값 끝에 줄바꿈이 섞인 데이터가 있어 trim) */
-function categoryIcon(category: string): keyof typeof MaterialCommunityIcons.glyphMap {
-  const c = (category ?? '').trim();
-  if (c === '콘') return 'ice-cream';
-  if (c === '홈/컵' || c === '컵' || c === '홈') return 'cup';
-  if (c === '튜브' || c === '쭈쭈바' || c === '펜슬') return 'bottle-tonic-outline';
-  if (c === '치어팩') return 'bottle-soda-outline';
-  if (c === '샌드/기타' || c === '샌드') return 'cookie-outline';
-  if (c === '얼음류') return 'cube-outline';
-  if (c === '상자류' || c === '벌크') return 'package-variant-closed';
-  if (c.includes('바')) return 'ice-pop';
-  return 'food-variant';
-}
-
-const SPAN_OPTIONS: { key: TileSpan; label: string }[] = [
-  { key: 1, label: '1칸' },
-  { key: 2, label: '2칸' },
-  { key: 'full', label: '줄' },
+const SPAN_OPTIONS: { key: TileSpan; label: string; short: string }[] = [
+  { key: 1, label: '1칸', short: '1' },
+  { key: 2, label: '2칸', short: '2' },
+  { key: 'full', label: '줄', short: '줄' },
 ];
 
 function Segmented<T extends string | number>({
@@ -95,7 +84,6 @@ type TileProps = {
   qty: number;
   editing: boolean;
   dragging: boolean;
-  pendingMove: boolean;
   tileColorOverride?: string;
   tileArtOverride?: string;
   fontFamily?: string;
@@ -105,10 +93,12 @@ type TileProps = {
   onRemove: () => void;
   onOpenQty: () => void;
   onSpan: (s: TileSpan) => void;
-  onToggleMove: () => void;
   onDragStart: (absX: number, absY: number) => void;
   onDragMove: (absX: number, absY: number) => void;
   onDragEnd: () => void;
+  /** 끌고 있는 손가락 위치(UI 스레드에서 갱신 — 끌리는 카드가 JS 지연과 상관없이 따라온다) */
+  fingerX: SharedValue<number>;
+  fingerY: SharedValue<number>;
   cardRef?: Ref<View>;
 };
 
@@ -125,18 +115,35 @@ const GridTile = memo(function GridTile(p: TileProps) {
   useEffect(() => clear, []);
 
   // 편집 중에만: 0.2초 누르고 있으면 끌기 시작(다른 버튼 탭과 안 겹치게)
-  const pan = useMemo(
-    () =>
-      Gesture.Pan()
-        .enabled(editing)
-        .activateAfterLongPress(200)
-        .runOnJS(true)
-        .onStart((e) => p.onDragStart(e.absoluteX, e.absoluteY))
-        .onUpdate((e) => p.onDragMove(e.absoluteX, e.absoluteY))
-        .onFinalize(() => p.onDragEnd()),
+  // 손가락 위치는 UI 스레드에서 바로 반영하고, 자리 판정(JS)은 0.05초에 한 번만 넘긴다
+  const pan = useMemo(() => {
+    const { fingerX, fingerY, onDragStart, onDragMove, onDragEnd } = p;
+    let lastSent = 0;
+    return Gesture.Pan()
+      .enabled(editing)
+      .activateAfterLongPress(200)
+      .onStart((e) => {
+        'worklet';
+        fingerX.value = e.absoluteX;
+        fingerY.value = e.absoluteY;
+        lastSent = Date.now();
+        scheduleOnRN(onDragStart, e.absoluteX, e.absoluteY);
+      })
+      .onUpdate((e) => {
+        'worklet';
+        fingerX.value = e.absoluteX;
+        fingerY.value = e.absoluteY;
+        const now = Date.now();
+        if (now - lastSent < 50) return;
+        lastSent = now;
+        scheduleOnRN(onDragMove, e.absoluteX, e.absoluteY);
+      })
+      .onFinalize(() => {
+        'worklet';
+        scheduleOnRN(onDragEnd);
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [editing, p.onDragStart, p.onDragMove, p.onDragEnd],
-  );
+  }, [editing, p.onDragStart, p.onDragMove, p.onDragEnd, p.fingerX, p.fingerY]);
 
   const spanRow = editing ? (
     <View className="absolute flex-row" style={{ left: 5, right: 5, bottom: 5, gap: 3 }}>
@@ -146,13 +153,16 @@ const GridTile = memo(function GridTile(p: TileProps) {
           <Pressable
             key={String(o.key)}
             onPress={() => p.onSpan(o.key)}
-            className="flex-1 items-center rounded-md py-1"
-            style={{ backgroundColor: on ? '#1A1A1A' : 'rgba(255,255,255,0.88)' }}
+            className="flex-1 items-center justify-center rounded-md"
+            style={{ height: 24, backgroundColor: on ? '#1A1A1A' : 'rgba(255,255,255,0.88)' }}
             accessibilityRole="button"
             accessibilityLabel={`칸 크기 ${o.label}`}
             accessibilityState={{ selected: on }}
           >
-            <Text style={{ fontSize: 11, fontWeight: 'bold', color: on ? '#FFFFFF' : '#1A1A1A' }}>{o.label}</Text>
+            {/* 좁은 4열에서도 한 줄로 — 글자가 꺾여 상품명을 덮지 않게 짧은 글자·1줄 고정 */}
+            <Text numberOfLines={1} style={{ fontSize: 11, fontWeight: 'bold', color: on ? '#FFFFFF' : '#1A1A1A' }}>
+              {p.cols >= 4 ? o.short : o.label}
+            </Text>
           </Pressable>
         );
       })}
@@ -172,7 +182,7 @@ const GridTile = memo(function GridTile(p: TileProps) {
             borderRadius: 14,
             borderWidth: 2,
             borderStyle: 'dashed',
-            borderColor: p.pendingMove ? '#CC2222' : '#888888',
+            borderColor: '#888888',
             backgroundColor: 'rgba(255,255,255,0.45)',
             opacity: p.dragging ? 0.25 : 1,
             alignItems: 'center',
@@ -190,16 +200,6 @@ const GridTile = memo(function GridTile(p: TileProps) {
           >
             <MaterialCommunityIcons name="close" size={14} color="#555555" />
           </Pressable>
-          <Pressable
-            onPress={p.onToggleMove}
-            hitSlop={10}
-            className="absolute left-1 top-1 h-6 w-6 items-center justify-center rounded-full"
-            style={{ backgroundColor: p.pendingMove ? '#CC2222' : '#FFFFFF' }}
-            accessibilityRole="button"
-            accessibilityLabel="빈칸 옮기기"
-          >
-            <MaterialCommunityIcons name="arrow-all" size={13} color={p.pendingMove ? '#FFFFFF' : '#1A1A1A'} />
-          </Pressable>
           {spanRow}
         </Pressable>
       </GestureDetector>
@@ -211,7 +211,16 @@ const GridTile = memo(function GridTile(p: TileProps) {
   const color = tileColor(product.name, p.tileColorOverride);
   const [head, sub] = splitTileName(product.name);
   const w = spanWidth(item.span, p.cols);
-  const headSize = Math.max(14, Math.min(w > 1 ? 40 : p.cols >= 4 ? 21 : p.cols === 2 ? 32 : 28, Math.floor((width / Math.max(head.length, 2)) * 0.95)));
+  const baseSize = w > 1 ? 40 : p.cols >= 4 ? 21 : p.cols === 2 ? 32 : 28;
+  // 한 줄로 쓰면 글자가 너무 작아지는 긴 이름(4글자 이상)은 반으로 나눠 2줄로, 글자 크기를 키운다
+  const headChars = [...head];
+  const availW = width - 12;
+  const twoLine = headChars.length >= 4 && Math.floor((availW / headChars.length) * 0.95) < MIN_ONE_LINE_SIZE;
+  const half = Math.ceil(headChars.length / 2);
+  const headText = twoLine ? `${headChars.slice(0, half).join('')}\n${headChars.slice(half).join('')}` : head;
+  const headSize = twoLine
+    ? Math.max(14, Math.min(sub ? 17 : baseSize, Math.floor((availW / half) * 0.95)))
+    : Math.max(14, Math.min(baseSize, Math.floor((width / Math.max(head.length, 2)) * 0.95)));
   const iconBg = color.fg === '#FFFFFF' ? 'rgba(255,255,255,0.88)' : 'rgba(255,255,255,0.7)';
   const art = tileArt(product.name, p.tileArtOverride);
   // 어두운 카드엔 어두운 그림자, 밝은 카드엔 흰 그림자로 글자 윤곽을 살린다
@@ -262,7 +271,7 @@ const GridTile = memo(function GridTile(p: TileProps) {
           opacity: p.dragging ? 0.25 : 1,
           borderWidth: editing ? 2 : 0,
           borderStyle: 'dashed',
-          borderColor: p.pendingMove ? '#CC2222' : 'rgba(255,255,255,0.95)',
+          borderColor: 'rgba(255,255,255,0.95)',
           elevation: 3,
           shadowColor: '#000',
           shadowOpacity: 0.08,
@@ -280,28 +289,20 @@ const GridTile = memo(function GridTile(p: TileProps) {
           </View>
         </Modal>
 
-        <Pressable
-          onPress={p.onOpenSettings}
-          hitSlop={10}
-          className="absolute left-1 top-1 z-10 h-6 w-6 items-center justify-center rounded-full"
-          style={{ backgroundColor: iconBg }}
-          accessibilityRole="button"
-          accessibilityLabel={`${product.name} 설정`}
-        >
-          <MaterialCommunityIcons name="cog-outline" size={13} color="#555555" />
-        </Pressable>
-        {editing ? (
+        {/* 편집 중엔 끌기·칸 크기가 목적이라 설정 버튼을 숨겨 상품명을 가리지 않게 한다 */}
+        {!editing ? (
           <Pressable
-            onPress={p.onToggleMove}
+            onPress={p.onOpenSettings}
             hitSlop={10}
-            className="absolute right-1 top-1 z-10 h-6 w-6 items-center justify-center rounded-full"
-            style={{ backgroundColor: p.pendingMove ? '#CC2222' : iconBg }}
+            className="absolute left-1 top-1 z-10 h-6 w-6 items-center justify-center rounded-full"
+            style={{ backgroundColor: iconBg }}
             accessibilityRole="button"
-            accessibilityLabel={p.pendingMove ? `${product.name} 옮기기 취소` : `${product.name} 옮기기(다음에 누른 카드 앞으로)`}
+            accessibilityLabel={`${product.name} 설정`}
           >
-            <MaterialCommunityIcons name="arrow-all" size={13} color={p.pendingMove ? '#FFFFFF' : '#1A1A1A'} />
+            <MaterialCommunityIcons name="cog-outline" size={13} color="#555555" />
           </Pressable>
-        ) : (
+        ) : null}
+        {!editing ? (
           <Pressable
             onPress={p.onRemove}
             hitSlop={10}
@@ -312,17 +313,16 @@ const GridTile = memo(function GridTile(p: TileProps) {
           >
             <MaterialCommunityIcons name="trash-can-outline" size={13} color="#555555" />
           </Pressable>
-        )}
+        ) : null}
 
-        <MaterialCommunityIcons name={categoryIcon(product.category)} size={15} color={color.fg} style={{ marginTop: 9, opacity: 0.75 }} />
-        <View className="w-full flex-1 items-center justify-center" style={{ paddingBottom: editing ? 26 : 22 }}>
+        <View className="w-full flex-1 items-center justify-center" style={{ paddingTop: editing ? 6 : 26, paddingBottom: editing ? 34 : 22 }}>
           <Text
-            numberOfLines={1}
+            numberOfLines={twoLine ? 2 : 1}
             adjustsFontSizeToFit
             minimumFontScale={0.6}
             style={{ color: color.fg, fontSize: headSize, textAlign: 'center', ...textShadow, ...(p.fontFamily ? { fontFamily: p.fontFamily } : { fontWeight: 'bold' }) }}
           >
-            {head}
+            {headText}
           </Text>
           {sub ? (
             <Text
@@ -375,7 +375,7 @@ const GridTile = memo(function GridTile(p: TileProps) {
 
 /**
  * 빠른발주 냉동고 화면(2026-10-22): 매장별 배경·선반, 구역별 열 수, 상품별 칸 크기, 빈칸,
- * 배치 편집(길게 눌러 끌어서 끼워 넣기 · ⤧로 옮기기) — [완료]를 누르면 onSave로 통째로 저장(팀원 기기로도 동기화).
+ * 배치 편집(길게 눌러 끌어서 끼워 넣기) — [완료]를 누르면 onSave로 통째로 저장(팀원 기기로도 동기화).
  */
 export default function FridgeGrid(props: {
   items: FridgeGridItem[];
@@ -408,17 +408,22 @@ export default function FridgeGrid(props: {
   const [draft, setDraft] = useState<FridgeGridItem[]>(props.items);
   const [gridWidth, setGridWidth] = useState(0);
   const [dragId, setDragId] = useState<string | null>(null);
-  const [pendingMoveId, setPendingMoveId] = useState<string | null>(null);
 
   // 편집을 시작할 때만 지금 배치를 복사해 둔다(편집 중 동기화로 목록이 바뀌어도 손대던 배치를 지킨다)
   useEffect(() => {
     if (editing) setDraft(props.items);
-    else setPendingMoveId(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing]);
   const list = editing ? draft : props.items;
   const draftRef = useRef(draft);
   draftRef.current = draft;
+  // 카드별 핸들러가 늘 최신 값을 보게 하는 참조(핸들러는 카드마다 한 번만 만든다)
+  const editingRef = useRef(editing);
+  editingRef.current = editing;
+  const propsRef = useRef(props);
+  propsRef.current = props;
+  const listRef = useRef(list);
+  listRef.current = list;
 
   const cell = gridWidth > 0 ? (gridWidth - GAP * (cols - 1)) / cols : 0;
   const tileH = Math.min(cell / 0.82, 170);
@@ -442,7 +447,19 @@ export default function FridgeGrid(props: {
   const gridRef = useRef<View>(null);
   const scrollRef = useRef<ScrollView>(null);
   const scrollY = useRef(0);
-  const ghost = useRef(new Animated.ValueXY()).current;
+  // 끌리는 카드 위치 = 손가락 위치 − 기준점. 둘 다 UI 스레드 값이라 JS가 바빠도 카드가 손가락을 놓치지 않는다
+  const fingerX = useSharedValue(0);
+  const fingerY = useSharedValue(0);
+  const ghostBaseX = useSharedValue(0);
+  const ghostBaseY = useSharedValue(0);
+  const ghostStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: fingerX.value - ghostBaseX.value },
+      { translateY: fingerY.value - ghostBaseY.value },
+      { scale: 1.06 },
+      { rotate: '2deg' },
+    ],
+  }));
   const drag = useRef<{
     id: string;
     offX: number;
@@ -464,28 +481,48 @@ export default function FridgeGrid(props: {
       const d = drag.current;
       if (!d) return;
       d.lastAbs = [absX, absY];
-      ghost.setValue({ x: absX - d.rootX - d.offX, y: absY - d.rootY - d.offY });
       const gx = absX - d.gridX;
       const gy = absY - d.gridY + (scrollY.current - d.scroll0);
       const cur = draftRef.current;
       const from = cur.findIndex((i) => i.id === d.id);
-      const hit = rectsRef.current.find((r) => gx >= r.x && gx <= r.x + r.w && gy >= r.y && gy <= r.y + r.h);
-      if (hit && cur[hit.index]?.id === d.id) return; // 자기 자리 위
-      const to = dropIndexAt(rectsRef.current, gx, gy);
+      const rects = rectsRef.current;
+      // 놓을 자리는 손가락이 아니라 "끌리는 카드의 중심"이 들어간 카드로 정한다(어디를 잡았든, 카드 폭이 얼마든 기준이 같다)
+      const mine = rects[from];
+      const cx = mine ? gx - d.offX + mine.w / 2 : gx;
+      const cy = mine ? gy - d.offY + mine.h / 2 : gy;
+      const hit = rects.find((r) => cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h);
+      let to: number | null;
+      if (hit) {
+        if (hit.index === from) return; // 자기 자리 위
+        to = hit.index > from ? hit.index + 1 : hit.index; // 앞으로 가면 그 카드 앞, 뒤로 가면 그 카드 뒤
+      } else {
+        const rowTiles = rects.filter((r) => cy >= r.y && cy <= r.y + r.h);
+        if (rowTiles.length) {
+          // 카드 없는 빈 칸(줄 끝 오른쪽·카드 사이 틈)에 놓으면: 줄 끝이면 그 줄 마지막 카드 뒤, 틈이면 가까운 카드 앞/뒤
+          const last = rowTiles.reduce((a, b) => (b.x > a.x ? b : a));
+          if (cx > last.x + last.w) {
+            to = last.index + 1;
+          } else {
+            const near = rowTiles.reduce((a, b) => (Math.abs(cx - (b.x + b.w / 2)) < Math.abs(cx - (a.x + a.w / 2)) ? b : a));
+            to = cx > near.x + near.w / 2 ? near.index + 1 : near.index;
+          }
+        } else {
+          to = dropIndexAt(rects, cx, cy); // 마지막 줄 아래면 맨 뒤
+        }
+      }
       const now = Date.now();
-      // 자리가 바뀌는 순간 배치가 움직여 손가락 아래 카드가 바뀌므로, 너무 잦은 재배치(떨림)를 막는다
+      // 자리가 바뀌는 순간 배치가 움직여 카드 아래가 바뀌므로, 너무 잦은 재배치(떨림)를 막는다
       if (to === null || to === from || to === from + 1 || now - d.lastMoveAt < 140) return;
       d.lastMoveAt = now;
       LayoutAnimation.configureNext(LayoutAnimation.create(160, 'easeInEaseOut', 'opacity'));
       setDraft(moveItem(cur, from, to));
     },
-    [ghost],
+    [],
   );
 
   const onDragStart = useCallback(
     (id: string) => (absX: number, absY: number) => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-      setPendingMoveId(null);
       rootRef.current?.measureInWindow((rootX, rootY, _rw, rootH) => {
         gridRef.current?.measureInWindow((gridX, gridY) => {
           const idx = draftRef.current.findIndex((i) => i.id === id);
@@ -506,7 +543,9 @@ export default function FridgeGrid(props: {
             lastAbs: [absX, absY],
           };
           setDragId(id);
-          ghost.setValue({ x: gridX + r.x - rootX, y: gridY + r.y - rootY });
+          // 처음 위치 = 눌린 카드 자리: 카드 왼쪽 위 = 손가락 − 눌린 지점의 카드 안 오프셋
+          ghostBaseX.value = rootX + (absX - (gridX + r.x));
+          ghostBaseY.value = rootY + (absY - (gridY + r.y));
           // 화면 위·아래 끝에 손가락을 대고 있으면 저절로 넘긴다
           autoScroll.current = setInterval(() => {
             const dd = drag.current;
@@ -522,7 +561,7 @@ export default function FridgeGrid(props: {
         });
       });
     },
-    [ghost, applyMove],
+    [ghostBaseX, ghostBaseY, applyMove],
   );
   const onDragEnd = useCallback(() => {
     if (autoScroll.current) clearInterval(autoScroll.current);
@@ -546,13 +585,39 @@ export default function FridgeGrid(props: {
     LayoutAnimation.configureNext(LayoutAnimation.create(160, 'easeInEaseOut', 'opacity'));
     setDraft((d) => d.map((i) => (i.id === id ? { ...i, span } : i)));
   };
-  const tapInEdit = (id: string) => {
-    if (!pendingMoveId || pendingMoveId === id) return;
-    const from = draft.findIndex((i) => i.id === pendingMoveId);
-    const to = draft.findIndex((i) => i.id === id);
-    LayoutAnimation.configureNext(LayoutAnimation.create(160, 'easeInEaseOut', 'opacity'));
-    setDraft(moveItem(draft, from, to)); // ⤧로 고른 카드를 누른 카드 "앞"에 끼워 넣기
-    setPendingMoveId(null);
+  // 카드마다 같은 함수 모양을 유지해 GridTile의 memo가 통하게 한다(옮기는 중 모든 카드가 다시 그려져 끊기던 원인)
+  const tileCbs = useRef(
+    new Map<string, Pick<TileProps, 'onTap' | 'onLongEdit' | 'onOpenSettings' | 'onRemove' | 'onOpenQty' | 'onSpan'>>(),
+  );
+  const cbsFor = (id: string) => {
+    let c = tileCbs.current.get(id);
+    if (!c) {
+      const productOf = () => listRef.current.find((x) => x.id === id)?.product ?? null;
+      c = {
+        onTap: () => {
+          if (editingRef.current) return; // 편집 중엔 누르기가 아니라 길게 눌러 끌어서 옮긴다
+          const p = productOf();
+          if (p) propsRef.current.onTap(p);
+        },
+        onLongEdit: () => propsRef.current.onEditingChange(true),
+        onOpenSettings: () => {
+          const p = productOf();
+          if (p) propsRef.current.onOpenSettings(p);
+        },
+        onRemove: () => {
+          const p = productOf();
+          if (p) propsRef.current.onRemove(p);
+          else setDraft((d) => d.filter((x) => x.id !== id));
+        },
+        onOpenQty: () => {
+          const p = productOf();
+          if (p) propsRef.current.onOpenQty(p);
+        },
+        onSpan: (s) => setSpan(id, s),
+      };
+      tileCbs.current.set(id, c);
+    }
+    return c;
   };
   const addSpacer = () => {
     setDraft((d) => [...d, { id: newSpacerId(), product: null, span: 1 }]);
@@ -627,7 +692,7 @@ export default function FridgeGrid(props: {
         {editing ? (
           <View className="mb-3 rounded-2xl bg-ink px-4 py-3">
             <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 13, textAlign: 'center' }}>
-              카드를 길게 눌러 끌어 옮기세요 · ⤧ 누르고 놓을 카드를 눌러도 돼요
+              카드 이름 부분을 길게 눌러 끌어서 옮기세요
             </Text>
             <View className="mt-2.5 flex-row items-center justify-center" style={{ gap: 8 }}>
               <Segmented<FridgeBackground>
@@ -673,67 +738,61 @@ export default function FridgeGrid(props: {
           ) : null}
           <View ref={gridRef} collapsable={false} onLayout={(e) => setGridWidth(e.nativeEvent.layout.width)}>
             {list.length === 0 ? props.empty : null}
-            {gridWidth > 0
-              ? rows.map((row, r) => {
-                  const rail = r > 0 ? railStyle(background, rowDivider(r - 1)) : null;
+            {gridWidth > 0 ? (
+              // 카드를 줄 안에 넣지 않고 계산된 자리(rects)에 절대 좌표로 놓는다 — 자리가 바뀌어도 카드가 새로 만들어지지 않고 위치만 움직인다
+              <View style={{ height: rects.reduce((m, r) => Math.max(m, r.y + r.h), 0) }}>
+                {rows.map((row, r) => {
+                  if (r === 0) return null;
+                  const rail = railStyle(background, rowDivider(r - 1));
+                  const top = (rects[row[0].index]?.y ?? 0) - rail.gap;
                   return (
-                    <View key={list[row[0].index].id}>
-                      {rail ? (
-                        <View style={{ height: rail.gap, justifyContent: 'center' }}>
-                          {rail.bar ? (
-                            <View
-                              style={{
-                                height: rail.bar,
-                                marginHorizontal: frame ? -4 : 0,
-                                borderRadius: 3,
-                                backgroundColor: rail.color,
-                                borderTopWidth: background === 'none' ? 0 : 1,
-                                borderTopColor: rail.edge,
-                                borderBottomWidth: background === 'case' ? 2 : 0,
-                                borderBottomColor: rail.edge,
-                              }}
-                            />
-                          ) : null}
-                        </View>
+                    <View key={`rail-${r}`} pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top, height: rail.gap, justifyContent: 'center' }}>
+                      {rail.bar ? (
+                        <View
+                          style={{
+                            height: rail.bar,
+                            marginHorizontal: frame ? -4 : 0,
+                            borderRadius: 3,
+                            backgroundColor: rail.color,
+                            borderTopWidth: background === 'none' ? 0 : 1,
+                            borderTopColor: rail.edge,
+                            borderBottomWidth: background === 'case' ? 2 : 0,
+                            borderBottomColor: rail.edge,
+                          }}
+                        />
                       ) : null}
-                      <View className="flex-row" style={{ gap: GAP }}>
-                        {row.map(({ index, width }) => {
-                          const it = list[index];
-                          return (
-                            <GridTile
-                              key={it.id}
-                              item={it}
-                              width={cell * width + GAP * (width - 1)}
-                              height={tileH}
-                              cols={cols}
-                              qty={it.product ? props.cart[it.product.id] ?? 0 : 0}
-                              editing={editing}
-                              dragging={dragId === it.id}
-                              pendingMove={pendingMoveId === it.id}
-                              tileColorOverride={it.product ? props.tileColors[it.product.id] : undefined}
-                              tileArtOverride={it.product ? props.tileArts[it.product.id] : undefined}
-                              fontFamily={props.fontFamily}
-                              onTap={() => (editing ? tapInEdit(it.id) : it.product && props.onTap(it.product))}
-                              onLongEdit={() => props.onEditingChange(true)}
-                              onOpenSettings={() => it.product && props.onOpenSettings(it.product)}
-                              onRemove={() =>
-                                it.product ? props.onRemove(it.product) : setDraft((d) => d.filter((x) => x.id !== it.id))
-                              }
-                              onOpenQty={() => it.product && props.onOpenQty(it.product)}
-                              onSpan={(s) => setSpan(it.id, s)}
-                              onToggleMove={() => setPendingMoveId((cur) => (cur === it.id ? null : it.id))}
-                              onDragStart={startFor(it.id)}
-                              onDragMove={applyMove}
-                              onDragEnd={onDragEnd}
-                              cardRef={it.id === firstProductId ? props.firstCardRef : undefined}
-                            />
-                          );
-                        })}
-                      </View>
                     </View>
                   );
-                })
-              : null}
+                })}
+                {list.map((it, index) => {
+                  const rc = rects[index];
+                  if (!rc) return null;
+                  return (
+                    <View key={it.id} style={{ position: 'absolute', left: rc.x, top: rc.y }}>
+                      <GridTile
+                        item={it}
+                        width={rc.w}
+                        height={tileH}
+                        cols={cols}
+                        qty={it.product ? props.cart[it.product.id] ?? 0 : 0}
+                        editing={editing}
+                        dragging={dragId === it.id}
+                        tileColorOverride={it.product ? props.tileColors[it.product.id] : undefined}
+                        tileArtOverride={it.product ? props.tileArts[it.product.id] : undefined}
+                        fontFamily={props.fontFamily}
+                        {...cbsFor(it.id)}
+                        onDragStart={startFor(it.id)}
+                        onDragMove={applyMove}
+                        onDragEnd={onDragEnd}
+                        fingerX={fingerX}
+                        fingerY={fingerY}
+                        cardRef={it.id === firstProductId ? props.firstCardRef : undefined}
+                      />
+                    </View>
+                  );
+                })}
+              </View>
+            ) : null}
           </View>
         </View>
       </ScrollView>
@@ -742,24 +801,26 @@ export default function FridgeGrid(props: {
       {draggingItem && ghostRect ? (
         <Animated.View
           pointerEvents="none"
-          style={{
-            position: 'absolute',
-            left: 0,
-            top: 0,
-            width: ghostRect.w,
-            height: ghostRect.h,
-            transform: [...ghost.getTranslateTransform(), { scale: 1.06 }, { rotate: '2deg' }],
-            borderRadius: 14,
-            elevation: 12,
-            shadowColor: '#000',
-            shadowOpacity: 0.3,
-            shadowRadius: 10,
-            shadowOffset: { width: 0, height: 8 },
-            backgroundColor: ghostColor?.bg ?? 'rgba(255,255,255,0.8)',
-            alignItems: 'center',
-            justifyContent: 'center',
-            opacity: 0.95,
-          }}
+          style={[
+            {
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              width: ghostRect.w,
+              height: ghostRect.h,
+              borderRadius: 14,
+              elevation: 12,
+              shadowColor: '#000',
+              shadowOpacity: 0.3,
+              shadowRadius: 10,
+              shadowOffset: { width: 0, height: 8 },
+              backgroundColor: ghostColor?.bg ?? 'rgba(255,255,255,0.8)',
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: 0.95,
+            },
+            ghostStyle,
+          ]}
         >
           <Text
             numberOfLines={1}
