@@ -16,7 +16,8 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MARKETING = path.join(ROOT, 'docs', 'marketing');
 const RAW_BASE = 'https://raw.githubusercontent.com/ef0070-cpu/expiry-keeper/main/';
-const IG_API = 'https://graph.instagram.com/v23.0';
+// 통합 로그인(시스템 사용자) 토큰은 graph.facebook.com에서만 통한다(2026-10-30 확인). 인스타 로그인 토큰이면 graph.instagram.com
+const IG_API = 'https://graph.facebook.com/v23.0';
 const THREADS_API = 'https://graph.threads.net/v1.0';
 // 예정 시각보다 이만큼 넘게 늦었으면(PC가 꺼져 있었음 등) 자동으로 올리지 않는다 — 밤 9시 글이 새벽에 나가지 않게
 const MAX_LATE_MS = 3 * 60 * 60 * 1000;

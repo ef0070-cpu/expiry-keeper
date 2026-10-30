@@ -1,4 +1,4 @@
-# 제작 지시서 — 이번 주 (캠페인 `wk1026`, 10/26~11/1)
+# 제작 지시서 — 이번 주 (캠페인 `wk1102`, 11/9~11/15)
 
 작성: 2026-10-28 ek-marketing → 받는 쪽: ek-content
 기준 문서: `docs/marketing/BRAND-VOICE.md`(1~6장), `docs/marketing/PLAN.md` 4·5·8·8-1장, `docs/HANDOFF.md` 1장
@@ -7,7 +7,7 @@
 
 ## 0-1. 지난 묶음 결과 한 줄
 
-10/16 묶음(wk1019)과 10/21 묶음(wk1026 초안)의 게시일·조회·설치 숫자는 **아직 없다.** PLAN 8장 기록표는 wk1019 6행·wk1026·wk1102·wk1109 모두 빈칸이고, 8-1 훅 비교표와 "한 줄 결론"도 빈칸이다. HANDOFF 1장도 홍보를 "아직 게시 안 함"으로 적고 있다. 따라서 **어떤 주제·채널·훅이 반응했는지는 아직 모른다.** 이번 지시서는 결과 반영이 아니라 계획대로 쓴 초안이며, 훅 2안은 8-1 표를 채우기 위한 첫 비교 재료다.
+10/16 묶음(wk1019)과 10/21 묶음(wk1102 초안)의 게시일·조회·설치 숫자는 **아직 없다.** PLAN 8장 기록표는 wk1019 6행·wk1102·wk1102·wk1109 모두 빈칸이고, 8-1 훅 비교표와 "한 줄 결론"도 빈칸이다. HANDOFF 1장도 홍보를 "아직 게시 안 함"으로 적고 있다. 따라서 **어떤 주제·채널·훅이 반응했는지는 아직 모른다.** 이번 지시서는 결과 반영이 아니라 계획대로 쓴 초안이며, 훅 2안은 8-1 표를 채우기 위한 첫 비교 재료다.
 
 ## 0-2. 포지셔닝 한 문장
 
@@ -88,16 +88,16 @@
 - 이미지: 사용 가능 기존 파일은 `store-assets/screenshots/03-order-management.jpg`(1호 매장, 타사 사진 없음, 단 현재 화면 상단 알림 아이콘이 작게 보임), `04-calculator.jpg`, `06-recipe.jpg`. **01·02·05 원본 금지**(옛 이름, 타사 상품 사진). 지금 폴드 앱 화면 금지(실제 매장 데이터). 새로 찍을 것은 스토어판 앱·테스트 계정·사진 없는 상품만: ① 빠른발주 구역과 타일 ② 담은 목록과 공유창(카톡 대화방·상대 이름 컷) ③ (가격표 통과 시) 디자인 고르기 화면과 저장 결과 ④ 원가 계산기에 일반 숫자를 넣은 화면.
 - 카드 이미지의 글자 카드는 배경+큰 글씨(상품 포장 흉내 AI 이미지 금지).
 
-### 링크 (UTM, PLAN 4장 형식, 주차 코드 `wk1026`)
+### 링크 (UTM, PLAN 4장 형식, 주차 코드 `wk1102`)
 | 채널 | 링크 |
 |---|---|
-| 네이버 블로그 | https://play.google.com/store/apps/details?id=com.shlab.expirykeeper&referrer=utm_source%3Dnaver_blog%26utm_medium%3Dpost%26utm_campaign%3Dwk1026 |
-| 인스타그램(프로필 링크) | https://play.google.com/store/apps/details?id=com.shlab.expirykeeper&referrer=utm_source%3Dinstagram%26utm_medium%3Dfeed%26utm_campaign%3Dwk1026 |
-| 스레드(프로필 링크) | https://play.google.com/store/apps/details?id=com.shlab.expirykeeper&referrer=utm_source%3Dthreads%26utm_medium%3Dpost%26utm_campaign%3Dwk1026 |
-| 유튜브 쇼츠(설명란·고정 댓글) | https://play.google.com/store/apps/details?id=com.shlab.expirykeeper&referrer=utm_source%3Dyoutube%26utm_medium%3Dshorts%26utm_campaign%3Dwk1026 |
-| 커뮤니티 | https://play.google.com/store/apps/details?id=com.shlab.expirykeeper&referrer=utm_source%3Dcommunity%26utm_medium%3Dpost%26utm_campaign%3Dwk1026 |
+| 네이버 블로그 | https://play.google.com/store/apps/details?id=com.shlab.expirykeeper&referrer=utm_source%3Dnaver_blog%26utm_medium%3Dpost%26utm_campaign%3Dwk1102 |
+| 인스타그램(프로필 링크) | https://play.google.com/store/apps/details?id=com.shlab.expirykeeper&referrer=utm_source%3Dinstagram%26utm_medium%3Dfeed%26utm_campaign%3Dwk1102 |
+| 스레드(프로필 링크) | https://play.google.com/store/apps/details?id=com.shlab.expirykeeper&referrer=utm_source%3Dthreads%26utm_medium%3Dpost%26utm_campaign%3Dwk1102 |
+| 유튜브 쇼츠(설명란·고정 댓글) | https://play.google.com/store/apps/details?id=com.shlab.expirykeeper&referrer=utm_source%3Dyoutube%26utm_medium%3Dshorts%26utm_campaign%3Dwk1102 |
+| 커뮤니티 | https://play.google.com/store/apps/details?id=com.shlab.expirykeeper&referrer=utm_source%3Dcommunity%26utm_medium%3Dpost%26utm_campaign%3Dwk1102 |
 
-인스타·스레드는 본문 링크가 안 눌리므로 프로필 링크를 wk1026으로 교체. 링크 금지 카페에서는 링크 대신 "플레이스토어에서 '유통기한 매니저'를 검색해 보세요".
+인스타·스레드는 본문 링크가 안 눌리므로 프로필 링크를 wk1102으로 교체. 링크 금지 카페에서는 링크 대신 "플레이스토어에서 '유통기한 매니저'를 검색해 보세요".
 
 ---
 
@@ -119,7 +119,7 @@
   7. 팀 공유 한 줄: 초대 코드로 직원과 상품 목록을 함께 관리(3주차 예고, 길게 쓰지 않음)
   8. 마무리: "필요한 기능이 있으면 댓글로 알려 주세요" + 행동 유도 1개: "플레이스토어에서 '유통기한 매니저'를 검색해 보세요" + 링크
 - **금지**: "10분", "빠르게/쉽게" 단독 형용, "자동 발주", "엑셀 발주서", "무제한", 가격·무료 문구, "자주 파는 상품이 다 들어 있다"
-- **UTM**: naver_blog / wk1026
+- **UTM**: naver_blog / wk1102
 
 ### 3-2) 인스타그램 3 + 스레드 3 (첫 줄 훅 2안 필수)
 공통: 각 주제마다 **훅 A / 훅 B를 서로 다른 장면**으로 쓴다. 같은 내용을 서로 다른 날 게시하고 PLAN 8-1 표(조회·저장·공유·댓글)로 비교. 인스타 해시태그는 게시물당 5개 이하, 스레드는 해시태그 없이 3~5문장. 모든 게시물 끝 행동 유도는 하나만.
@@ -162,7 +162,7 @@
 - 해시태그: #냉장고파먹기 #냉장고정리 #집밥 #유통기한 #유통기한매니저
 - 금지: 가격·"무료 앱(광고 포함)", "쿠팡", "폐기 ○% 감소"
 
-- **UTM**: instagram, threads / wk1026(프로필 링크)
+- **UTM**: instagram, threads / wk1102(프로필 링크)
 
 ### 3-3) 유튜브 쇼츠 대본 1편 — 매장
 - **대상**: 아이스크림 할인점·편의점 점주
@@ -180,7 +180,7 @@
 
 - **설명란**: "유통기한 매니저 팀이 올리는 영상입니다."(제작사 표시) + 링크. 해시태그 3~5개(#발주관리 #아이스크림할인점 #가격표 #유통기한매니저). 가격·무료 문구 없음
 - **금지**: "10초 발주", "자동 발주", 실제 매장·상품 포장·타사 로고 노출, 카톡 대화 노출
-- **UTM**: youtube / wk1026
+- **UTM**: youtube / wk1102
 
 ### 3-4) 커뮤니티 글 1편 — 매장
 - **대상**: 점주 카페 회원(편의점·무인점포·아이스크림 할인점)
@@ -193,7 +193,7 @@
   4. 마무리: "필요한 기능이 있으면 댓글로 알려 주세요" + 행동 유도 1개
   5. (사장님 결정 시) 15분 통화 의견 요청 — PLAN 7장 이벤트 B. 혜택·사례금 약속 없이. 기본은 넣지 않음
 - **금지**: 가격·무료, 개인 1인칭("제가 만든"), 다른 계정 댓글·후기, 여러 카페 동시 게시, "확인했습니다"(확인 안 했으면)
-- **UTM**: community / wk1026
+- **UTM**: community / wk1102
 
 ---
 
@@ -218,11 +218,11 @@
 - [ ] v30이 프로덕션에서 받아지는지(플레이 콘솔), v31 프로덕션 여부
 - [ ] 캡처 4종 준비(타사 사진·실제 매장명·대화방 없음)
 - [ ] 커뮤니티: 가입한 카페 홍보 규칙 확인
-- [ ] 인스타·스레드 프로필 링크를 wk1026으로 교체
+- [ ] 인스타·스레드 프로필 링크를 wk1102으로 교체
 - [ ] 완성 원고를 `ek-legal`에 검토 요청(가격표 문구, 점주 표현, 질문형 문구, 쿠팡 칩 제외 확인)
 
 ## 6. 사장님 결정 필요
-1. **`wk1026` 중복**: `docs/marketing/2026-10-21/`의 지난 묶음이 이미 `utm_campaign=wk1026`을 쓰고 있고, 그 원고에는 지금 규칙에 어긋나는 문구(무료 안내, "개발자 본인")가 남아 있을 수 있다. 이번 묶음을 wk1026으로 쓰고 10/21 원고는 게시하지 않을지, 이번 묶음을 `wk1102`로 옮길지 결정 필요(이번 지시서는 요청대로 wk1026 사용).
+1. **wk1026 중복 결정**: 해결됨. 이번 묶음은 wk1102, 10/21 묶음은 wk1026을 쓴다.
 2. **가격표 노출·출시 시점 확인**: 스토어판 홈에 가격표 아이콘이 보이는지, 언제부터인지. 안 보이면 가격표 제외.
 3. **프로덕션 출시 상태**: v30 출시 완료 여부와 v31 프로덕션 승격 여부(플레이 콘솔). v31·v32·v33 기능은 출시 확인 뒤에야 쓸 수 있음. 특히 검색발주 초성·별칭 검색, 발주서 확인창, 이력, 음성 발주는 출시되면 다음 주 소재로 쓸 수 있으나 지금은 제외.
 4. **초성·별칭 검색이 v30 이전인지** 확인 후 쓸지(미확인이라 이번엔 제외).
