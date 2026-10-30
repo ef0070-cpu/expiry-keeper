@@ -56,8 +56,9 @@ const FloatingMic = memo(function FloatingMic({
   const pan = useMemo(
     () =>
       Gesture.Pan()
-        .activeOffsetX([-12, 12])
-        .activeOffsetY([-12, 12])
+        // 누르고 말하는 동안 손이 조금 떨려도 드래그로 바뀌어 듣기가 취소되지 않게 시작 거리를 넉넉히 잡는다(12 → 24)
+        .activeOffsetX([-24, 24])
+        .activeOffsetY([-24, 24])
         .onStart(() => {
           'worklet';
           sx.value = tx.value;

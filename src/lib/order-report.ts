@@ -178,6 +178,10 @@ export type PhotoCandidate = {
   likes: number;
   dislikes: number;
   myVote: 1 | -1 | null;
+  /** 내가 올린 사진인지 — 삭제는 내 사진만 가능하다(서버 규칙과 같다) */
+  mine: boolean;
+  /** 올린 시각(삭제는 올린 지 24시간 안에만) */
+  createdAt: string | null;
 };
 
 /** 이 바코드의 사진 후보들과 각 후보의 득표 현황, 내 투표 상태를 조회한다. */
@@ -190,7 +194,7 @@ export async function listPhotoCandidates(barcode: string): Promise<PhotoCandida
   const [{ data: photos, error }, { data: sessionData }] = await Promise.all([
     supabase
       .from('order_catalog_photos')
-      .select('id, photo_uri')
+      .select('id, photo_uri, submitted_by, created_at')
       .eq('barcode', barcode)
       .order('created_at', { ascending: true }),
     supabase.auth.getSession(),
@@ -218,6 +222,8 @@ export async function listPhotoCandidates(barcode: string): Promise<PhotoCandida
       likes,
       dislikes,
       myVote: (mine?.vote as 1 | -1 | undefined) ?? null,
+      mine: !!myId && p.submitted_by === myId,
+      createdAt: p.created_at ?? null,
     };
   });
 }

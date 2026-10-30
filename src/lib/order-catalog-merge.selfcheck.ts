@@ -105,6 +105,21 @@ const base: OrderProduct = {
   console.assert(already.moved.length === 0 && already.items[0].barcode === 'OLD', '새 바코드 상품이 이미 있으면 옮기지 않음');
 }
 
+// 7) 사진 우선순위: ① 공용 첫 이미지 → ② 공용이 없으면 사용자가 찍은 사진을 지킨다 → ③ 둘 다 없으면 null(화면에서 글자 카드)
+{
+  const mine = { ...base, imageUri: 'file:///mine.jpg' };
+  const row = (image_uri: string | null) => ({ barcode: '111', name: '기존이름', brand: '기존브랜드', price: 1000, category: '바', image_uri });
+  const shared = mergeCatalogIntoProducts([mine], [row('http://x/shared.jpg')], new Set());
+  console.assert(shared.items[0].imageUri === 'http://x/shared.jpg', '① 공용 사진이 있으면 사용자 사진보다 공용 사진이 먼저');
+  const keep = mergeCatalogIntoProducts([mine], [row(null)], new Set());
+  console.assert(keep.items[0].imageUri === 'file:///mine.jpg', '② 공용 사진이 없으면 사용자가 찍은 사진을 지킨다');
+  console.assert(!keep.changed, '② 사진이 그대로면 바뀐 것으로 치지 않는다(수정 표시가 붙지 않게)');
+  const none = mergeCatalogIntoProducts([base], [row(null)], new Set());
+  console.assert(none.items[0].imageUri === null, '③ 둘 다 없으면 null(글자 카드)');
+  const empty = mergeCatalogIntoProducts([mine], [row('')], new Set());
+  console.assert(empty.items[0].imageUri === 'file:///mine.jpg', '빈 문자열도 "공용 사진 없음"으로 본다');
+}
+
 {
   // 신규·수정 표시: 처음 본 때부터 하루 유지
   const T = 1_000_000;

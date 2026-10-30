@@ -11,6 +11,19 @@ const NOTICE_MS = 2500; // 안내 말풍선이 저절로 사라지는 시간
 const INLINE_SIZE = 54; // 검색창 안 마이크(원래 44의 약 1.25배 — 1.5배는 너무 컸다)
 export const FLOAT_SIZE = 70; // 화면에 띄우는 마이크(원래 56의 1.25배)
 const TAP_MS = 350; // 이보다 짧게 눌렀다 떼면 '톡' 누른 것(onTap), 길게 누르면 말하기
+const ENDING_WAIT_MS = 600; // 이전 듣기의 end 이벤트를 기다리는 최대 시간
+
+// 음성 인식을 쓸 수 있는지는 기기에서 바뀌지 않는다 — 렌더링마다 네이티브를 부르면 말하는 동안 중간 결과가 올 때마다 낭비라 한 번만 확인한다(true일 때만 저장)
+let availableCache = false;
+function isRecognitionAvailable(): boolean {
+  if (availableCache) return true;
+  try {
+    availableCache = ExpoSpeechRecognitionModule.isRecognitionAvailable();
+  } catch {
+    availableCache = false;
+  }
+  return availableCache;
+}
 
 /**
  * 누르고 말하기 마이크 버튼 — 누르고 있는 동안만 듣고, 손을 떼면 들은 말을 onHeard로 넘긴다.
@@ -52,6 +65,7 @@ const VoiceMicButton = memo(function VoiceMicButton({
   const listeningRef = useRef(false);
   const permOk = useRef(false); // 마이크 권한을 이미 받았는지 — 누를 때마다 확인하면 몇 초씩 걸려 말하기가 시작도 못 한다
   const owner = useRef(false); // 이 버튼이 시작한 듣기인지 — 화면에 마이크가 둘이라(검색창·둥근 버튼) 서로의 이벤트를 받지 않게
+  const ending = useRef(false); // 시작한 듣기의 end/error 이벤트가 아직 안 온 상태 — 이때 새로 시작하면 늦게 온 옛 end가 새 듣기를 지워 먹통이 된다
   const maxTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const graceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -141,6 +155,7 @@ const VoiceMicButton = memo(function VoiceMicButton({
     if (e.isFinal) deliver(t);
   });
   useSpeechRecognitionEvent('end', () => {
+    ending.current = false;
     if (!owner.current) return;
     owner.current = false;
     clearTimers();
@@ -153,6 +168,7 @@ const VoiceMicButton = memo(function VoiceMicButton({
     }
   });
   useSpeechRecognitionEvent('error', (e) => {
+    ending.current = false;
     if (!owner.current) return;
     owner.current = false;
     errored.current = true;
@@ -204,23 +220,32 @@ const VoiceMicButton = memo(function VoiceMicButton({
         permOk.current = true;
       }
       if (!holding.current) return; // 권한 창이 뜨는 사이 손을 뗐다
+      if (ending.current) {
+        // 방금 전 듣기가 아직 끝나는 중이다 — 끝났다는 신호(end/error)를 잠깐 기다린 뒤 시작한다(안 기다리면 그 신호가 새 듣기를 지운다)
+        try {
+          ExpoSpeechRecognitionModule.abort();
+        } catch {
+          // 이미 끝난 상태 — 무시
+        }
+        const waitUntil = Date.now() + ENDING_WAIT_MS;
+        while (ending.current && Date.now() < waitUntil) await new Promise((r) => setTimeout(r, 40));
+        ending.current = false;
+        if (!holding.current) return; // 기다리는 사이 손을 뗐다
+      }
       owner.current = true;
+      ending.current = true;
       ExpoSpeechRecognitionModule.start({ lang: 'ko-KR', interimResults: true, continuous: false, maxAlternatives: 1 });
       if (maxTimer.current) clearTimeout(maxTimer.current);
       maxTimer.current = setTimeout(end, MAX_LISTEN_MS);
     } catch {
       holding.current = false;
+      ending.current = false;
+      owner.current = false;
       showNotice('음성 인식을 쓸 수 없어요. 글자로 검색해 주세요');
     }
   };
 
-  let available = false;
-  try {
-    available = ExpoSpeechRecognitionModule.isRecognitionAvailable();
-  } catch {
-    available = false;
-  }
-  if (!available) return null;
+  if (!isRecognitionAvailable()) return null;
 
   const floating = variant === 'floating';
   const size = floating ? FLOAT_SIZE : INLINE_SIZE;
@@ -232,6 +257,9 @@ const VoiceMicButton = memo(function VoiceMicButton({
         onPressIn={begin}
         onPressOut={end}
         disabled={disabled}
+        // 누른 채 말하는 동안 손가락이 밀려도 누름이 풀리지 않게(기본 20px) 넉넉히 잡는다. 둥근 버튼은 주변에 다른 버튼이 없어 터치 영역도 넓힌다
+        pressRetentionOffset={{ top: 100, bottom: 100, left: 100, right: 100 }}
+        hitSlop={floating ? 10 : undefined}
         className={floating ? 'items-center justify-center rounded-full' : 'items-center justify-center rounded-lg'}
         style={{
           width: size,

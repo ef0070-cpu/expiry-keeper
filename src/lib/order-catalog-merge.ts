@@ -25,8 +25,8 @@ export type OrderCatalogRow = {
 
 /**
  * 로컬 발주 상품 목록에 공용 카탈로그(Supabase order_catalog) 값을 병합한다. IO 없는 순수 함수.
- * 바코드로 매칭되면 공용 필드(name/brand/price/category/imageUri)를 카탈로그 값으로 덮어쓴다
- * (공용 값이 항상 이김). 매칭 안 되고 removedBarcodes에도 없으면 신규 상품으로 추가한다
+ * 바코드로 매칭되면 공용 필드(name/brand/price/category)를 카탈로그 값으로 덮어쓴다(공용 값이 항상 이김).
+ * 사진(imageUri)은 공용 사진이 있을 때만 덮어쓰고, 공용 사진이 없으면 로컬 사진(사용자가 찍은 것)을 지킨다. 매칭 안 되고 removedBarcodes에도 없으면 신규 상품으로 추가한다
  * (사용자가 직접 삭제한 바코드는 재생성하지 않음).
  */
 export function mergeCatalogIntoProducts(
@@ -49,18 +49,20 @@ export function mergeCatalogIntoProducts(
       const nextBrand = row.brand ?? '';
       const nextPrice = row.price ?? local.price;
       const nextCategory = row.category ?? local.category;
+      // 사진 우선순위(사장님 결정): ① 공용 첫 이미지가 있으면 그것 ② 공용 사진이 없으면 사용자가 직접 찍은·고른 사진을 지키고 ③ 둘 다 없으면 null(화면에서 글자 카드)
+      const nextImage = row.image_uri || local.imageUri;
       if (
         local.name !== row.name ||
         local.brand !== nextBrand ||
         local.price !== nextPrice ||
         local.category !== nextCategory ||
-        local.imageUri !== row.image_uri
+        local.imageUri !== nextImage
       ) {
         local.name = row.name;
         local.brand = nextBrand;
         local.price = nextPrice;
         local.category = nextCategory;
-        local.imageUri = row.image_uri;
+        local.imageUri = nextImage;
         changed = true;
         updatedBarcodes.push(row.barcode);
       }

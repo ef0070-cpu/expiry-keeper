@@ -1170,17 +1170,16 @@ ${skipped}개는 지금 목록에 없어 빠졌어요.`);
                 버튼이 눌리기 쉬웠다 — 버튼마다 44×44 칸을 따로 주고 칸 사이를 띄운다(hitSlop 없음) */}
             <View
               className="flex-row items-center rounded-xl border border-line bg-paper pl-3 pr-1"
-              style={{ gap: 4 }}
+              // 마이크(54)가 행 안에 온전히 들어가게 한다 — 예전에는 마이크가 행보다 커서 위·아래 4px가 부모 밖으로 삐져나갔고, 안드로이드는 부모 밖 영역의 터치를 전달하지 않아 가장자리를 누르면 반응이 없었다
+              style={{ gap: 4, minHeight: 56 }}
             >
               <MaterialCommunityIcons name="magnify" size={20} color="#888888" />
               <SearchInput value={query} onCommit={setQuery} />
-              <View style={{ marginVertical: -4 }}>
               <VoiceMicButton
                 onHeard={onHeard}
                 active={micFab.enabled}
                 onTap={onMicToggle}
               />
-              </View>
               <Pressable
                 onPress={() => router.push('/scan?mode=order-search')}
                 className="h-11 w-11 items-center justify-center rounded-lg active:bg-bg"

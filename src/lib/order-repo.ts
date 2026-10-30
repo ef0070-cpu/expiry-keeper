@@ -922,9 +922,9 @@ export async function syncOrderCatalog(): Promise<void> {
         const withName = nameOverrides.has(row.barcode)
           ? { ...withBrand, name: nameOverrides.get(row.barcode)! }
           : withBrand;
-        // 이 기기에서 직접 고른 사진은 투표로 대표사진이 되기 전까지 공용 값이 덮어쓰지 않게 한다
-        // (카테고리/브랜드/상품명 오버라이드와 같은 이유).
-        return photoOverrides.has(row.barcode)
+        // 사진 우선순위(사장님 결정): 공용 첫 이미지가 있으면 그것이 먼저다. 이 기기에서 직접 고른 사진은
+        // 공용 사진이 없을 때만 쓴다(있을 때는 공용 사진이 이긴다). 둘 다 없으면 화면에서 글자 카드.
+        return photoOverrides.has(row.barcode) && !row.image_uri
           ? { ...withName, image_uri: photoOverrides.get(row.barcode)! }
           : withName;
       });
