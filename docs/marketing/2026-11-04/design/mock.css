@@ -1,0 +1,60 @@
+/* 예시 화면(CSS 제작, 실제 앱 화면 아님) 공통 - 앱에 있는 요소만 단순화해 그림. 가상 숫자·가상 이름 */
+.exlabel { position: absolute; left: 88px; display: inline-block; font-size: 42px; font-weight: 800; color: #FFF; background: #1A1A1A; padding: 8px 32px; border-radius: 999px; letter-spacing: -0.03em; }
+.card { position: absolute; left: 88px; width: 904px; padding: 40px 48px; border-radius: 48px; background: #FFF; box-shadow: 0 24px 56px rgba(40,50,80,.16); }
+.card .k { font-size: 40px; font-weight: 700; color: #555; margin-bottom: 28px; }
+.card .code { font-size: 56px; font-weight: 800; color: #CC2222; letter-spacing: 0.2em; line-height: 1.3; }
+.card .k2 { font-size: 52px; font-weight: 800; margin-bottom: 28px; }
+.card .inp { height: 120px; border-radius: 28px; background: #F7F7F7; border: 4px solid #E3E3E3; display: flex; align-items: center; padding: 0 36px; font-size: 46px; font-weight: 600; color: #8A8A8A; }
+.view { position: absolute; left: 88px; width: 904px; height: 480px; border-radius: 48px; background: #1A1A1A; box-shadow: 0 24px 56px rgba(80,40,20,.25); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.bc { display: flex; height: 240px; background: #FFF; padding: 24px 32px; border-radius: 16px; }
+.bc s { display: block; height: 100%; background: #1A1A1A; } .bc s.g { background: #FFF; }
+.scan { position: absolute; left: 48px; right: 48px; top: 50%; height: 8px; margin-top: -4px; border-radius: 4px; background: #FF002B; box-shadow: 0 0 24px rgba(255,0,43,.7); }
+.manual { position: absolute; left: 88px; width: 904px; height: 128px; border-radius: 999px; background: rgba(26,26,26,.72); color: #FFF; font-size: 52px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+.cal { position: absolute; left: 88px; width: 904px; padding: 36px 40px 44px; border-radius: 48px; background: #FFF; box-shadow: 0 24px 56px rgba(120,70,40,.16); }
+.cal .seg { display: flex; width: 400px; margin: 0 auto 32px; border-radius: 999px; background: #F2F2F2; padding: 8px; }
+.cal .seg span { flex: 1; text-align: center; font-size: 44px; font-weight: 800; color: #777; padding: 8px 0; border-radius: 999px; }
+.cal .seg span.on { background: #CC2222; color: #FFF; }
+.cal .wk, .cal .grid { display: grid; grid-template-columns: repeat(7, 1fr); }
+.cal .wk span { text-align: center; font-size: 38px; font-weight: 700; color: #777; padding-bottom: 12px; }
+.cal .c { height: 90px; text-align: center; font-size: 46px; font-weight: 800; padding-top: 6px; position: relative; }
+.cal .c u { position: absolute; left: 50%; bottom: 8px; width: 24px; height: 24px; margin-left: -12px; border-radius: 50%; }
+.cal u.r { background: #FF002B; } .cal u.o { background: #FB8500; } .cal u.g { background: #008000; }
+.rc .u { font-size: 42px; font-weight: 800; margin-bottom: 20px; }
+.rc .chips { display: flex; gap: 14px; }
+.rc .chips span { font-size: 42px; font-weight: 700; padding: 8px 32px; border-radius: 999px; background: #F7F7F7; border: 3px solid #E3E3E3; }
+.rt { display: flex; align-items: center; gap: 20px; margin-bottom: 20px; }
+.rt .nm { flex: 1; font-size: 56px; font-weight: 800; }
+.rt .bd { font-size: 38px; font-weight: 800; color: #FFF; background: #CC2222; padding: 6px 22px; border-radius: 12px; }
+.fk { width: 44px; height: 44px; border-radius: 12px; background: #CC2222; }
+.m1, .m2 { font-size: 40px; font-weight: 600; color: #666; margin-bottom: 8px; } .m1 b { color: #CC2222; font-weight: 800; }
+.tp { font-size: 46px; font-weight: 700; margin: 20px 0 24px; }
+.yt { display: flex; align-items: center; gap: 14px; font-size: 42px; font-weight: 800; color: #CC2222; }
+.pl { width: 56px; height: 40px; border-radius: 12px; background: #CC2222; position: relative; }
+.pl::after { content: ''; position: absolute; left: 22px; top: 11px; border-left: 16px solid #FFF; border-top: 9px solid transparent; border-bottom: 9px solid transparent; }
+/* wk1116 추가 */
+.exlabel.big { top: 150px; font-size: 52px; padding: 12px 40px; }
+.top .page.none { display: none; }
+.srch { height: 128px; border-radius: 999px; background: #F7F7F7; border: 4px solid #CC2222; display: flex; align-items: center; padding: 0 48px; font-size: 52px; font-weight: 800; margin-bottom: 28px; }
+.res { display: flex; align-items: center; justify-content: space-between; height: 128px; border-bottom: 3px solid #EEE; font-size: 52px; font-weight: 800; }
+.res:last-child { border-bottom: 0; }
+.addbtn { font-size: 44px; font-weight: 800; color: #FFF; background: #CC2222; padding: 12px 44px; border-radius: 999px; }
+.bar { display: flex; flex: 1; height: 56px; border-radius: 28px; overflow: hidden; }
+.bar i { display: block; height: 100%; } .bar .ok { background: #008000; } .bar .bad { background: #CC2222; }
+.mrow { display: flex; align-items: center; gap: 28px; height: 132px; border-bottom: 3px solid #EEE; }
+.mrow:last-child { border-bottom: 0; }
+.mrow .m { width: 120px; font-size: 52px; font-weight: 800; }
+.mhead { font-size: 44px; font-weight: 700; color: #555; margin: 0 0 8px 148px; }
+.gr { position: absolute; border-radius: 16px; background: #CFCFCF; }
+/* 재심사 반영: 통계 카드(stats.tsx 구성: 월 행 + 소진/폐기 글자 + 얇은 막대 + 범례) */
+.ms { padding: 40px 48px 36px !important; }
+.ms .mt { font-size: 44px; font-weight: 800; margin-bottom: 8px; }
+.ms .mr { padding: 22px 0 20px; border-bottom: 3px solid #EEE; }
+.ms .mr .l { display: flex; justify-content: space-between; align-items: baseline; }
+.ms .mr .l b { font-size: 52px; font-weight: 800; }
+.ms .mr .l span { font-size: 42px; font-weight: 600; color: #666; }
+.ms .tb { display: flex; height: 18px; margin-top: 14px; border-radius: 9px; overflow: hidden; background: #F2F2F2; }
+.ms .tb i { display: block; } .ms .tb .ok { background: #008000; } .ms .tb .bad { background: #CC2222; }
+.ms .lg { display: flex; gap: 40px; margin-top: 24px; font-size: 40px; font-weight: 600; color: #444; }
+.ms .lg u { display: inline-block; width: 24px; height: 24px; border-radius: 50%; margin-right: 12px; vertical-align: -2px; }
+.ms .lg u.ok { background: #008000; } .ms .lg u.bad { background: #CC2222; }
+.cap { position: absolute; font-size: 40px; font-weight: 800; color: #555; letter-spacing: -0.03em; }

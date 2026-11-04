@@ -1,0 +1,151 @@
+{
+  "approved": true,
+  "note": "wk1116 묶음(2026-11-04). 원고: instagram-threads.md 훅 A 사용(훅 B는 같은 요일 다음 주 11/24·26·28 16:00에 별도 게시, PLAN 8-1 훅 비교). 10/28 묶음(11/16·18·20)과 겹치지 않게 화·목·토로 잡음. 게시 전 필수: R-4 스토어판 앱에서 검색발주·날짜 배지·발주 관리 담기·월별 통계 동작 확인(v31 승격 미확인, 검색발주 화면은 v33에서 변경). 카드는 캡처 대신 '예시 화면 · 실제와 다를 수 있어요' 라벨 붙은 CSS 박스 사용(shots/w1116-*.jpg가 생기면 교체). 인스타 프로필 링크는 게시 전 wk1116으로 교체. UTM은 wk1116. approved는 사장님만 true로 바꾼다.",
+  "items": [
+    {
+      "id": "ig-a",
+      "channel": "instagram",
+      "at": "2026-11-17T16:00:00+09:00",
+      "text": "진열 순서에 없는 상품, 발주에 어디 끼워 적으세요?\n순서대로 담는 상품 말고, 이름으로 찾아야 하는 상품이 있습니다.\n유통기한 매니저에서는 상품 이름을 검색해서 발주 목록에 담을 수 있어요.\n담은 상품은 발주 목록에 차곡차곡 쌓입니다.\n플레이스토어에서 '유통기한 매니저'를 검색해 보세요.\n\n#아이스크림할인점 #무인아이스크림할인점 #발주관리 #검색발주 #유통기한매니저",
+      "slides": [
+        {
+          "text": "진열 순서에 없는 상품,\n발주에 어디 끼워 적으세요?",
+          "html": "design/ig-a-1.html"
+        },
+        {
+          "text": "순서대로 담는 상품 말고,\n이름으로 찾는 상품이 있어요",
+          "html": "design/ig-a-2.html"
+        },
+        {
+          "text": "상품 이름을 검색해서 담아요",
+          "html": "design/ig-a-3.html"
+        },
+        {
+          "text": "담은 상품은 발주 목록에 쌓여요",
+          "html": "design/ig-a-4.html"
+        },
+        {
+          "text": "플레이스토어에서\n'유통기한 매니저'를\n검색해 보세요",
+          "html": "design/ig-a-5.html"
+        }
+      ],
+      "images": [
+        "images/ig-a-1.jpg",
+        "images/ig-a-2.jpg",
+        "images/ig-a-3.jpg",
+        "images/ig-a-4.jpg",
+        "images/ig-a-5.jpg"
+      ]
+    },
+    {
+      "id": "th-a",
+      "channel": "threads",
+      "at": "2026-11-17T16:00:00+09:00",
+      "text": "진열 순서에 없는 상품, 발주에 어디 끼워 적으세요?\n순서대로 담는 상품 말고, 이름으로 찾아야 하는 상품이 있습니다.\n유통기한 매니저에서는 상품 이름을 검색해서 발주 목록에 담을 수 있어요.\n#발주관리\nhttps://play.google.com/store/apps/details?id=com.shlab.expirykeeper&referrer=utm_source%3Dthreads%26utm_medium%3Dpost%26utm_campaign%3Dwk1116",
+      "slides": [
+        {
+          "text": "상품 이름을 검색해서 담아요",
+          "html": "design/th-a-1.html"
+        },
+        {
+          "text": "담은 상품은 발주 목록에 쌓여요",
+          "html": "design/th-a-2.html"
+        }
+      ],
+      "images": [
+        "images/th-a-1.jpg",
+        "images/th-a-2.jpg"
+      ]
+    },
+    {
+      "id": "ig-b",
+      "channel": "instagram",
+      "at": "2026-11-19T16:00:00+09:00",
+      "text": "발주 넣기 전에, 냉동고에 뭐가 남았는지 먼저 보시나요?\n발주 문자를 쓰기 전에는 냉동고 안쪽에 남은 상품부터 떠올리게 됩니다.\n유통기한 매니저에서는 바코드로 등록해 둔 상품을 날짜 배지와 함께 목록으로 볼 수 있어요.\n발주는 같은 앱의 발주 관리에서 담습니다.\n목록과 날짜는 등록해 둔 내용을 기준으로 보여 드려요.\n플레이스토어에서 '유통기한 매니저'를 검색해 보세요.\n\n#아이스크림할인점 #무인아이스크림할인점 #재고관리 #발주관리 #유통기한매니저",
+      "slides": [
+        {
+          "text": "발주 넣기 전에,\n냉동고에 뭐가 남았는지\n먼저 보시나요?",
+          "html": "design/ig-b-1.html"
+        },
+        {
+          "text": "등록한 상품을\n날짜 배지와 함께 봐요",
+          "html": "design/ig-b-2.html"
+        },
+        {
+          "text": "목록은 목록대로 보고,\n발주는 같은 앱의 발주 관리에서 담아요",
+          "html": "design/ig-b-3.html"
+        },
+        {
+          "text": "플레이스토어에서\n'유통기한 매니저'를\n검색해 보세요",
+          "html": "design/ig-b-4.html"
+        }
+      ],
+      "images": [
+        "images/ig-b-1.jpg",
+        "images/ig-b-2.jpg",
+        "images/ig-b-3.jpg",
+        "images/ig-b-4.jpg"
+      ]
+    },
+    {
+      "id": "th-b",
+      "channel": "threads",
+      "at": "2026-11-19T16:00:00+09:00",
+      "text": "발주 넣기 전에, 냉동고에 뭐가 남았는지 먼저 보시나요?\n유통기한 매니저는 바코드로 등록해 둔 상품을 날짜 배지와 함께 목록으로 보여 줍니다.\n발주는 같은 앱의 발주 관리에서 담을 수 있어요.\n목록과 날짜는 등록해 둔 내용을 기준으로 보여 드려요.\n#재고관리\nhttps://play.google.com/store/apps/details?id=com.shlab.expirykeeper&referrer=utm_source%3Dthreads%26utm_medium%3Dpost%26utm_campaign%3Dwk1116",
+      "slides": [
+        {
+          "text": "등록한 상품을\n날짜 배지와 함께 봐요",
+          "html": "design/th-b-1.html"
+        }
+      ],
+      "images": [
+        "images/th-b-1.jpg"
+      ]
+    },
+    {
+      "id": "ig-c",
+      "channel": "instagram",
+      "at": "2026-11-21T16:00:00+09:00",
+      "text": "이번 달 버린 상품, 뭐가 제일 많았는지 기억나세요?\n월말이 되면 이번 달에 버린 것과 다 쓴 것이 머릿속에서 섞입니다.\n유통기한 매니저에서는 버린 것과 다 쓴 것을 기록해 두고 월별로 돌아볼 수 있어요.\n다음 달 발주를 정할 때 지난 기록을 함께 볼 수 있어요.\n플레이스토어에서 '유통기한 매니저'를 검색해 보세요.\n\n#아이스크림할인점 #무인아이스크림할인점 #폐기관리 #매장운영 #유통기한매니저",
+      "slides": [
+        {
+          "text": "이번 달 버린 상품,\n뭐가 제일 많았는지\n기억나세요?",
+          "html": "design/ig-c-1.html"
+        },
+        {
+          "text": "버린 것, 다 쓴 것을 기록해 두면\n월별로 돌아볼 수 있어요",
+          "html": "design/ig-c-2.html"
+        },
+        {
+          "text": "월별로 돌아보는 기록",
+          "html": "design/ig-c-3.html"
+        },
+        {
+          "text": "플레이스토어에서\n'유통기한 매니저'를\n검색해 보세요",
+          "html": "design/ig-c-4.html"
+        }
+      ],
+      "images": [
+        "images/ig-c-1.jpg",
+        "images/ig-c-2.jpg",
+        "images/ig-c-3.jpg",
+        "images/ig-c-4.jpg"
+      ]
+    },
+    {
+      "id": "th-c",
+      "channel": "threads",
+      "at": "2026-11-21T16:00:00+09:00",
+      "text": "이번 달 버린 상품, 뭐가 제일 많았는지 기억나세요?\n월말에는 버린 것과 다 쓴 것이 기억 속에서 섞이곤 합니다.\n유통기한 매니저에서는 버린 것과 다 쓴 것을 기록해 두고 월별로 돌아볼 수 있어요.\n#매장운영\nhttps://play.google.com/store/apps/details?id=com.shlab.expirykeeper&referrer=utm_source%3Dthreads%26utm_medium%3Dpost%26utm_campaign%3Dwk1116",
+      "slides": [
+        {
+          "text": "월별로 돌아보는 기록",
+          "html": "design/th-c-1.html"
+        }
+      ],
+      "images": [
+        "images/th-c-1.jpg"
+      ]
+    }
+  ]
+}
