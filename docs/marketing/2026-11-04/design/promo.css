@@ -3,7 +3,7 @@
 html, body { width: 1080px; height: 1350px; overflow: hidden; }
 body { position: relative; font-family: 'Pretendard', sans-serif; color: #1A1A1A; background: #F7F7F7;
        word-break: keep-all; letter-spacing: -0.03em; -webkit-font-smoothing: antialiased; }
-body.ice { background: #E2F3EC; }      /* wk1116 B: 연민트 - 10/28 ice(#E6F1F9)와 구분 */
+body.ice { background: #E2F3EC; }      /* wk1116 B: 연민트 - 10/28 ice(#E6F1F9)와 구분. wk1116 블로그 세트 보조색 1개: 사진 4장(blog-01~04) 모두 이 색 */
 body.butter { background: #FFF4D6; }   /* ig-3-2 보조색: 버터 노랑 */
 body.cream { background: #FAF4EA; }    /* ig-3-3 보조색: 주방 크림 */
 .abs { position: absolute; }
