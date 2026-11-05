@@ -1,0 +1,151 @@
+{
+  "approved": true,
+  "note": "wk1123 묶음(2026-11-05, 새 상품이 들어온 날 냉동고 앞에서). 원고: instagram-threads.md 훅 A 사용(훅 B는 같은 요일 다음 주 11/13·14·15 16:00에 별도 게시, PLAN 8-1 훅 비교). 게시 전 필수: 스토어판 앱 대조(설치본 버전, 홈 가격표 아이콘 여부, 바코드 검색·구역 칩 필터 동작) — BRIEF 5장. 카드는 실제 캡처(shots/w1123-*.jpg)가 없으면 앱 소스 재현(design/SOURCE-MAP.md)이며 '예시 데이터 · 실제와 다를 수 있어요' 라벨 필수. 인스타 프로필 링크는 게시 전 wk1123으로 교체. UTM은 wk1123. approved는 사장님만 true로 바꾼다.",
+  "items": [
+    {
+      "id": "ig-a",
+      "channel": "instagram",
+      "at": "2026-11-06T16:00:00+09:00",
+      "text": "새 상품이 들어온 날, 그 날짜는 어디에 적어 두세요?\n문을 닫기 전에 바코드를 대면 상품 등록 화면이 열려요.\n유통기한 매니저에서는 상품 이름, 유통기한, 수량, 카테고리(매장 위치)를 남겨 둘 수 있습니다.\n바코드가 안 읽히면 '바코드 없이 직접 입력'도 있어요.\n알림은 점주님이 등록해 둔 날짜를 기준으로 와요.\n플레이스토어에서 '유통기한 매니저'를 검색해 보세요.\n\n#아이스크림할인점 #무인아이스크림할인점 #입고관리 #바코드 #유통기한매니저",
+      "slides": [
+        {
+          "text": "새 상품이 들어온 날,\n그 날짜는 어디에\n적어 두세요?",
+          "html": "design/ig-a-1.html"
+        },
+        {
+          "text": "바코드를 대면\n상품 등록 화면이 열려요",
+          "html": "design/ig-a-2.html"
+        },
+        {
+          "text": "이름·날짜·위치를\n남겨 둘 수 있어요",
+          "html": "design/ig-a-3.html"
+        },
+        {
+          "text": "알림은 점주님이 등록해 둔\n날짜를 기준으로 와요\n바코드가 안 읽히면 '바코드 없이 직접 입력'도 있어요",
+          "html": "design/ig-a-4.html"
+        },
+        {
+          "text": "플레이스토어에서\n'유통기한 매니저'를\n검색해 보세요",
+          "html": "design/ig-a-5.html"
+        }
+      ],
+      "images": [
+        "images/ig-a-1.jpg",
+        "images/ig-a-2.jpg",
+        "images/ig-a-3.jpg",
+        "images/ig-a-4.jpg",
+        "images/ig-a-5.jpg"
+      ]
+    },
+    {
+      "id": "th-a",
+      "channel": "threads",
+      "at": "2026-11-06T16:00:00+09:00",
+      "text": "새 상품이 들어온 날, 그 날짜는 어디에 적어 두세요?\n문을 닫기 전에 바코드를 대면 상품 등록 화면이 열려요.\n유통기한 매니저에서는 이름, 유통기한, 수량, 카테고리(매장 위치)를 남겨 둘 수 있습니다.\n#입고관리\nhttps://play.google.com/store/apps/details?id=com.shlab.expirykeeper&referrer=utm_source%3Dthreads%26utm_medium%3Dpost%26utm_campaign%3Dwk1123",
+      "slides": [
+        {
+          "text": "바코드를 대면\n상품 등록 화면이 열려요",
+          "html": "design/th-a-1.html"
+        },
+        {
+          "text": "이름·날짜·위치를\n남겨 둘 수 있어요",
+          "html": "design/th-a-2.html"
+        }
+      ],
+      "images": [
+        "images/th-a-1.jpg",
+        "images/th-a-2.jpg"
+      ]
+    },
+    {
+      "id": "ig-b",
+      "channel": "instagram",
+      "at": "2026-11-07T16:00:00+09:00",
+      "text": "냉동고 날짜 알림, 아침 9시에 받는 게 좋을까요, 저녁에 받는 게 좋을까요?\n유통기한 매니저 설정에서는 알림 횟수와 알림 시간(시·분)을 직접 고를 수 있어요.\n횟수는 1~7회까지 고를 수 있고, 가장 많이 고르면 30일 전부터 알려 줍니다.\n알림은 점주님이 등록해 둔 날짜를 기준으로 와요.\n플레이스토어에서 '유통기한 매니저'를 검색해 보세요.\n\n#아이스크림할인점 #무인아이스크림할인점 #유통기한알림 #매장운영 #유통기한매니저",
+      "slides": [
+        {
+          "text": "냉동고 날짜 알림,\n아침 9시에 받는 게 좋을까요,\n저녁에 받는 게 좋을까요?",
+          "html": "design/ig-b-1.html"
+        },
+        {
+          "text": "횟수와 시각은\n직접 골라요",
+          "html": "design/ig-b-2.html"
+        },
+        {
+          "text": "횟수를 늘리면 더 일찍부터 알려요\n알림은 점주님이 등록해 둔\n날짜를 기준으로 와요",
+          "html": "design/ig-b-3.html"
+        },
+        {
+          "text": "플레이스토어에서\n'유통기한 매니저'를\n검색해 보세요",
+          "html": "design/ig-b-4.html"
+        }
+      ],
+      "images": [
+        "images/ig-b-1.jpg",
+        "images/ig-b-2.jpg",
+        "images/ig-b-3.jpg",
+        "images/ig-b-4.jpg"
+      ]
+    },
+    {
+      "id": "th-b",
+      "channel": "threads",
+      "at": "2026-11-07T16:00:00+09:00",
+      "text": "냉동고 날짜 알림, 아침 9시에 받는 게 좋을까요, 저녁에 받는 게 좋을까요?\n유통기한 매니저에서는 알림 횟수(1~7회)와 알림 시간을 직접 고를 수 있어요.\n알림은 점주님이 등록해 둔 날짜를 기준으로 와요.\n#유통기한알림\nhttps://play.google.com/store/apps/details?id=com.shlab.expirykeeper&referrer=utm_source%3Dthreads%26utm_medium%3Dpost%26utm_campaign%3Dwk1123",
+      "slides": [
+        {
+          "text": "횟수와 시각은\n직접 골라요",
+          "html": "design/th-b-1.html"
+        }
+      ],
+      "images": [
+        "images/th-b-1.jpg"
+      ]
+    },
+    {
+      "id": "ig-c",
+      "channel": "instagram",
+      "at": "2026-11-08T16:00:00+09:00",
+      "text": "이 상품 날짜 며칠이에요, 하고 누가 물으면 어디서 찾아보세요?\n유통기한 매니저 목록에서는 상품 이름이나 바코드로 검색할 수 있어요.\n카테고리에 구역 이름을 적어 두면 구역별로 걸러 보고, 유통기한순으로 정렬도 됩니다.\n목록과 날짜는 등록해 둔 내용을 기준으로 보여 드려요.\n플레이스토어에서 '유통기한 매니저'를 검색해 보세요.\n\n#아이스크림할인점 #무인아이스크림할인점 #냉동고정리 #냉동고날짜 #유통기한매니저",
+      "slides": [
+        {
+          "text": "이 상품 날짜 며칠이에요,\n하고 누가 물으면\n어디서 찾아보세요?",
+          "html": "design/ig-c-1.html"
+        },
+        {
+          "text": "상품 이름,\n바코드로 찾아요",
+          "html": "design/ig-c-2.html"
+        },
+        {
+          "text": "구역 이름을 적어 두면 구역별로 걸러 볼 수 있어요\n날짜 가까운 순으로 정렬도 돼요\n목록과 날짜는 등록해 둔 내용을 기준으로 보여 드려요",
+          "html": "design/ig-c-3.html"
+        },
+        {
+          "text": "플레이스토어에서\n'유통기한 매니저'를\n검색해 보세요",
+          "html": "design/ig-c-4.html"
+        }
+      ],
+      "images": [
+        "images/ig-c-1.jpg",
+        "images/ig-c-2.jpg",
+        "images/ig-c-3.jpg",
+        "images/ig-c-4.jpg"
+      ]
+    },
+    {
+      "id": "th-c",
+      "channel": "threads",
+      "at": "2026-11-08T16:00:00+09:00",
+      "text": "이 상품 날짜 며칠이에요, 하고 누가 물으면 어디서 찾아보세요?\n유통기한 매니저 목록에서는 상품 이름이나 바코드로 검색하고, 구역별로 걸러 볼 수 있어요.\n목록과 날짜는 등록해 둔 내용을 기준으로 보여 드려요.\n#냉동고정리\nhttps://play.google.com/store/apps/details?id=com.shlab.expirykeeper&referrer=utm_source%3Dthreads%26utm_medium%3Dpost%26utm_campaign%3Dwk1123",
+      "slides": [
+        {
+          "text": "상품 이름,\n바코드로 찾아요",
+          "html": "design/th-c-1.html"
+        }
+      ],
+      "images": [
+        "images/th-c-1.jpg"
+      ]
+    }
+  ]
+}
