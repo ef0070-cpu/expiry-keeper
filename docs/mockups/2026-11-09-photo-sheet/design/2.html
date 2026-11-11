@@ -1,0 +1,91 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Gamja+Flower&display=block" rel="stylesheet">
+<style>
+@font-face { font-family: 'MDI'; src: url(MaterialCommunityIcons.ttf); }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 1080px; height: 1350px; overflow: hidden; }
+body { position: relative; font-family: 'Pretendard', sans-serif; color: #1A1A1A; word-break: keep-all; letter-spacing: -0.03em; background: linear-gradient(180deg, #EDEFF2, #F7F7F7); -webkit-font-smoothing: antialiased; }
+.mi { font-family: 'MDI' !important; font-weight: 400; font-style: normal; line-height: 1; display: inline-block; letter-spacing: 0; }
+.h1 { position: absolute; left: 72px; right: 72px; top: 52px; font-size: 54px; font-weight: 800; letter-spacing: -0.05em; white-space: nowrap; }
+.h2 { position: absolute; left: 72px; right: 72px; top: 124px; font-size: 28px; font-weight: 500; color: #555; white-space: nowrap; }
+.tag { display: inline-block; vertical-align: middle; margin-left: 14px; padding: 4px 16px; border-radius: 999px; background: #1A1A1A; color: #fff; font-size: 24px; font-weight: 700; }
+.foot { position: absolute; left: 0; right: 0; bottom: 22px; text-align: center; font-size: 22px; color: #666; font-weight: 500; }
+.plabel { position: absolute; text-align: center; font-size: 30px; font-weight: 800; }
+.plabel.bad { color: #CC2222; } .plabel.good { color: #1B7F3B; }
+.phone { position: absolute; padding: 16px; border-radius: 56px; background: #16181B; box-shadow: 0 30px 60px rgba(20,30,50,.28), inset 0 0 0 2px #3A3F45; }
+.vp { position: relative; border-radius: 42px; overflow: hidden; background: #F7F7F7; }
+.app { position: absolute; left: 0; top: 0; transform-origin: 0 0; overflow: hidden; background: #F7F7F7;
+  font-family: 'Gamja Flower', 'Pretendard', sans-serif; font-weight: 400; letter-spacing: 0; color: #1A1A1A; line-height: 1.3; }
+.app * { font-family: inherit; }
+.app .mi { font-family: 'MDI' !important; }
+.sbar { height: 28px; background: #FFF; display: flex; align-items: center; justify-content: space-between; padding: 0 22px; font-size: 14px; position: relative; }
+.sbar .cam { position: absolute; left: 50%; top: 8px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: #16181B; }
+.sbar .ic { display: flex; gap: 4px; }
+.hdr { height: 56px; background: #FFF; display: flex; align-items: center; padding: 0 16px; gap: 20px; font-size: 25px; font-weight: 700; }
+.scrim { position: absolute; inset: 0; background: rgba(0,0,0,.55); z-index: 5; }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 6; background: #FFF; border-radius: 24px 24px 0 0; padding: 10px 18px 30px; }
+.handle { width: 44px; height: 5px; border-radius: 3px; background: #DDD; margin: 0 auto 10px; }
+.xbtn { position: absolute; right: 14px; top: 14px; z-index: 2; }
+.ttl { font-size: 22px; line-height: 26px; font-weight: 900; text-align: center; color: #1A1A1A; }
+.dsc { text-align: center; color: #333; font-size: 13.5px; line-height: 20px; margin-top: 6px; }
+.cam { position: relative; margin-top: 14px; width: 100%; border-radius: 18px; overflow: hidden; background: #2A2F33; }
+.cam.shot { background: #3C4349; }
+.cam .gv { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,.35); }
+.cam .gh { position: absolute; left: 0; right: 0; height: 1px; background: rgba(255,255,255,.35); }
+.cam .guide { position: absolute; top: 13%; left: 0; right: 0; text-align: center; color: #FFF; font-size: 15px; font-weight: bold; text-shadow: 0 0 4px rgba(0,0,0,.6); }
+.cam .cn { position: absolute; width: 34px; height: 34px; border: 0 solid #FFF; }
+.cam .shutter0 { position: absolute; left: 50%; top: 50%; margin: -42px 0 0 -42px; width: 84px; height: 84px; border-radius: 42px; background: rgba(0,0,0,.45); border: 3px solid rgba(255,255,255,.9); display: flex; flex-direction: column; align-items: center; justify-content: center; color: #FFF; font-size: 12px; font-weight: bold; }
+/* 일반 아이스크림 바 실루엣(단색, 상표·글자 없음) */
+.bar { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -52%); width: 1em; height: 1em; }
+.bar .body { position: absolute; left: .39em; top: .17em; width: .22em; height: .38em; border-radius: .11em .11em .035em .035em; background: #E7B7A4; box-shadow: inset .035em 0 0 rgba(255,255,255,.28), inset -.03em 0 0 rgba(0,0,0,.12); }
+.bar .stick { position: absolute; left: .4725em; top: .55em; width: .055em; height: .16em; border-radius: 0 0 .03em .03em; background: #C9A66B; }
+.bar .bite { position: absolute; left: .575em; top: .2em; width: .07em; height: .07em; border-radius: 50%; background: #2A2F33; }
+.cam.shot .bar .bite { background: #3C4349; }
+.btn { height: 56px; border-radius: 18px; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 18px; font-weight: 800; }
+.btn.red { background: #B81F26; color: #FFF; }
+.btn.line { border: 1.5px solid #222; color: #111; }
+.chk { display: flex; gap: 10px; align-items: flex-start; margin-top: 12px; }
+.chk .bx { width: 26px; height: 26px; border-radius: 6px; background: #1A1A1A; display: flex; align-items: center; justify-content: center; flex: none; }
+.chk .tx { flex: 1; font-size: 13.5px; line-height: 19px; color: #222; }
+.navbar { position: absolute; left: 0; right: 0; bottom: 0; height: 24px; display: flex; align-items: center; justify-content: center; z-index: 40; }
+.navbar i { width: 108px; height: 4px; border-radius: 2px; background: #1A1A1A; }
+/* 번호 표시·짚기 */
+.ring { position: absolute; border: 4px solid #FF002B; border-radius: 22px; box-shadow: 0 0 0 3px #FFF, 0 0 0 7px rgba(255,0,43,.25); z-index: 30; pointer-events: none; }
+.ring.round { border-radius: 999px; }
+.nb { position: absolute; z-index: 31; width: 48px; height: 48px; border-radius: 50%; background: #FF002B; color: #FFF; font-family: 'Pretendard', sans-serif !important; font-size: 30px; font-weight: 800; line-height: 48px; text-align: center; box-shadow: 0 0 0 4px #FFF, 0 4px 10px rgba(0,0,0,.35); letter-spacing: 0; }
+.nb.s { width: 40px; height: 40px; line-height: 40px; font-size: 25px; }
+.legend { position: absolute; left: 72px; right: 72px; }
+.lg { display: flex; align-items: center; gap: 18px; height: 60px; font-size: 29px; font-weight: 700; letter-spacing: -0.04em; white-space: nowrap; }
+.lg .nb { position: static; flex: none; }
+.lg.bad .nb { background: #FF002B; } .lg.good .nb { background: #1B7F3B; }
+.lg b { font-weight: 800; color: #CC2222; } .lg.good b { color: #1B7F3B; }
+</style></head><body>
+<div class="h1">개선안 A — 사진 등록 시트</div><div class="h2">셔터를 카메라 아래로, 버튼은 한 줄로<span class="tag">개선안 A</span></div><div class="phone" style="left:88px;top:205px;width:424px;height:792px"><div class="vp" style="width:392px;height:760px"><div class="app" style="width:392px;height:760px;transform:scale(1)">
+<div class="sbar"><span>9:41</span><i class="cam"></i><span class="ic"><span class="mi" style="font-size:14px;color:inherit;">&#xf08be;</span><span class="mi" style="font-size:14px;color:inherit;">&#xf0928;</span><span class="mi" style="font-size:14px;color:inherit;">&#xf0081;</span></span></div>
+<div class="hdr"><span class="mi" style="font-size:24px;color:inherit;">&#xf0141;</span><span>상품 등록</span></div>
+<div class="scrim"></div><div class="sheet"><div class="handle"></div><div class="xbtn"><span class="mi" style="font-size:28px;color:#222;">&#xf0156;</span></div>
+<div class="ttl">📷 상품 사진 직접 등록</div>
+<div class="dsc">바코드를 찍었으나 아직 등록된 이미지가 없어요.<br>이름과 바코드에 맞는 상품 사진을 직접 찍어 등록해 주세요!</div><div class="cam " style="height:304px">
+<div class="bar" style="font-size:304px"><div class="body"></div><div class="stick"></div><div class="bite"></div></div><div class="gv" style="left:33.333333333333336%"></div><div class="gh" style="top:33.333333333333336%"></div><div class="gv" style="left:66.66666666666667%"></div><div class="gh" style="top:66.66666666666667%"></div><div class="guide">여기에 상품을 맞춰주세요</div>
+<div class="cn" style="left:16px;top:16px;border-left-width:3px;border-top-width:3px;border-top-left-radius:10px"></div>
+<div class="cn" style="right:16px;top:16px;border-right-width:3px;border-top-width:3px;border-top-right-radius:10px"></div>
+<div class="cn" style="left:16px;bottom:16px;border-left-width:3px;border-bottom-width:3px;border-bottom-left-radius:10px"></div>
+<div class="cn" style="right:16px;bottom:16px;border-right-width:3px;border-bottom-width:3px;border-bottom-right-radius:10px"></div></div><div id="srow" style="position:relative;height:72px;margin-top:14px;display:flex;justify-content:center;align-items:center">
+<div class="btn line" style="position:absolute;left:0;top:8px;width:56px;gap:0"><span class="mi" style="font-size:28px;color:#111;">&#xf0976;</span></div>
+<div style="width:72px;height:72px;border-radius:36px;background:#B81F26;border:4px solid #FFF;box-shadow:0 0 0 3px #B81F26;display:flex;align-items:center;justify-content:center"><span class="mi" style="font-size:30px;color:#FFF;">&#xf0100;</span></div></div><div class="chk"><div class="bx"><span class="mi" style="font-size:18px;color:#FFF;">&#xf012c;</span></div><div class="tx">내가 촬영한 사진을 다른 사장님들과 함께 공유하고 서비스에 사용하는 데 동의합니다</div></div><div class="nb" style="left:172px;top:239px">1</div><div class="ring round" style="left:148px;top:417px;width:96px;height:96px"></div><div class="ring " style="left:12px;top:431px;width:68px;height:68px"></div><div class="nb" style="left:252px;top:420px">2</div><div class="ring " style="left:14px;top:109px;width:364px;height:308px"></div><div class="nb" style="left:338px;top:405px">4</div></div><div class="navbar"><i></i></div></div></div></div><div class="phone" style="left:568px;top:205px;width:424px;height:792px"><div class="vp" style="width:392px;height:760px"><div class="app" style="width:392px;height:760px;transform:scale(1)">
+<div class="sbar"><span>9:41</span><i class="cam"></i><span class="ic"><span class="mi" style="font-size:14px;color:inherit;">&#xf08be;</span><span class="mi" style="font-size:14px;color:inherit;">&#xf0928;</span><span class="mi" style="font-size:14px;color:inherit;">&#xf0081;</span></span></div>
+<div class="hdr"><span class="mi" style="font-size:24px;color:inherit;">&#xf0141;</span><span>상품 등록</span></div>
+<div class="scrim"></div><div class="sheet"><div class="handle"></div><div class="xbtn"><span class="mi" style="font-size:28px;color:#222;">&#xf0156;</span></div>
+<div class="ttl">📷 상품 사진 직접 등록</div>
+<div class="dsc">바코드를 찍었으나 아직 등록된 이미지가 없어요.<br>이름과 바코드에 맞는 상품 사진을 직접 찍어 등록해 주세요!</div><div class="cam shot" style="height:304px">
+<div class="bar" style="font-size:304px"><div class="body"></div><div class="stick"></div><div class="bite"></div></div>
+<div class="cn" style="left:16px;top:16px;border-left-width:3px;border-top-width:3px;border-top-left-radius:10px"></div>
+<div class="cn" style="right:16px;top:16px;border-right-width:3px;border-top-width:3px;border-top-right-radius:10px"></div>
+<div class="cn" style="left:16px;bottom:16px;border-left-width:3px;border-bottom-width:3px;border-bottom-left-radius:10px"></div>
+<div class="cn" style="right:16px;bottom:16px;border-right-width:3px;border-bottom-width:3px;border-bottom-right-radius:10px"></div></div><div style="display:flex;gap:10px;margin-top:14px"><div class="btn line" style="flex:1"><span class="mi" style="font-size:22px;color:#111;">&#xf099b;</span><span>다시 찍기</span></div><div class="btn red" style="flex:1.6"><span class="mi" style="font-size:22px;color:#FFF;">&#xf012c;</span><span>저장하기</span></div></div><div class="chk"><div class="bx"><span class="mi" style="font-size:18px;color:#FFF;">&#xf012c;</span></div><div class="tx">내가 촬영한 사진을 다른 사장님들과 함께 공유하고 서비스에 사용하는 데 동의합니다</div></div><div class="ring " style="left:12px;top:423px;width:368px;height:68px"></div><div class="nb" style="left:326px;top:398px">3</div></div><div class="navbar"><i></i></div></div></div></div><div class="legend" style="top:1019px">
+<div class="lg good"><div class="nb">1</div><span>가운데 큰 셔터를 없애 <b>상품이 안 가려짐</b></span></div>
+<div class="lg good"><div class="nb">2</div><span>큰 빨간 셔터 + 갤러리를 <b>한 줄로</b> 합쳐 시트가 짧아짐</span></div>
+<div class="lg good"><div class="nb">3</div><span>촬영 후 <b>[다시 찍기] [저장하기]</b> 한 줄, 문구는 ‘저장하기’</span></div>
+<div class="lg good"><div class="nb">4</div><span>카메라 높이를 <b>폭 비율·화면 40% 중 작은 쪽</b>으로 제한</span></div></div>
+<div class="foot">기기 화면이 아니라 앱 소스(PhotoCaptureSheet.tsx) 기준 재현이며 일부 값은 추정입니다</div></body></html>

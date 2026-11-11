@@ -51,7 +51,7 @@
 
 - **훅 B는 같은 요일 다음 주(11/13·14·15) 16:00**에 별도 게시(PLAN 8-1 훅 비교). `publish.json`에는 아직 없다. 훅 A·B를 같은 날 올리지 않는다.
 - 게시 순서는 11/06 정오 전에 승인해야 한다(승인이 늦으면 시각을 고쳐 다시 승인). 자동 게시는 예정 시각 3시간 안에만 올라가고 PC가 켜져 있어야 한다.
-- [ ] **인스타·스레드 프로필 링크를 wk1123으로 교체**(모바일 앱, 11/06 전). 인스타: https://play.google.com/store/apps/details?id=com.shlab.expirykeeper&referrer=utm_source%3Dinstagram%26utm_medium%3Dfeed%26utm_campaign%3Dwk1123 / 스레드: ...utm_source%3Dthreads%26utm_medium%3Dpost%26utm_campaign%3Dwk1123
+- [x] **인스타 프로필 링크 wk1123 교체 완료**(11/06 오전 사장님). **스레드 프로필 링크는 앱이 기본 주소까지 거부해 보류**(선택 사항 — 스레드 글 본문 링크에 wk1123이 있어 집계 영향 없음, 나중에 앱 재시작·업데이트 후 재시도 또는 PC 웹). 원래 항목: 인스타·스레드 프로필 링크를 wk1123으로 교체(모바일 앱, 11/06 전). 인스타: https://play.google.com/store/apps/details?id=com.shlab.expirykeeper&referrer=utm_source%3Dinstagram%26utm_medium%3Dfeed%26utm_campaign%3Dwk1123 / 스레드: ...utm_source%3Dthreads%26utm_medium%3Dpost%26utm_campaign%3Dwk1123
 - [ ] 카드·사진을 GitHub에 커밋·푸시(Meta가 주소로 가져감) → `node scripts/publish-promo.mjs` 미리보기가 전부 ✓인지 확인 → 승인
 - [ ] 게시 때 원고의 `[훅 A]/[훅 B]` 표기, `(공통 본문)` 줄, 괄호 지시는 빼고 훅 한 줄+본문+태그/링크만. 스레드는 올린 뒤 15분 안에만 수정 가능
 
