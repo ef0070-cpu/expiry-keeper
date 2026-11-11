@@ -4,7 +4,7 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import * as Linking from 'expo-linking';
 import { useEffect, useRef, useState } from 'react';
-import { Modal, Pressable, Text, View } from 'react-native';
+import { Modal, Pressable, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { persistLocalPhoto } from '@/lib/local-photo';
 import { setPhotoPrivate } from '@/lib/photo-privacy';
@@ -29,6 +29,9 @@ export default function PhotoCaptureSheet({
   onDone: (uri: string) => void;
 }) {
   const insets = useSafeAreaInsets();
+  const { width: winW, height: winH } = useWindowDimensions();
+  // 카메라 높이: 폭 기준 비율(1.08)과 화면 높이의 40% 중 작은 쪽. 큰 화면·가로 모드에서도 아래 버튼이 화면 안에 들어오게 한다
+  const camH = Math.min((winW - 36) / 1.08, winH * 0.4);
   const [permission, requestPermission] = useCameraPermissions();
   const camRef = useRef<CameraView>(null);
   const [shot, setShot] = useState<string | null>(null);
@@ -101,7 +104,7 @@ export default function PhotoCaptureSheet({
             바코드를 찍었으나 아직 등록된 이미지가 없어요.{'\n'}이름과 바코드에 맞는 상품 사진을 직접 찍어 등록해 주세요!
           </Text>
 
-          <View style={{ marginTop: 14, width: '100%', aspectRatio: 1.08, borderRadius: 18, overflow: 'hidden', backgroundColor: '#2A2F33' }}>
+          <View style={{ marginTop: 14, width: '100%', height: camH, borderRadius: 18, overflow: 'hidden', backgroundColor: '#2A2F33' }}>
             {shot ? (
               <Image source={{ uri: shot }} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }} contentFit="cover" />
             ) : permission?.granted ? (
@@ -120,29 +123,6 @@ export default function PhotoCaptureSheet({
                 >
                   여기에 상품을 맞춰주세요
                 </Text>
-                <Pressable
-                  onPress={shoot}
-                  accessibilityRole="button"
-                  accessibilityLabel="셔터"
-                  style={{
-                    position: 'absolute',
-                    left: '50%',
-                    top: '50%',
-                    marginLeft: -42,
-                    marginTop: -42,
-                    width: 84,
-                    height: 84,
-                    borderRadius: 42,
-                    backgroundColor: 'rgba(0,0,0,0.45)',
-                    borderWidth: 3,
-                    borderColor: 'rgba(255,255,255,0.9)',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <MaterialCommunityIcons name="camera" size={28} color="#FFFFFF" />
-                  <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: 'bold' }}>셔터</Text>
-                </Pressable>
               </>
             ) : (
               <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 }}>
@@ -158,44 +138,92 @@ export default function PhotoCaptureSheet({
             <View pointerEvents="none" style={{ ...CORNER, right: 16, bottom: 16, borderRightWidth: 3, borderBottomWidth: 3, borderBottomRightRadius: 10 }} />
           </View>
 
-          <Pressable
-            onPress={shot ? register : shoot}
-            disabled={busy || (!shot && !permission?.granted)}
-            accessibilityRole="button"
-            style={({ pressed }) => ({
-              marginTop: 12,
-              height: 56,
-              borderRadius: 18,
-              backgroundColor: '#B81F26',
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 8,
-              opacity: pressed || busy || (!shot && !permission?.granted) ? 0.6 : 1,
-            })}
-          >
-            <MaterialCommunityIcons name={shot ? 'check' : 'camera'} size={22} color="#FFFFFF" />
-            <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '800' }}>{shot ? '이 사진으로 등록' : '사진 촬영하기'}</Text>
-          </Pressable>
-          <Pressable
-            onPress={shot ? () => setShot(null) : fromGallery}
-            accessibilityRole="button"
-            style={({ pressed }) => ({
-              marginTop: 10,
-              height: 56,
-              borderRadius: 18,
-              borderWidth: 1.5,
-              borderColor: '#222222',
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 8,
-              opacity: pressed ? 0.6 : 1,
-            })}
-          >
-            <MaterialCommunityIcons name={shot ? 'restore' : 'image-outline'} size={22} color="#111111" />
-            <Text style={{ color: '#111111', fontSize: 18, fontWeight: '800' }}>{shot ? '다시 찍기' : '갤러리에서 선택'}</Text>
-          </Pressable>
+          {shot ? (
+            // 촬영 후: 한 줄에 [다시 찍기] [저장하기]
+            <View style={{ marginTop: 12, flexDirection: 'row', gap: 10 }}>
+              <Pressable
+                onPress={() => setShot(null)}
+                accessibilityRole="button"
+                accessibilityLabel="다시 찍기"
+                style={({ pressed }) => ({
+                  flex: 1,
+                  height: 56,
+                  borderRadius: 18,
+                  borderWidth: 1.5,
+                  borderColor: '#222222',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  opacity: pressed ? 0.6 : 1,
+                })}
+              >
+                <MaterialCommunityIcons name="restore" size={22} color="#111111" />
+                <Text style={{ color: '#111111', fontSize: 17, fontWeight: '800' }}>다시 찍기</Text>
+              </Pressable>
+              <Pressable
+                onPress={register}
+                accessibilityRole="button"
+                accessibilityLabel="저장하기"
+                style={({ pressed }) => ({
+                  flex: 1.4,
+                  height: 56,
+                  borderRadius: 18,
+                  backgroundColor: '#B81F26',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  opacity: pressed ? 0.6 : 1,
+                })}
+              >
+                <MaterialCommunityIcons name="check" size={22} color="#FFFFFF" />
+                <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '800' }}>저장하기</Text>
+              </Pressable>
+            </View>
+          ) : (
+            // 촬영 전: 카메라 아래 가운데 셔터, 왼쪽에 갤러리 (일반 카메라 앱 배치 — 셔터가 상품을 가리지 않는다)
+            <View style={{ marginTop: 12, height: 80, alignItems: 'center', justifyContent: 'center' }}>
+              <Pressable
+                onPress={fromGallery}
+                accessibilityRole="button"
+                accessibilityLabel="갤러리에서 선택"
+                style={({ pressed }) => ({
+                  position: 'absolute',
+                  left: 0,
+                  width: 56,
+                  height: 56,
+                  borderRadius: 18,
+                  borderWidth: 1.5,
+                  borderColor: '#222222',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: pressed ? 0.6 : 1,
+                })}
+              >
+                <MaterialCommunityIcons name="image-outline" size={26} color="#111111" />
+              </Pressable>
+              <View style={{ width: 80, height: 80, borderRadius: 40, borderWidth: 3, borderColor: '#B81F26', alignItems: 'center', justifyContent: 'center' }}>
+                <Pressable
+                  onPress={shoot}
+                  disabled={busy || !permission?.granted}
+                  accessibilityRole="button"
+                  accessibilityLabel="사진 촬영하기"
+                  style={({ pressed }) => ({
+                    width: 64,
+                    height: 64,
+                    borderRadius: 32,
+                    backgroundColor: '#B81F26',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    opacity: pressed || busy || !permission?.granted ? 0.6 : 1,
+                  })}
+                >
+                  <MaterialCommunityIcons name="camera" size={28} color="#FFFFFF" />
+                </Pressable>
+              </View>
+            </View>
+          )}
           <Pressable
             onPress={() => setAgreed((v) => !v)}
             accessibilityRole="checkbox"
