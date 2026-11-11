@@ -21,6 +21,7 @@ import SummaryHeader from '@/components/SummaryHeader';
 import { lookupBarcode } from '@/lib/barcode-lookup';
 import { SIGNAL_ORDER, SIGNAL_TITLES, SIGNAL_BG, SignalKey, daysUntil, signalOf } from '@/lib/dates';
 import { cancelExpiryAlerts } from '@/lib/notifications';
+import { nextCategorySelection } from '@/lib/category-select';
 import { matchesSearch } from '@/lib/korean-search';
 import { deleteProduct, listProducts, resolveProduct } from '@/lib/repo';
 import { useAppMode } from '@/lib/settings';
@@ -32,6 +33,8 @@ export default function Dashboard() {
   const [products, setProducts] = useState<Product[]>([]);
   const [query, setQuery] = useState('');
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
+  // 구역 칩 '여러 개' 모드 — 기본은 칩을 누르면 그 구역 하나만 선택(category-select.ts)
+  const [multiCategory, setMultiCategory] = useState(false);
   const [signalFilter, setSignalFilter] = useState<SignalKey | null>(null);
   const [sortBy, setSortBy] = useState<'expiry' | 'name'>('expiry');
   const [refreshing, setRefreshing] = useState(false);
@@ -135,12 +138,13 @@ export default function Dashboard() {
   }, [scannedBarcode, query, products]);
 
   const toggleCategory = (c: string) => {
-    setSelectedCategories((prev) => {
-      const next = new Set(prev);
-      if (next.has(c)) next.delete(c);
-      else next.add(c);
-      return next;
-    });
+    setSelectedCategories((prev) => nextCategorySelection(prev, c, multiCategory));
+  };
+
+  // '여러 개' 토글: 켜면 지금 선택을 그대로 두고 여러 개를 고르게 하고, 끄면 '전체'로 돌아간다
+  const toggleMultiCategory = () => {
+    if (multiCategory) setSelectedCategories(new Set());
+    setMultiCategory((v) => !v);
   };
 
   const confirmDelete = useCallback(
@@ -305,11 +309,13 @@ export default function Dashboard() {
             active={selectedCategories.size === 0}
             onPress={() => setSelectedCategories(new Set())}
           />
+          <Chip label="여러 개" icon="view-grid-plus-outline" active={multiCategory} onPress={toggleMultiCategory} />
           {categories.map((c) => (
             <Chip
               key={c}
               label={c}
               active={selectedCategories.has(c)}
+              icon={multiCategory && selectedCategories.has(c) ? 'check' : undefined}
               onPress={() => toggleCategory(c)}
             />
           ))}
