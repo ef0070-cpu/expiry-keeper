@@ -2,6 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Alert, FlatList, Pressable, Text, View } from 'react-native';
+import HomeBanner from '@/components/HomeBanner';
 import ProductCard from '@/components/ProductCard';
 import { daysUntil, signalOf, SIGNAL_BG, todayStr } from '@/lib/dates';
 import { cancelExpiryAlerts } from '@/lib/notifications';
@@ -358,6 +359,8 @@ export default function CalendarScreen() {
           contentContainerStyle={{ paddingBottom: 24 }}
         />
       </View>
+      {/* 하단 배너: 다른 화면과 같이 광고 제거(평생 결제·구독·테스터)는 안 보임. 안 보이면 null이라 60:40 배치 그대로 */}
+      <HomeBanner />
     </View>
   );
 }
