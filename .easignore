@@ -1,0 +1,62 @@
+# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+
+# dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# local env files
+.env
+.env*.local
+
+# typescript
+*.tsbuildinfo
+
+# build artifacts (regenerate via eas build)
+*.apk
+*.aab
+
+# Supabase CLI local state
+supabase/.temp/
+
+example
+
+# generated native folders
+/ios
+/android
+
+# superpowers subagent-driven-development scratch workspace
+.superpowers/
+
+# git worktrees for isolated feature work
+.claude/worktrees/
+.private/
+
+# EAS 업로드 전용 — Claude 스킬 링크 폴더(Windows에서 링크 복사 권한 오류 EPERM, 앱과 무관)
+.agents/
+.claude/skills/
